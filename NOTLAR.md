@@ -404,3 +404,17 @@ Kullanıcının onayladığı taslağa göre `app.py` yeniden düzenlendi; iş m
 - Liste indirme yine yalnızca "indirmeye hazırla" düğmesiyle (IDM sorunu).
 - Ayrı portta kopya veriyle görsel kontrol yapıldı; indirme tetiklenmedi. AppTest güncellendi (3 sekme, ana düğme,
   özet kutuları). Python 3.9.13 ile **79 test geçti**. README kullanım adımları yeni düzene göre güncellendi.
+
+## Ücretsiz deneme düğmesi ve liste indirme (2026-11-06)
+- **🧪 Ücretsiz dene** (`pipeline.free_check`): KAP + haber siteleri + fiyatlar toplanır, yapay zekâ HİÇ çağrılmaz
+  (`update_all(analyze=False)`); OpenAI kredisi harcanmaz. Sonunda sıradaki haber sayısı ve bir sonraki gerçek
+  güncellemenin tahmini maliyeti gösterilir (`estimate_next_run`: girdi metin uzunluğundan, çıktı bu bilgisayardaki
+  geçmiş ortalamadan; alt sınır ikinci görüşsüz, üst sınır her habere ikinci görüş).
+- Liste CSV'si Türkçe başlıklı (Hisse, Şirket, Sinyal, Kontrol, Skor, Haber sayısı, Son 1/5 gün %, Son haber özeti).
+- Düğme sonrası sayfa yenilenmeden önce veritabanı bağlantısı kapatılıyor (önceden her tıklamada açık bağlantı kalıyordu;
+  Windows'ta test dosyası silinemiyordu).
+- Kullanıcının ilk gerçek güncellemesi (17:34): 10 haber işlendi (4 analiz, 6 ön elemede elendi), ~0.045 USD;
+  65 haber sırada. **Gözlem:** Sıra en eski haberden başlıyor; bu turda dünkü BloombergHT haberleri işlendi, bugünkü
+  KAP bildirimleri bekliyor. SOKM "pozitif" ama aynı gün fiyat %-10 (taban) — fiyat ters yönde hareket ettiğinde
+  uyarı gösterilmesi ileride değerlendirilebilir (eşik/skor değişikliği değil, bilgi notu).
+- AppTest: ücretsiz düğme tıklanır, yapay zekâ çağrılırsa test düşer. Python 3.9.13 ile **80 test geçti**.

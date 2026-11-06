@@ -444,6 +444,16 @@ class PanelTests(unittest.TestCase):
                 self.assertTrue(any("Gelişmiş" in tab.label for tab in at.tabs))
                 self.assertTrue(any("Geçmiş veri pilotu" in m.value for m in at.markdown))
                 self.assertTrue(any(b.label == "🔄 Haberleri güncelle" for b in at.button))
+                # Ücretsiz deneme: toplama ağ gerektirdiği için sahte; yapay zekâ çağrılırsa test düşer.
+                from bist_haber import analyzer, pipeline
+                fake = {"free": True, "kap": {"new": 3}, "rss": {"new": 1},
+                        "estimate": {"waiting": 4, "next_count": 4, "low_usd": 0.01, "high_usd": 0.03}}
+                with patch.object(pipeline, "free_check", return_value=fake) as free, \
+                        patch.object(analyzer, "analyze", side_effect=AssertionError("kredi harcanmamalı")):
+                    at.button(key="free_check").click().run(timeout=30)
+                free.assert_called_once()
+                self.assertEqual(len(at.exception), 0, str(at.exception))
+                self.assertTrue(any("kredi harcanmadı" in i.value for i in at.info))
                 self.assertEqual([m.label for m in at.metric][:3], ["Olumlu haber", "Olumsuz haber", "Son güncelleme"])
                 at.run(timeout=30)
                 self.assertEqual(len(at.exception), 0)

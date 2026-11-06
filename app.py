@@ -79,6 +79,7 @@ if not pipeline.has_api_key():
     key = k1.text_input("OpenAI API anahtarı", type="password", placeholder="sk-...", label_visibility="collapsed")
     if k2.button("Anahtarı kaydet", use_container_width=True) and key.strip():
         pipeline.save_api_key(key)
+        conn.close()  # sayfa yenilenmeden önce bağlantıyı bırak (aksi hâlde açık kalıyordu)
         st.rerun()
 
 with st.expander("⚙️ Ayarlar"):
@@ -100,9 +101,32 @@ if h2.button("🔄 Haberleri güncelle", type="primary", use_container_width=Tru
         st.session_state["last_result"] = res
     except Exception as e:
         st.error(f"Güncelleme tamamlanamadı: {e}")
+    conn.close()  # sayfa yenilenmeden önce bağlantıyı bırak (aksi hâlde açık kalıyordu)
+    st.rerun()
+
+if h2.button("🧪 Ücretsiz dene", use_container_width=True, key="free_check",
+             help="Haberleri ve fiyatları toplar ama yapay zekâyı çağırmaz; OpenAI kredisi harcanmaz. "
+                  "Bir sonraki gerçek güncellemenin yaklaşık maliyetini gösterir."):
+    bar = st.progress(0.0, text="Başlıyor (yapay zekâ kullanılmayacak)...")
+    try:
+        res = pipeline.free_check(conn, days=days, analysis_limit=analysis_limit,
+                                  progress=lambda m, p: bar.progress(min(p, 1.0), text=m))
+        st.session_state["last_result"] = res
+    except Exception as e:
+        st.error(f"Ücretsiz deneme tamamlanamadı: {e}")
+    conn.close()  # sayfa yenilenmeden önce bağlantıyı bırak (aksi hâlde açık kalıyordu)
     st.rerun()
 
 last = st.session_state.get("last_result", {})
+if last.get("free"):
+    est = last.get("estimate", {})
+    new_kap = last.get("kap", {}).get("new", 0)
+    new_rss = last.get("rss", {}).get("new", 0)
+    st.info(f"🧪 Ücretsiz deneme tamamlandı — yapay zekâ çağrılmadı, kredi harcanmadı. "
+            f"KAP'ta {new_kap}, haber sitelerinde {new_rss} yeni kayıt bulundu. "
+            f"Sırada {est.get('waiting', 0)} haber var; bir sonraki **Haberleri güncelle** bunların "
+            f"{est.get('next_count', 0)} tanesini analiz eder (tahmini maliyet "
+            f"{est.get('low_usd', 0):.3f}–{est.get('high_usd', 0):.3f} $).")
 if last:
     if last.get("kap", {}).get("rate_limited"):
         st.warning("KAP geçici olarak istek sınırı uyguladı; kalan bildirimler bir sonraki güncellemede okunacak.")
@@ -178,13 +202,19 @@ with tab_list:
         st.caption("Bir hisseye tıklayınca haberin özeti, nedeni ve kaynağı açılır. "
                    "✅ Teyitli: iki ayrı analiz aynı sonuca vardı · ⚠️ Kontrol et: analizler çelişti ya da emin değil.")
         if st.session_state.get("signals_export_ready"):
-            frame = pd.DataFrame(rows)[["ticker", "name", "signal", "score", "news_count", "chg_1d", "chg_5d", "last_news"]]
+            frame = pd.DataFrame(rows)
+            frame["kontrol"] = frame["flags"].map(check_badge).str.replace("✅ ", "").str.replace("⚠️ ", "")
+            frame = frame[["ticker", "name", "signal", "kontrol", "score", "news_count", "chg_1d", "chg_5d", "last_news"]]
+            frame.columns = ["Hisse", "Şirket", "Sinyal", "Kontrol", "Skor", "Haber sayısı",
+                             "Son 1 gün %", "Son 5 gün %", "Son haber özeti"]
+            frame = frame.round({"Skor": 2, "Son 1 gün %": 1, "Son 5 gün %": 1})
             st.download_button("⬇️ Listeyi indir (Excel uyumlu CSV)", frame.to_csv(index=False).encode("utf-8-sig"),
                                file_name=f"halley_liste_{datetime.now(config.TR_TZ).date()}.csv", mime="text/csv",
                                key="signals_download")
         elif st.button("⬇️ Listeyi indirmeye hazırla", key="signals_export_prepare"):
             # Dosya yalnızca istenince hazırlanır (indirme yöneticileri hazır dosyayı kendiliğinden indirebiliyor).
             st.session_state["signals_export_ready"] = True
+            conn.close()  # sayfa yenilenmeden önce bağlantıyı bırak (aksi hâlde açık kalıyordu)
             st.rerun()
 
 # ---------------- Haberler ----------------

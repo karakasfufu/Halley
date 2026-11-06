@@ -57,3 +57,37 @@ def update_all(conn, days: int = 1, progress: Optional[Progress] = None, analyze
         out["prices"] = {"hata": str(e)}
     say("Tamamlandı.", 1.0)
     return out
+
+
+# Tahmin için fiyat varsayımı (gpt-5-mini, 2026-11-06): 1M girdi tokenı 0.25 USD, 1M çıktı tokenı 2 USD.
+INPUT_USD_PER_TOKEN = 0.25 / 1_000_000
+OUTPUT_USD_PER_TOKEN = 2.0 / 1_000_000
+
+
+def estimate_next_run(conn, analysis_limit: int = 10) -> Dict[str, float]:
+    """Bir sonraki "Haberleri güncelle"nin yaklaşık maliyeti. Yapay zekâ çağrılmaz.
+
+    Girdi tokenı metin uzunluğundan, çıktı tokenı bu bilgisayardaki geçmiş analizlerin ortalamasından
+    (yoksa ihtiyatlı 4000) tahmin edilir. Alt sınır ikinci görüşsüz, üst sınır her habere ikinci görüş
+    alınmış ve tüm haber siteleri ön elemeyi geçmiş gibi hesaplanır.
+    """
+    rows = analyzer.pending(conn, analysis_limit)
+    f_tok, a_tok = analyzer.estimate(rows)
+    avg_out = conn.execute("SELECT AVG(output_tokens) FROM analyses WHERE stage='full' AND output_tokens>0").fetchone()[0]
+    avg_out = float(avg_out or 4000)
+    n = len(rows)
+    low = (f_tok + a_tok) * INPUT_USD_PER_TOKEN + n * avg_out * OUTPUT_USD_PER_TOKEN
+    high = (f_tok + 2 * a_tok) * INPUT_USD_PER_TOKEN + 2 * n * avg_out * OUTPUT_USD_PER_TOKEN
+    return {"next_count": n, "waiting": len(analyzer.pending(conn)), "low_usd": low, "high_usd": high}
+
+
+def free_check(conn, days: int = 1, progress: Optional[Progress] = None, analysis_limit: int = 10) -> Dict[str, dict]:
+    """Ücretsiz deneme: haberleri ve fiyatları toplar, yapay zekâyı HİÇ çağırmaz.
+
+    Toplama (KAP, haber siteleri) ve fiyat servisi ücretsizdir; OpenAI kredisi harcanmaz. Sonunda
+    bir sonraki gerçek güncellemede kaç haberin analiz edileceği ve yaklaşık maliyeti gösterilir.
+    """
+    out = update_all(conn, days=days, progress=progress, analyze=False, analysis_limit=analysis_limit)
+    out["estimate"] = estimate_next_run(conn, analysis_limit)
+    out["free"] = True
+    return out

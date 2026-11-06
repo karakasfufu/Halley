@@ -279,3 +279,27 @@ class PromptRuleTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FreeCheckTests(unittest.TestCase):
+    def test_free_check_never_calls_ai_and_estimates_cost(self):
+        from bist_haber import pipeline
+        conn = memory_db()
+        add_news(conn, nid="kap:1", body="Sözleşme bedeli 10 milyon TL. " * 20)
+        add_news(conn, nid="kap:2", body="Yeni yatırım kararı alındı. " * 20)
+        with patch.object(pipeline, "universe", return_value={"TEST": "Deneme"}), \
+                patch.object(kap, "collect", return_value={"new": 2}), \
+                patch.object(kap, "fetch_missing_bodies", return_value={}), \
+                patch("bist_haber.rss.collect", return_value={"new": 0}), \
+                patch("bist_haber.prices.update", return_value=0), \
+                patch.object(analyzer, "analyze", side_effect=AssertionError("Ücretsiz denemede yapay zekâ çağrılmamalı")), \
+                patch.object(analyzer, "LLM", side_effect=AssertionError("Ücretsiz denemede istemci kurulmamalı")), \
+                patch.object(pipeline, "has_api_key", return_value=True):
+            out = pipeline.free_check(conn, analysis_limit=10)
+        self.assertTrue(out["free"])
+        self.assertNotIn("analyze", out)
+        est = out["estimate"]
+        self.assertEqual(est["next_count"], 2)
+        self.assertGreater(est["high_usd"], est["low_usd"])
+        self.assertGreater(est["low_usd"], 0)
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM analyses").fetchone()[0], 0)
