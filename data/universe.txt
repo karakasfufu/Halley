@@ -1,0 +1,3 @@
+# Takip edilecek hisse kodları, her satıra bir tane (ör. THYAO).
+# Bu dosyada hiç kod yoksa KAP'taki tüm şirketler takip edilir.
+# Endeks bileşimi zamanla değişir; geçmişe dönük testte o tarihteki liste kullanılmalı (NOTLAR.md, Dipnot 1).
