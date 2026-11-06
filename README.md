@@ -95,6 +95,8 @@ tarihli şirket büyüklüğü bağlamı, zaman sıralı ayrı doğrulama dönem
 
 ## Geliştirmeye devam edecek kişi / yapay zekâ için
 
+**Güncel devir:** [DEVIR.md](DEVIR.md). README, NOTLAR ve devir dosyasını kod değiştirmeden birlikte okuyun.
+
 **Kullanıcı:** Türkçe konuşuyor, Python bilmiyor; arayüzü çıktıya bakarak yönlendiriyor. Vade: birkaç günlük/haftalık
 swing. Emirleri Midas'tan elle giriyor (otomatik emir yok, Faz 6 iptal). Model **gpt-5-mini** olmalı (kullanıcının açık isteği).
 
