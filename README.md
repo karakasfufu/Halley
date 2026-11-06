@@ -8,12 +8,15 @@ kendiniz girersiniz. Çıktı yatırım tavsiyesi değildir.
 
 1. Bilgisayarda Python 3.9 veya üstü kurulu olmalı.
 2. **`baslat.bat`** dosyasına çift tıklayın. İlk açılışta gerekli paketler kurulur (birkaç dakika).
-3. Tarayıcıda panel açılır. Sol menüden OpenAI API anahtarınızı bir kez girin.
-4. **Verileri güncelle** düğmesine basın. Panel KAP ve haberleri toplar, yapay zekâya analiz ettirir.
-5. **Sinyaller** sekmesinde bir satır seçerek o hisseyi etkileyen haberleri ve gerekçeleri görün.
+3. Tarayıcıda panel açılır. İlk açılışta üstte çıkan kutuya kendi OpenAI API anahtarınızı bir kez girin.
+4. Sağ üstteki **🔄 Haberleri güncelle** düğmesine basın. Panel KAP ve haberleri toplar, yapay zekâya analiz ettirir.
+5. **Bugünün listesi** sekmesinde olumlu ve olumsuz haber alan hisseler ayrı listelenir. Bir hisseye tıklayınca
+   haberin özeti, nedeni ve kaynağı açılır. ✅ Teyitli: iki ayrı analiz aynı sonuca vardı · ⚠️ Kontrol et: emin değil.
+6. Ayarlar (kaç günlük bildirim, güncelleme başına haber sayısı, liste dönemi) **⚙️ Ayarlar** bölümündedir.
+   Durum bilgisi ve geçmiş veri pilotu **🔧 Gelişmiş** sekmesindedir.
 
 Canlı akış KAP'ın yanında **BloombergHT ve Uzmanpara** haberlerini de toplar; Dünya, Habertürk,
-NTV ve TRT kaynakları korunur. Kaynakların okunma durumu **Durum** sekmesinde görünür.
+NTV ve TRT kaynakları korunur. Kaynakların okunma durumu **Gelişmiş** sekmesinde görünür.
 RSS haberleri ön elemeden geçer; geçenlerin tam metni alınmaya çalışılır ve aynı modelle analiz edilir.
 Maliyet için panelde güncelleme başına **1, 3, 5 veya 10 haber** seçilebilir (varsayılan 10; KAP dahil).
 Kalan haberler bekler. Bu adet sınırıdır; **1 USD parasal tavan yalnızca geçmiş veri pilotundadır**.
@@ -61,7 +64,7 @@ python -m bist_haber init | collect | analyze --dry-run | analyze | prices | rep
 
 ## Geçmiş veri pilotu (Faz 4 başlangıcı)
 
-Panelde **Geçmiş veri pilotu** sekmesini açın:
+Panelde **🔧 Gelişmiş** sekmesindeki **Geçmiş veri pilotu** bölümünü açın:
 1. En az 21 gün önce biten, en fazla 32 günlük bir tarih aralığı seçip **Belgeleri hazırla** düğmesine basın.
 2. **Fiyatları al** düğmesine basın. Bu iki adım OpenAI harcaması yapmaz.
 3. **En fazla 10 bildirimi analiz et** düğmesi yalnızca belgesi ve 10 işlem günlük fiyatı hazır olayları işler.

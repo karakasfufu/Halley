@@ -391,3 +391,16 @@ Kullanıcı onayıyla uygulandı. Model, düşünme düzeyi, ikinci görüş, b�
 - Testler: `tests/test_calibration.py` (6 test: küçük örnekte seçim yok, yalnız geliştirmede seçim + temkinli eşitlik,
   doğrulamanın seçimi değiştirememesi, ambargo, kilitli satırların dışlanması, canlı eşiklerin korunması).
   Python 3.9.13 ile **79 test geçti**.
+
+## Arayüz sadeleştirmesi (2026-11-06, Claude)
+Kullanıcının onayladığı taslağa göre `app.py` yeniden düzenlendi; iş mantığı değişmedi.
+- Kenar çubuğu kaldırıldı. Üstte başlık + tek **🔄 Haberleri güncelle** düğmesi. API anahtarı yoksa üstte giriş kutusu.
+- Ayarlar (KAP gün sayısı, güncelleme başına haber, liste dönemi) katlanır **⚙️ Ayarlar** bölümünde.
+- 3 özet kutusu: olumlu haber, olumsuz haber, son güncelleme (oturumda yoksa son analiz zamanı).
+- 9 sütunlu tablo yerine **olumlu / olumsuz** iki liste; her hisse tıklanınca açılır (kısa neden + ✅/⚠️ etiketi).
+  Nötr hisseler varsayılan gizli, anahtarla gösterilir. Ayrıntıda skor, 1/5 günlük fiyat değişimi, haber kartları;
+  etki 1–5 yerine "düşük/orta/yüksek", kalıcılık "birkaç gün/hafta/aylar" olarak yazılır.
+- Sekmeler 4 → 3: **Bugünün listesi**, **Haberler**, **🔧 Gelişmiş** (durum + geçmiş veri pilotu).
+- Liste indirme yine yalnızca "indirmeye hazırla" düğmesiyle (IDM sorunu).
+- Ayrı portta kopya veriyle görsel kontrol yapıldı; indirme tetiklenmedi. AppTest güncellendi (3 sekme, ana düğme,
+  özet kutuları). Python 3.9.13 ile **79 test geçti**. README kullanım adımları yeni düzene göre güncellendi.
