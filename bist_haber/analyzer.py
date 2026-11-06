@@ -99,6 +99,25 @@ FİNANSAL SONUÇLAR
 - Piyasa beklentisi metinde yoksa beklentiye göre sapmayı bilemezsin: güveni en fazla 0.7 ver.
   Metinde beklenti varsa (ör. "beklentinin üzerinde") bunu en önemli etken say.
 
+YENİ BİLGİ Mİ, ESKİ BİLGİ Mİ?
+- "Yapılan Açıklama Güncelleme mi? Evet" ya da "Düzeltme mi? Evet" ise bildirim daha önce duyurulmuş bir
+  konunun devamıdır. Eski açıklamada zaten bilinen olayı (ör. sözleşmenin askıya alınması) yeniden
+  puanlama; YALNIZCA bu bildirimle gelen yeni bilgiyi değerlendir (ör. yenileme görüşmelerinin başlaması
+  olumlu ya da nötr bir gelişmedir). Sadece tablo/sermaye düzeltmesi gibi teknik güncellemeler nötrdür.
+- Dönemsel raporlarda (aylık satış, haftalık işlem vb.) projenin başından beri biriken KÜMÜLATİF toplamı
+  yeni haber sayma. Yeni bilgi yalnızca son dönemin rakamıdır; düzenli tekrarlanan rutin bir raporsa ve
+  metinde önceki dönemlere göre belirgin bir sapma yoksa etki en fazla 1–2 olmalı.
+
+FİNANSAL SIKINTI İŞARETLERİ
+- "Finansal yükümlülüklerin yerine getirilmesi", "nakit sıkıntısı", "borç yapılandırma", "konkordato",
+  "ödeme güçlüğü", "faaliyetlerin sürdürülebilirliği" gibi ifadeler eşliğinde yapılan işten çıkarma,
+  varlık satışı veya yeniden yapılanma ÖNCELİKLE bir sıkıntı sinyalidir: negatif say. "Maliyet tasarrufu
+  sağlayacak" diye pozitif yorumlama; şirket bunu iyi niyetle sunsa da metnin bağlamı belirleyicidir.
+
+ŞİRKET BÜYÜKLÜĞÜ BİLİNMİYORSA
+- Piyasa değeri verilmediyse, tanınmış büyük bir şirket için küçük bir ceza/tutarın (ör. birkaç on milyon TL)
+  etkisini abartma; belirsizliğin ortadan kalkması (soruşturmanın kapanması) da ayrıca değerlendirilmelidir.
+
 PAY ALIM SATIM BİLDİRİMLERİ (olay_tipi iceriden_pay_alim_satim)
 - Yöneticinin veya ana ortağın kendi şirketinden ALIMI hafif pozitif, SATIŞI hafif negatif sinyaldir.
   İşlem tutarı piyasa değerine göre anlamlıysa etki 2, küçük/rutin ise etki 1.

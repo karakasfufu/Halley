@@ -255,3 +255,50 @@ Hepsi ücretsiz kod değişikliği; gpt-5-mini, high düşünme ve ikinci görü
 6. **Kilitli gün işareti:** Tavan/taban kilidi olan giriş/çıkış günleri sonuç tablosunda işaretlensin.
 - Bu düzeltmeler önceki 10 analizi değiştirmez (önbellek). Etkisini görmek için aynı 10 olayın yeniden analizi
   ~0.08 USD tutar ve yalnızca kullanıcı onayıyla yapılmalı. Eşikler hâlâ değiştirilmemeli.
+
+## İnceleme düzeltmeleri uygulandı (2026-11-06, Claude)
+
+Kullanıcı onayıyla, önceki bölümdeki 1–4 ve 6. öneriler uygulandı. Ücretli model çağrısı yapılmadı.
+gpt-5-mini, high düşünme, ikinci görüş, 1 USD pilot tavanı, 10 bildirim sınırı ve 1.5 sn KAP beklemesi değişmedi.
+Skor eşikleri ve yarılanma süreleri değiştirilmedi.
+
+- **Talimat (`analyzer.ANALYSIS_PROMPT`):** "Yeni bilgi mi, eski bilgi mi?" (güncelleme/düzeltme bildiriminde
+  yalnızca yeni bilgi; dönemsel raporda kümülatif toplam yeni haber sayılmaz), "Finansal sıkıntı işaretleri"
+  ve "Şirket büyüklüğü bilinmiyorsa" bölümleri eklendi. Pilot da aynı talimatı kullanır.
+  Uyarı: Kurallar aynı 10 olayın incelemesinden çıktı; aynı olaylarla yeniden deneme yalnızca akıl sağlığı
+  kontrolüdür, bağımsız doğrulama sayılmaz.
+- **Rutin konular (`config.KAP_SKIP_SUBJECTS`):** Piyasa yapıcılığı, likidite sağlayıcılık, bilgilendirme
+  politikası, haftalık rapor, sürdürülebilirlik raporu, kurumsal yönetim bilgi formu eklendi. Günlük akış bunları
+  analize göndermez. Pilot mevcut seçimi değiştirmeden bu konuları ücret harcamadan atlar
+  (`skipped_routine`), kayıtları silmez. Yeniden "Belgeleri hazırla" yapılırsa örnekleme bu konuları dışlar;
+  bu, 100'lük örneğin içeriğini değiştirir (önceki analizler veritabanında kalır).
+- **İngilizce çeviri temizliği (`textutil.strip_translation`):** KAP HTML metni ve PDF ek metninden İngilizce
+  çeviri satırları atılır. Kelime oranına dayanır; Türkçe harfli özel isim içeren İngilizce satırlar da
+  yakalanır. Belge tamamen İngilizceyse dokunulmaz. Pilot belgelerinde toplam metin ~%10 kısaldı (beklenenden az:
+  pilot belgelerinin çoğu zaten Türkçe PDF/tablo). Atılan Türkçe harfli 38 satır elle kontrol edildi; hepsi İngilizce.
+- **Ek seçimi (`kap.select_attachments`):** Hazirun, vekaletname, imza sirküleri, özgeçmiş, ticaret sicili
+  gazetesi, başvuru/talep formu ve Türkçesi de bulunan İngilizce kopyalar (ör. "(ENG)", "Invitation…",
+  "Disclosure Policy") ek sınırını doldurmaz. Atlananlar metinde "[ATLANAN RUTİN/ÇEVİRİ EKLER: …]" olarak listelenir.
+  Tek PDF hiç atlanmaz; hepsi rutin görünürse ilki yine okunur.
+- **İmza sayfası:** Pilotta yalnızca son sayfa boşsa (genelde imza/kaşe) belge engellenmez; modele not düşülür.
+  Ortadaki boş sayfa hâlâ engeller.
+- **Tavan/taban kilidi (`backtest.evaluate`):** Giriş/çıkış günü açılış=en yüksek=en düşük=kapanış ise yeni
+  `uygulanabilirlik` sütunu doldurulur; getiri yine hesaplanır. CSV, yöntem metni ve panel kilitli satır sayısını gösterir.
+  Gerçek pilot verisinde 3 satır işaretlendi (elle bulunan günlerle tutarlı). Yöntem metnine `endekse_göre_%`'nin
+  net getiriden hesaplandığı da yazıldı.
+
+### Gerçek belgelerle kontrol (KAP isteği, API ücreti yok)
+- 22 eksik belge yeni kurallarla yeniden okundu (kullanıcının veritabanına yazılmadı): **3'ü tamamen çözüldü**
+  (biri pay alım teklifi). 2'si artık rutin konu olduğu için atlanacak. Birçok belgede sorun sayısı azaldı
+  (ör. 4 → 1). Kalan ana engel: "PDF metni uzunluk sınırını aşıyor" (8000 karakter/ek) ve sayfa sınırı (10).
+- Bu sınırlar bilerek körlemesine yükseltilmedi. Öneri: yalnızca önemli konularda (pay alım teklifi,
+  birleşme, pay geri alım programı) sınırı konuya özel artırmak. Ek girdi maliyeti bildirim başına
+  ~0.001–0.003 USD tahmini; kullanıcı onayı gerekiyor.
+
+### Testler
+- Yeni `tests/test_review_fixes.py` (15 test): çeviri temizliği, tamamen İngilizce belgenin korunması, ek seçimi,
+  imza sayfası, ek sayısı sınırı, rutin konunun ücretsiz atlanması (pilot + günlük), kilitli gün işareti,
+  talimat kuralları ve model/kalite/KAP ayarlarının değişmediği.
+- Python 3.9.13 ile **65 test geçti**, `compileall` temiz. Streamlit'in `use_container_width` uyarıları önceden de vardı.
+- Kullanıcının panel klasörü (`Documents\ChatGPT\…\work\Halley`) git kopyası değil; bu değişiklikler orada
+  otomatik görünmez. Panelde görmek için o klasör GitHub'dan güncellenmeli ve panel yeniden başlatılmalı.

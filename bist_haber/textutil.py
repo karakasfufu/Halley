@@ -19,6 +19,51 @@ def html_to_text(s: str) -> str:
     return re.sub(r"\n\s*\n+", "\n", s).strip()
 
 
+_TR_CHARS = re.compile(r"[çğıöşüÇĞİÖŞÜ]")
+_EN_WORDS = set("""
+the of and to in on for by with as at from that this is are was were be been has have had will would
+our its it an a or which who whose than then there these those such any all not no into upon under
+over per via within without also both each other same about regarding related hereby herein thereof
+notification flag disclosure announcement content explanations explanation date previous subject update
+correction postponed material event general forward looking evaluations evaluation statement translated
+translation version english turkish prevail prevails discrepancy inconsistency case between purposes
+informational respectfully announced public company companys companies shares share shareholders board
+directors capital total amount aggregate value excluding including executed sales agreements agreement
+within scope project portfolio units timeshare investors investor information basis taken provided
+pursuant accordance decided decision resolution meeting registered issued increase decrease approved
+""".split())
+
+
+def _is_english(line: str) -> bool:
+    words = re.findall(r"[A-Za-zçğıöşüÇĞİÖŞÜ']+", line)
+    if len(words) < 2:
+        return False
+    # Türkçe harf içeren kelimeler çoğunluktaysa satır Türkçedir. İngilizce satırda yalnızca
+    # özel isimler (ör. "Sinpaş Kızılbük") Türkçe harf içerebilir.
+    tr_words = sum(bool(_TR_CHARS.search(w)) for w in words)
+    if tr_words / len(words) > 0.25:
+        return False
+    share = sum(w.lower().strip("'") in _EN_WORDS for w in words) / len(words)
+    return share >= 0.5 or (len(words) >= 6 and share >= 0.3)
+
+
+def strip_translation(text: str) -> str:
+    """KAP metinlerindeki İngilizce çeviri satırlarını atar (Türkçe asıl metin korunur).
+
+    KAP bildirimlerinin çoğu aynı içeriği Türkçe + İngilizce verir; çeviri atılınca metin
+    yaklaşık yarıya iner, bilgi kaybolmaz. Belge tamamen İngilizceyse (ör. yabancı ihraççı)
+    ya da geriye çok az Türkçe kalırsa metin olduğu gibi döndürülür.
+    """
+    if not text:
+        return text
+    lines = text.splitlines()
+    kept = [ln for ln in lines if not _is_english(ln.strip())]
+    result = "\n".join(kept)
+    if len(result) < 200 and len(text) > 2 * max(len(result), 1):
+        return text  # çeviri değil asıl metin İngilizce olabilir; dokunma
+    return result
+
+
 def title_key(title: str) -> str:
     """Farklı sitelerdeki aynı haberi yakalamak için normalize başlık."""
     return re.sub(r"[^0-9a-zçğıöşü]+", "", tr_lower(title))[:80]

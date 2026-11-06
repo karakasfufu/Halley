@@ -59,6 +59,13 @@ KAP_SKIP_SUBJECTS = [
     "Varant - Sertifika",
     "Kamuyu Aydınlatma Platformu Duyurusu",
     "BISTECH",
+    # 2026-11-06 pilot incelemesi: içerik olarak fiyat bilgisi taşımayan rutin bildirimler.
+    "Piyasa Yapıcılığı Kapsamında",           # aracı kurumun fon piyasa yapıcılığı işlem raporu
+    "Likidite Sağlayıcılık Kapsamında",
+    "Bilgilendirme Politikası",
+    "Haftalık Rapor",
+    "Sürdürülebilirlik Raporu",
+    "Kurumsal Yönetim Bilgi Formu",
 ]
 
 RSS_FEEDS = {

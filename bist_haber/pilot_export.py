@@ -8,7 +8,7 @@ import pandas as pd
 from . import backtest
 
 RESULT_COLUMNS = ["bildirim", "hisse", "yön", "vade", "giriş", "çıkış", "getiri_%",
-                  "net_getiri_%", "endekse_göre_%", "en_düşük_%", "eksik"]
+                  "net_getiri_%", "endekse_göre_%", "en_düşük_%", "eksik", "uygulanabilirlik"]
 SUMMARY_COLUMNS = ["vade", "olay_sayısı", "farklı_hisse", "net_yükseliş_oranı",
                    "ortalama_net_getiri", "medyan_net_getiri", "ortalama_endekse_göre"]
 
@@ -65,6 +65,11 @@ def build_report(conn, results, cost_bps=20):
         "Sonuçlardaki 'eksik' yalnızca fiyat/ileri dönem kapsamını anlatır; bütün belgelerin "
         "eksiksiz okunduğunu göstermez. Belge eksikleri ayrı CSV'dedir.",
         "Toplam alış+satış maliyeti varsayımı: %{:.2f}".format(cost_bps / 100),
+        "'endekse_göre_%' = net getiri (maliyet düşülmüş) − aynı günlerdeki XU100 getirisi.",
+        "'uygulanabilirlik' sütunu: giriş veya çıkış günü açılış=en yüksek=en düşük=kapanış ise "
+        "(çoğunlukla tavan/taban kilidi) işlem fiilen gerçekleşmeyebilirdi; getiri yine hesaplanır ama "
+        "bu satırlar dikkatle yorumlanmalıdır. Kilitli satır: {}".format(
+            int((frame["uygulanabilirlik"].fillna("") != "").sum())),
         "Giriş: yayın gününden sonraki ilk endeks işlem gününün açılışı. Giriş günü birinci "
         "işlem günüdür; 1/3/5/10. işlem günü kapanışı ölçülür.",
         "Pozitif özet yalnızca yön=1 ve fiyat sonucu tam olayları içerir. Negatif/nötr olaylar "

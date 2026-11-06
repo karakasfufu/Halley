@@ -82,6 +82,9 @@ def render():
         if "bt_analysis_result" in st.session_state:
             result = st.session_state["bt_analysis_result"]
             st.write(f"Son turda analiz edilen: {result['analyzed']}")
+            if result.get("skipped_routine"):
+                st.caption(f"Rutin konu olduğu için ücret harcanmadan atlanan: {result['skipped_routine']} "
+                           "(ör. fon piyasa yapıcılığı raporu). Kayıtlar silinmedi.")
             if result.get("stopped"):
                 st.warning(result["stopped"])
         cost = st.selectbox("Toplam alış + satış maliyeti varsayımı", [0, 10, 20, 50], index=2,
@@ -109,7 +112,12 @@ def render():
                 st.info("Fiyat sonucu tam pozitif olay bulunmadığından pozitif özet boş.")
             st.download_button("Pozitif olay özetini indir (CSV)", files["halley_pozitif_ozet.csv"],
                                file_name="halley_pozitif_ozet.csv", mime="text/csv", key="bt_summary_download")
-            st.write(f"**Tüm olay/vade satırları:** {len(frame)} · eksik: {(frame['eksik'] != '').sum()}")
+            locked = int((frame["uygulanabilirlik"].fillna("") != "").sum())
+            st.write(f"**Tüm olay/vade satırları:** {len(frame)} · eksik: {(frame['eksik'] != '').sum()}"
+                     f" · tavan/taban kilidi şüphesi: {locked}")
+            if locked:
+                st.caption("⚠️ 'uygulanabilirlik' sütunu dolu satırlarda giriş ya da çıkış günü tek fiyatla geçmiş "
+                           "(çoğunlukla tavan/taban kilidi). O gün alım/satım fiilen yapılamamış olabilir.")
             st.caption("Buradaki 'eksik' yalnızca fiyat sonuçlarını gösterir. Belgesi eksik veya henüz denetlenmemiş "
                        "bildirimler aşağıdaki ayrı listededir; 'eksik: 0' bütün belgelerin tam olduğu anlamına gelmez.")
             st.dataframe(frame, hide_index=True, use_container_width=True)

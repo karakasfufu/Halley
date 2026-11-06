@@ -13,7 +13,7 @@ from typing import Callable, Dict, List, Optional
 import requests
 
 from . import config
-from .textutil import effective_date, html_to_text
+from .textutil import effective_date, html_to_text, strip_translation, tr_lower
 
 LIST_URL = config.KAP_BASE + "/tr/api/disclosure/members/byCriteria"
 DETAIL_URL = config.KAP_BASE + "/tr/Bildirim/{index}"
@@ -114,13 +114,48 @@ def _pdf_text(data: bytes) -> str:
     logging.getLogger("pypdf").setLevel(logging.ERROR)
     reader = PdfReader(io.BytesIO(data[start:]))
     text = "\n".join((p.extract_text() or "") for p in reader.pages[:config.KAP_ATTACHMENT_PAGES])
-    return re.sub(r"[ \t]+", " ", text).strip()
+    return strip_translation(re.sub(r"[ \t]+", " ", text).strip())
+
+
+# Bilgi taşımayan rutin ekler (adından tanınır). Örnek: hazirun cetveli, vekaletname.
+_ROUTINE_ATTACHMENT = re.compile(
+    r"hazirun|hazır bulunan|vekaletname|vekâletname|imza sirk|imza beyan|özgeçmiş|ozgecmis"
+    r"|\bttsg\b|_ttsg\b|ticaret sicil|başvuru formu|basvuru formu|talep formu")
+# Türkçesi de yüklenmiş belgelerin İngilizce kopyası.
+_ENGLISH_ATTACHMENT = re.compile(
+    r"\(eng\)|[\s_\-]eng[\s_.\-]|\beng\.pdf$|english|ingilizce|invitation|disclosure policy"
+    r"|distribution table|translation|announcement|\bminutes\b|general assembly")
+
+
+def select_attachments(attachments: List[dict]):
+    """(okunacak PDF'ler, atlanan PDF adları). Ek sayısı sınırı yalnızca bilgi taşıyan eklere harcanır.
+
+    İngilizce kopya ancak listede başka (Türkçe) PDF varsa atlanır; tek PDF hiçbir zaman atlanmaz.
+    """
+    pdfs = [a for a in attachments if str(a.get("fileExtension", "")).lower() == "pdf"]
+    keep, skipped = [], []
+    for a in pdfs:
+        name = tr_lower(str(a.get("fileName", "")))
+        if _ROUTINE_ATTACHMENT.search(name):
+            skipped.append(a.get("fileName", "PDF"))
+        else:
+            keep.append(a)
+    english = [a for a in keep if _ENGLISH_ATTACHMENT.search(tr_lower(str(a.get("fileName", ""))))]
+    if english and len(keep) > len(english):
+        skipped += [a.get("fileName", "PDF") for a in english]
+        keep = [a for a in keep if a not in english]
+    if not keep and pdfs:  # hepsi rutin görünüyorsa yine de ilkini oku; hiçbir şeyi körlemesine atma
+        keep, skipped = pdfs[:1], [a.get("fileName", "PDF") for a in pdfs[1:]]
+    return keep, skipped
 
 
 def _attachment_texts(attachments: List[dict]) -> str:
     """Ana metin "açıklama ekte" diyorsa asıl bilgi PDF ektedir; ilk birkaç PDF'yi okur."""
     out = []
-    pdfs = [a for a in attachments if str(a.get("fileExtension", "")).lower() == "pdf" and a.get("objId")]
+    pdfs, skipped = select_attachments(attachments)
+    pdfs = [a for a in pdfs if a.get("objId")]
+    if skipped:
+        out.append("[ATLANAN RUTİN/ÇEVİRİ EKLER: " + "; ".join(skipped) + "]")
     for a in pdfs[:config.KAP_MAX_ATTACHMENTS]:
         time.sleep(config.KAP_REQUEST_DELAY)
         r = _get(f"{config.KAP_BASE}/tr/api/file/download/{a['objId']}")
@@ -176,7 +211,7 @@ def _clean(text: str) -> str:
             continue
         out.append(line)
         prev = line
-    return "\n".join(out)
+    return strip_translation("\n".join(out))
 
 
 def _tickers(item: dict) -> List[str]:

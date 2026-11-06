@@ -119,11 +119,16 @@ def fetch_document(index, subject):
     body, attachments = kap._parse_page(kap._get(kap.DETAIL_URL.format(index=index)).text)
     # Pilotta tüm ekleri denetle; eksik materyal olan bildirime para harcama.
     import time
-    pdfs = [a for a in attachments if str(a.get("fileExtension", "")).lower() == "pdf"]
+    from .textutil import strip_translation
+    # Rutin ekler (hazirun, vekaletname...) ve Türkçesi olan İngilizce kopyalar sınırı doldurmaz;
+    # atlananlar metinde açıkça listelenir.
+    pdfs, skipped = kap.select_attachments(attachments)
     if any(str(a.get("fileExtension", "")).lower() not in ("pdf",) for a in attachments):
         issues.append("PDF dışındaki ekler okunmadı.")
     if len(pdfs) > config.KAP_MAX_ATTACHMENTS:
         issues.append("PDF ek sayısı okuma sınırını aşıyor.")
+    if skipped:
+        body += "\n\n[ATLANAN RUTİN/ÇEVİRİ EKLER: " + "; ".join(skipped) + "]"
     for a in pdfs[:config.KAP_MAX_ATTACHMENTS]:
         time.sleep(config.KAP_REQUEST_DELAY)
         if not a.get("objId"):
@@ -140,9 +145,14 @@ def fetch_document(index, subject):
             if len(reader.pages) > config.KAP_ATTACHMENT_PAGES:
                 issues.append("PDF sayfa sınırını aşıyor.")
             texts = [p.extract_text() or "" for p in reader.pages[:config.KAP_ATTACHMENT_PAGES]]
-            if any(not t.strip() for t in texts):
+            blank = [i for i, t in enumerate(texts) if not t.strip()]
+            note = ""
+            if blank == [len(reader.pages) - 1] and len(texts) >= 2:
+                # Yalnızca son sayfa boşsa bu genelde imza/kaşe sayfasıdır: engelleme, modele bildir.
+                note = "\n[NOT: Son sayfada metin yok; muhtemelen imza/kaşe sayfası.]"
+            elif blank:
                 issues.append("PDF içinde metni okunamayan sayfa var.")
-            text = "\n".join(texts)
+            text = strip_translation("\n".join(texts)) + note
             if len(text) > config.KAP_ATTACHMENT_CHARS:
                 issues.append("PDF metni uzunluk sınırını aşıyor.")
             body += f"\n\n[EK: {a.get('fileName', 'PDF')}]\n{text[:config.KAP_ATTACHMENT_CHARS]}"
@@ -330,6 +340,10 @@ def analyze(conn, progress=None, client=None, max_items=MAX_NEWS_PER_RUN):
         if row["id"] not in covered:
             stats["skipped_prices"] += 1
             continue  # ölçülemeyecek olaya API harcaması yapma; kaydı silme veya nötr sayma
+        if any(s in (row["subject"] or "") for s in config.KAP_SKIP_SUBJECTS):
+            # Seçimden sonra rutin sayılan konu (ör. fon piyasa yapıcılığı): para harcama, kaydı silme.
+            stats["skipped_routine"] = stats.get("skipped_routine", 0) + 1
+            continue
         # Yalnızca bildirimin o tarihte taşıdığı ihraççı kodları; bugünkü evren ve fiyat çağrılmaz.
         universe = {c: c for c in row["candidates"].split(",") if c}
         try:
@@ -407,7 +421,8 @@ def evaluate(conn, cost_bps=20):
         for horizon in (1, 3, 5, 10):
             record = {"bildirim": impact["news_id"], "hisse": impact["ticker"], "yön": impact["direction"],
                       "vade": horizon, "giriş": None, "çıkış": None, "getiri_%": None,
-                      "net_getiri_%": None, "endekse_göre_%": None, "en_düşük_%": None, "eksik": ""}
+                      "net_getiri_%": None, "endekse_göre_%": None, "en_düşük_%": None, "eksik": "",
+                      "uygulanabilirlik": ""}
             exit_idx = entry_idx + horizon - 1
             if exit_idx >= len(sessions):
                 record["eksik"] = "İşlem takvimi veya ileri fiyat dönemi eksik."
@@ -426,6 +441,23 @@ def evaluate(conn, cost_bps=20):
                 lows = [r["low"] for r in interval if r["low"] is not None]
                 record.update({"getiri_%": gross, "net_getiri_%": gross - cost_bps / 100,
                                "endekse_göre_%": gross - benchmark_return - cost_bps / 100,
-                               "en_düşük_%": (min(lows) / a["open"] - 1) * 100 if len(lows) == horizon else None})
+                               "en_düşük_%": (min(lows) / a["open"] - 1) * 100 if len(lows) == horizon else None,
+                               "uygulanabilirlik": _lock_note(a, b)})
             out.append(record)
     return out
+
+
+def _locked(bar) -> bool:
+    """Açılış = en yüksek = en düşük = kapanış: gün boyu tek fiyat (çoğunlukla tavan/taban kilidi)."""
+    values = [bar.get(k) for k in ("open", "high", "low", "close")]
+    return all(v is not None for v in values) and max(values) - min(values) < 1e-9
+
+
+def _lock_note(entry_bar, exit_bar) -> str:
+    # Bu günlerde emir karşılanmamış olabilir; getiri hesaplanır ama "uygulanamaz olabilir" diye işaretlenir.
+    notes = []
+    if _locked(entry_bar):
+        notes.append("giriş günü tek fiyat (tavan/taban kilidi olabilir; alış gerçekleşmeyebilirdi)")
+    if _locked(exit_bar):
+        notes.append("çıkış günü tek fiyat (tavan/taban kilidi olabilir; satış gerçekleşmeyebilirdi)")
+    return "; ".join(notes)
