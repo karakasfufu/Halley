@@ -14,7 +14,7 @@ from typing import Callable, Dict, List, Literal, Optional, Tuple
 
 from openai import (AuthenticationError, BadRequestError, OpenAI, PermissionDeniedError,
                     RateLimitError)
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from . import config
 
@@ -35,14 +35,14 @@ class FilterResult(BaseModel):
 class StockImpact(BaseModel):
     hisse: str
     yon: Literal["pozitif", "negatif", "notr"]
-    etki: int
+    etki: int = Field(ge=1, le=5)
     gerekce: str
 
 
 class FullAnalysis(BaseModel):
     olay_tipi: EventType
     kalicilik: Literal["kisa", "orta", "uzun"]
-    guven: float
+    guven: float = Field(ge=0, le=1)
     ozet: str
     etkiler: List[StockImpact]
 
@@ -90,8 +90,8 @@ KURALLAR
 FİNANSAL SONUÇLAR
 - [FİNANSAL TABLO ÖZETİ] içindeki "YILLIK DEĞİŞİMLER" kod tarafından hesaplanmıştır; doğru kabul et,
   kendin yeniden hesaplama.
-- Türk şirketleri enflasyon muhasebesi (TMS 29) uygular; önceki dönem rakamları cari alım gücüne
-  getirilmiştir, yani yıllık değişim reel büyümedir.
+- TMS 29 uygulanıp uygulanmadığını yalnızca verilen belgede açıkça yazıyorsa kabul et.
+  Her şirketin veya dönemin enflasyon düzeltmesi içerdiğini varsayma; belirsizse reel büyüme deme.
 - Değerlendir: net kâr (ana ortaklık payı) yönü ve büyüklüğü, esas faaliyet kârı (operasyonel güç),
   son çeyreğin önceki yılın aynı çeyreğine göre durumu (trend), zarardan kâra/kârdan zarara geçiş.
   "Net Parasal Pozisyon Kazançları" ve ertelenmiş vergi gibi nakit dışı kalemlerin sonucu
@@ -197,7 +197,8 @@ def _save(conn, news_id, stage, model, result: BaseModel, tin, tout):
 
 def pending(conn, limit: Optional[int] = None) -> List:
     # body NULL: KAP metni henüz alınamadı → metin gelene kadar bekle
-    sql = "SELECT * FROM news WHERE status='new' AND body IS NOT NULL ORDER BY published_at"
+    sql = ("SELECT * FROM news WHERE status='new' AND body IS NOT NULL "
+           "AND LENGTH(TRIM(body, char(9)||char(10)||char(13)||' '))>0 ORDER BY published_at")
     return conn.execute(sql + (f" LIMIT {int(limit)}" if limit else "")).fetchall()
 
 

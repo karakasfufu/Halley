@@ -32,16 +32,36 @@ def _criteria(d_from: date, d_to: date) -> dict:
 
 
 def list_disclosures(d_from: date, d_to: date) -> List[dict]:
+    def interval(start, end):
+        # KAP uzun aralıklarda tam 2000 kayıt döndürebiliyor: kesilmiş listeyi tam sanma.
+        # POST liste istekleri de GET metin istekleriyle aynı hız sınırını korur.
+        time.sleep(config.KAP_REQUEST_DELAY)
+        for wait in (5, 15, None):
+            r = requests.post(LIST_URL, json=_criteria(start, end), headers=config.HTTP_HEADERS, timeout=60)
+            if r.status_code != 429:
+                r.raise_for_status()
+                break
+            if wait is None:
+                raise RateLimited("KAP bildirim listesi için istek sınırı uyguluyor")
+            time.sleep(wait)
+        items = r.json()
+        if not isinstance(items, list):
+            raise ValueError("KAP beklenen bildirim listesini döndürmedi")
+        if len(items) >= 2000:
+            if start == end:
+                raise RuntimeError("Tek günlük KAP listesi kayıt sınırına ulaştı; tamlık doğrulanamadı.")
+            middle = start + (end - start) // 2
+            return interval(start, middle) + interval(middle + timedelta(days=1), end)
+        return items
+
     out = []
     # KAP, başlangıç ve bitişin aynı takvim yılında olmasını istiyor.
     start = d_from
     while start <= d_to:
         end = min(d_to, date(start.year, 12, 31))
-        r = requests.post(LIST_URL, json=_criteria(start, end), headers=config.HTTP_HEADERS, timeout=60)
-        r.raise_for_status()
-        out.extend(r.json())
+        out.extend(interval(start, end))
         start = end + timedelta(days=1)
-    return out
+    return list({str(it["disclosureIndex"]): it for it in out}.values())
 
 
 class RateLimited(Exception):
@@ -131,6 +151,7 @@ def fetch_body(index: int, subject: str = "") -> str:
         summary = fetch_summary(index)
         if summary:
             return summary
+        time.sleep(config.KAP_REQUEST_DELAY)
     body, attachments = _parse_page(_get(DETAIL_URL.format(index=index)).text)
     if attachments and (len(body) < config.KAP_SHORT_BODY_CHARS or _POINTS_TO_ATTACHMENT.search(body)):
         extra = _attachment_texts(attachments)
@@ -217,15 +238,14 @@ def fetch_missing_bodies(conn, progress: Optional[Callable[[int, int], None]] = 
     Yeni yayımlanan bildirimin sayfası ilk dakikalarda boş gelebiliyor; o zaman metin
     NULL bırakılır ve bir sonraki toplamada tekrar denenir.
     """
-    # 6 saattir metni alınamayanlar başlık + konu ile analiz edilsin, sonsuza dek beklemesin.
-    cutoff = (datetime.now(config.TR_TZ) - timedelta(hours=6)).isoformat()
-    conn.execute("UPDATE news SET body='', note='metin alınamadı, başlıkla analiz' "
-                 "WHERE source='kap' AND status='new' AND body IS NULL AND published_at < ?", (cutoff,))
+    # Eski sürümün başlıkla analize bıraktığı, henüz analiz edilmemiş kayıtları kurtar.
+    # Yayın yaşı, metnin alınmasından vazgeçmek için bir gerekçe değildir.
+    conn.execute("UPDATE news SET body=NULL, note=NULL WHERE source='kap' AND status='new' "
+                 "AND body='' AND note='metin alınamadı, başlıkla analiz'")
     conn.commit()
     rows = conn.execute("SELECT id, published_at, subject FROM news WHERE source='kap' AND status='new' AND body IS NULL"
                         " ORDER BY published_at DESC").fetchall()
     st = {"bodies_fetched": 0, "bodies_pending": 0, "rate_limited": False}
-    now = datetime.now(config.TR_TZ)
     for i, r in enumerate(rows):
         if progress:
             progress(i, len(rows))
@@ -241,7 +261,9 @@ def fetch_missing_bodies(conn, progress: Optional[Callable[[int, int], None]] = 
             continue
         finally:
             time.sleep(config.KAP_REQUEST_DELAY)
-        if not body and now - datetime.fromisoformat(r["published_at"]) < timedelta(minutes=30):
+        if not body.strip():
+            conn.execute("UPDATE news SET note='Metin alınamadı; başlıkla analiz yapılmadı.' WHERE id=?", (r["id"],))
+            conn.commit()
             st["bodies_pending"] += 1
             continue
         conn.execute("UPDATE news SET body=? WHERE id=?", (body, r["id"]))

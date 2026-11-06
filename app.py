@@ -91,6 +91,11 @@ with st.sidebar:
 
 # ---------------- Üst özet ----------------
 st.markdown("### Günün tablosu")
+legacy_empty = conn.execute("SELECT COUNT(*) FROM news WHERE source='kap' AND status='analyzed' "
+                            "AND LENGTH(TRIM(COALESCE(body,''), char(9)||char(10)||char(13)||' '))=0").fetchone()[0]
+if legacy_empty:
+    st.warning(f"Önceki sürümden {legacy_empty} KAP analizinin tam metni yok. "
+               "Bu kayıtlar skora katılmıyor; eski analizler ayrıca gözden geçirilmeli.")
 rows = report.build(conn, uni, days=window)
 counts = dict(conn.execute("SELECT status, COUNT(*) FROM news GROUP BY status").fetchall())
 waiting = conn.execute("SELECT COUNT(*) FROM news WHERE status='new'").fetchone()[0]
@@ -100,7 +105,7 @@ c2.metric("Pozitif sinyal", sum(1 for r in rows if r["score"] >= 1.5))
 c3.metric("Negatif sinyal", sum(1 for r in rows if r["score"] <= -1.5))
 c4.metric("Analiz bekleyen", waiting)
 
-tab_sig, tab_news, tab_state = st.tabs(["📈 Sinyaller", "📰 Haber akışı", "⚙️ Durum"])
+tab_sig, tab_news, tab_state, tab_backtest = st.tabs(["📈 Sinyaller", "📰 Haber akışı", "⚙️ Durum", "🧪 Geçmiş veri pilotu"])
 
 # ---------------- Sinyaller ----------------
 with tab_sig:
@@ -212,6 +217,13 @@ with tab_state:
         with st.expander("Son güncellemenin ayrıntıları"):
             st.json(st.session_state["last_result"])
 
+conn.close()
+
+with tab_backtest:
+    from bist_haber.backtest_ui import render as render_backtest
+    render_backtest()
+
 st.markdown("<div class='disclaimer'>Bu araç haberleri otomatik olarak özetler ve skorlar; yatırım tavsiyesi değildir. "
             "Skor eşikleri henüz geçmiş veriyle kalibre edilmedi. Karar ve emir sorumluluğu kullanıcıdadır.</div>",
             unsafe_allow_html=True)
+

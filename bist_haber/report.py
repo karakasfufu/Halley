@@ -37,7 +37,9 @@ def build(conn, universe: Dict[str, str], days: int = 7, as_of: Optional[date] =
     since = (as_of - timedelta(days=days)).isoformat()
     rows = conn.execute(
         "SELECT i.*, n.note AS summary, n.title FROM impacts i JOIN news n ON n.id=i.news_id "
-        "WHERE i.effective_date>? AND i.effective_date<=? ORDER BY i.published_at",
+        "WHERE i.effective_date>? AND i.effective_date<=? "
+        "AND (n.source!='kap' OR LENGTH(TRIM(COALESCE(n.body,''), char(9)||char(10)||char(13)||' '))>0) "
+        "ORDER BY i.published_at",
         (since, as_of.isoformat())).fetchall()
     agg: Dict[str, dict] = {}
     # Aynı olay (aynı hisse + aynı olay türü, 2 gün içinde) birden çok kaynaktan gelebilir

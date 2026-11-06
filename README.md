@@ -52,6 +52,32 @@ python -m bist_haber init | collect | analyze --dry-run | analyze | prices | rep
 - Fiyatlar ve piyasa değeri yfinance'tan, gecikmeli. Resmi tatiller işlem günü hesabında yok.
 - Ayrıntılı kararlar, riskler ve sonraki fazlar için: `NOTLAR.md`.
 
+## Geçmiş veri pilotu (Faz 4 başlangıcı)
+
+Panelde **Geçmiş veri pilotu** sekmesini açın:
+1. En az 21 gün önce biten, en fazla 32 günlük bir tarih aralığı seçip **Belgeleri hazırla** düğmesine basın.
+2. **Fiyatları al** düğmesine basın. Bu iki adım OpenAI harcaması yapmaz.
+3. **Pilotu analiz et** düğmesi yalnızca belgesi ve 10 işlem günlük fiyatı hazır olayları işler.
+   Model gpt-5-mini; yüksek düşünme ve gerektiğinde ayrı ikinci görüş korunur.
+
+- 100 veya 200 bildirim, fiyat sonuçlarına bakılmadan tekrar üretilebilir biçimde örneklenir.
+- Toplam pilot API bütçesi **5 USD**; kullanım ve belirsiz çağrı rezervleri diskte tutulur.
+  Yeniden açmak veya tarih değiştirmek bütçeyi sıfırlamaz. Bu sınır günlük güncelleme akışına uygulanmaz.
+- İstek içeriği/talimat/model/görüş aynıysa saklanan sonuç kullanılır. İlk ve ikinci görüşün önbelleği ayrıdır.
+  Bağlantı kopması/yarım yanıt otomatik ücretli tekrar başlatmaz; gerekiyorsa kayıt geliştirici tarafından incelenir.
+- Metin/ek kesilmesi, okunamayan PDF ve PDF dışındaki ekler pilotta işaretlenir; eksik belge analiz edilmez.
+- Giriş, yayın gününden **sonraki** endeks işlem gününün açılışıdır; 1/3/5/10 gün sonraki kapanışlar ölçülür.
+  Giriş günü birinci işlem günüdür. Eksik fiyat başka tarihe kaydırılmaz.
+- Bugünkü piyasa değeri veya şirket listesi geçmişe taşınmaz; kodlar eski bildirimin ihraççı kodlarından alınır.
+  Dolaylı hisse etkileri bu ilk pilotun kapsamı dışındadır.
+- Bu bir **olay pilotudur**; tam günlük birleşik skor/portföy backtest'i değildir. Eşikleri değiştirmez.
+  Tarihsel kotasyon evreni, resmi tatil takvimi ve fiyat düzeltmeleri henüz bağımsız doğrulanmadı.
+  Fiyatı/ekleri eksik olayların dışarıda kalması ve örtüşen haberler sonuçları etkileyebilir.
+- Veriler `data/backtest/` altında, günlük veritabanından ayrı tutulur ve GitHub'a gönderilmez.
+
+Tam kalibrasyon için sonraki adım: doğrulanmış tarihsel evren/takvim, eksiksiz haber penceresi,
+tarihli şirket büyüklüğü bağlamı, zaman sıralı ayrı doğrulama dönemi ve ileriye dönük izleme.
+
 ## Geliştirmeye devam edecek kişi / yapay zekâ için
 
 **Kullanıcı:** Türkçe konuşuyor, Python bilmiyor; arayüzü çıktıya bakarak yönlendiriyor. Vade: birkaç günlük/haftalık
@@ -71,11 +97,15 @@ swing. Emirleri Midas'tan elle giriyor (otomatik emir yok, Faz 6 iptal). Model *
 | `bist_haber/report.py` | Skorlama (sönme, çift sayım önleme), eşikler |
 | `bist_haber/prices.py` | yfinance fiyat + piyasa değeri (günlük önbellek) |
 | `bist_haber/config.py` | Tüm ayarlar ve KAP atlama listesi |
+| `bist_haber/backtest.py` | Belge denetimi, 5 USD bütçe/istek önbelleği, geçmiş fiyat ve olay ölçümü |
+| `bist_haber/backtest_ui.py` | Panelin geçmiş veri pilotu sekmesi |
 
 **Bilinmesi gerekenler**
 - Python 3.9 uyumlu kalmalı (kullanıcının makinesi): `X | Y` tip sözdizimi, `match` vb. kullanmayın.
 - Windows'ta proje yolu uzunsa venv kurulumu "long path" hatası verir; `baslat.bat` venv'i `%USERPROFILE%\.venvs\bist-haber` altına kurar.
 - KAP ~1 sn/istek üzerinde HTTP 429 veriyor; `KAP_REQUEST_DELAY` düşürülmemeli.
 - Streamlit sunucusu `bist_haber` modüllerindeki değişiklikleri her zaman yeniden yüklemiyor; kod değişince paneli yeniden başlatın.
-- Otomatik test yok. Değişiklikten sonra: `python -m bist_haber collect` → `analyze --dry-run` → `analyze --limit 3` → `report`.
+- Ücretsiz regresyon testleri: `python -m unittest discover -s tests -v` (Python 3.9).
+  Anahtar/ağ uygunsa ek canlı kontrol: `collect` → `analyze --dry-run` → `analyze --limit 3` → `report`.
+  Gerçek API kontrolünün ücretli olduğu unutulmamalı; test sonucu ile gerçek piyasa başarısı ayrı şeylerdir.
 - `.env` (API anahtarı) ve `data/*.db` git'e eklenmez.

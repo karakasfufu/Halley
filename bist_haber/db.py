@@ -64,9 +64,10 @@ CREATE TABLE IF NOT EXISTS prices (
 """
 
 
-def connect() -> sqlite3.Connection:
-    config.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(config.DB_PATH)
+def connect(path=None) -> sqlite3.Connection:
+    path = path or config.DB_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
     # Eski veritabanlarına sonradan eklenen sütunlar

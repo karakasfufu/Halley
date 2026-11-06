@@ -3,3 +3,7 @@
 __pycache__/
 data/*.db
 data/rapor_*.csv
+data/backtest/
+*.db-wal
+*.db-shm
+.pytest_cache/
