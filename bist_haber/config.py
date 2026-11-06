@@ -62,12 +62,15 @@ KAP_SKIP_SUBJECTS = [
 ]
 
 RSS_FEEDS = {
-    "bloomberght": "https://www.bloomberght.com/rss",
+    "bloomberght": "https://www.bloomberght.com/rss/tum-haberler.xml",
+    "uzmanpara": "https://uzmanpara.milliyet.com.tr/haber_rss/",
     "dunya": "https://www.dunya.com/rss?dunya",
     "haberturk": "https://www.haberturk.com/rss/ekonomi.xml",
     "ntv": "https://www.ntv.com.tr/ekonomi.rss",
     "trt": "https://www.trthaber.com/ekonomi_articles.rss",
 }
+RSS_SOURCE_LABELS = {"bloomberght": "BloombergHT", "uzmanpara": "Uzmanpara", "dunya": "Dünya",
+                     "haberturk": "Habertürk", "ntv": "NTV", "trt": "TRT Haber"}
 RSS_MAX_AGE_DAYS = 3  # bazı akışlar aylar önceki haberleri de içeriyor
 # Hisse eşleşmesi olmayan RSS haberleri ancak bu kelimelerden birini içerirse LLM'e gider.
 RSS_MARKET_KEYWORDS = ["borsa", "bist", "hisse", "kap'a", "kap’a", "temettü", "halka arz", "bedelsiz", "bedelli"]

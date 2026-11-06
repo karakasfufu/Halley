@@ -12,6 +12,13 @@ kendiniz girersiniz. Çıktı yatırım tavsiyesi değildir.
 4. **Verileri güncelle** düğmesine basın. Panel KAP ve haberleri toplar, yapay zekâya analiz ettirir.
 5. **Sinyaller** sekmesinde bir satır seçerek o hisseyi etkileyen haberleri ve gerekçeleri görün.
 
+Canlı akış KAP'ın yanında **BloombergHT ve Uzmanpara** haberlerini de toplar; Dünya, Habertürk,
+NTV ve TRT kaynakları korunur. Kaynakların okunma durumu **Durum** sekmesinde görünür.
+RSS haberleri ön elemeden geçer; geçenlerin tam metni alınmaya çalışılır ve aynı modelle analiz edilir.
+Maliyet için panelde güncelleme başına **1, 3, 5 veya 10 haber** seçilebilir (varsayılan 10; KAP dahil).
+Kalan haberler bekler. Bu adet sınırıdır; **1 USD parasal tavan yalnızca geçmiş veri pilotundadır**.
+RSS akışları güncel haberler içindir; doğrulanmış geçmiş arşiv yerine kullanılıp eski backtest'e eklenmez.
+
 > KAP hızlı isteklere sınır koyduğu için bildirim metinleri yaklaşık saniyede bir okunur.
 > Günlük ~150-350 bildirimde ilk güncelleme 3-6 dakika sürebilir; sonrakiler sadece yenileri okur.
 
@@ -78,6 +85,10 @@ Panelde **Geçmiş veri pilotu** sekmesini açın:
   Tarihsel kotasyon evreni, resmi tatil takvimi ve fiyat düzeltmeleri henüz bağımsız doğrulanmadı.
   Fiyatı/ekleri eksik olayların dışarıda kalması ve örtüşen haberler sonuçları etkileyebilir.
 - Veriler `data/backtest/` altında, günlük veritabanından ayrı tutulur ve GitHub'a gönderilmez.
+- **Bütün pilot tablolarını ve yöntemi indir (ZIP)** düğmesi olay sonuçları, pozitif olay özeti,
+  belge eksikleri CSV'leri ve yöntem TXT'sini birlikte indirir. Aynı dosyalar ayrı düğmelerle de indirilebilir.
+  İndirme mevcut sonuçları kullanır; yeniden analiz veya API harcaması başlatmaz.
+  Sonuç tablosundaki `eksik: 0` yalnızca fiyat sonuçlarını anlatır; eksik belgeler ayrı listededir.
 
 Tam kalibrasyon için sonraki adım: doğrulanmış tarihsel evren/takvim, eksiksiz haber penceresi,
 tarihli şirket büyüklüğü bağlamı, zaman sıralı ayrı doğrulama dönemi ve ileriye dönük izleme.

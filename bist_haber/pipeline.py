@@ -28,7 +28,10 @@ def universe(conn) -> Dict[str, str]:
     return load_universe(conn)
 
 
-def update_all(conn, days: int = 1, progress: Optional[Progress] = None, analyze: bool = True) -> Dict[str, dict]:
+def update_all(conn, days: int = 1, progress: Optional[Progress] = None, analyze: bool = True,
+               analysis_limit: int = 10) -> Dict[str, dict]:
+    if not isinstance(analysis_limit, int) or not 1 <= analysis_limit <= 10:
+        raise ValueError("Bir güncellemede en fazla 10 haber analiz edilebilir.")
     say = progress or (lambda msg, p: None)
     uni = universe(conn)
     out = {}
@@ -41,8 +44,9 @@ def update_all(conn, days: int = 1, progress: Optional[Progress] = None, analyze
     if analyze and has_api_key():
         say("Yapay zekâ haberleri analiz ediyor...", 0.5)
         out["analyze"] = analyzer.analyze(
-            conn, uni, progress=lambda i, n: say(f"Yapay zekâ haberleri analiz ediyor ({i}/{n})...",
+            conn, uni, limit=analysis_limit, progress=lambda i, n: say(f"Yapay zekâ haberleri analiz ediyor ({i}/{n})...",
                                                  0.5 + 0.42 * i / max(n, 1)))
+        out["analyze"]["waiting"] = len(analyzer.pending(conn))
     elif analyze:
         out["analyze"] = {"atlandı": "OpenAI anahtarı yok"}
     say("Fiyatlar güncelleniyor...", 0.94)

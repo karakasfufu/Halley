@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta
 import pandas as pd
 import streamlit as st
 
-from . import backtest, config, pipeline
+from . import backtest, config, pipeline, pilot_export
 
 
 def render():
@@ -87,33 +87,44 @@ def render():
         cost = st.selectbox("Toplam alış + satış maliyeti varsayımı", [0, 10, 20, 50], index=2,
                             format_func=lambda v: f"%{v / 100:.2f}", key="bt_cost")
         results = backtest.evaluate(conn, cost_bps=cost)
+        exported = pilot_export.build_report(conn, results, cost_bps=cost)
+        files = exported["files"]
+        st.download_button("📦 Bütün pilot tablolarını ve yöntemi indir (ZIP)",
+                           pilot_export.zip_bytes(files), file_name="halley_pilot_raporu.zip",
+                           mime="application/zip", key="bt_all_download")
+        st.caption("ZIP içinde dört dosya bulunur: olay sonuçları, pozitif olay özeti, belge eksikleri ve yöntem açıklaması. "
+                   "İndirmek mevcut sonuçları kullanır; yeni analiz veya OpenAI harcaması başlatmaz.")
         if results:
-            frame = pd.DataFrame(results)
+            frame = exported["frame"]
             st.caption("Giriş: haberin yayımlandığı günden sonraki ilk endeks işlem gününün açılışı. "
                        "1 gün: o günün kapanışı; 5 gün: giriş dahil beşinci işlem gününün kapanışı. "
                        "Negatif/nötr olaylar açığa satış kazancı olarak hesaplanmaz.")
             st.warning("Eksik fiyatlı olaylar tabloda korunur. Yakın tarihli aynı hisse haberleri "
                        "birbirini etkileyebilir; bunlar bağımsız işlem veya portföy getirisi değildir.")
-            usable = frame[(frame["yön"] == 1) & (frame["eksik"] == "")]
-            if not usable.empty:
-                summary = usable.groupby("vade").agg(
-                    olay_sayısı=("bildirim", "count"), farklı_hisse=("hisse", "nunique"),
-                    net_yükseliş_oranı=("net_getiri_%", lambda s: (s > 0).mean() * 100),
-                    ortalama_net_getiri=("net_getiri_%", "mean"),
-                    medyan_net_getiri=("net_getiri_%", "median"),
-                    ortalama_endekse_göre=("endekse_göre_%", "mean"))
+            summary = exported["summary"]
+            if not summary.empty:
                 st.write("**Pozitif olaylar · betimleyici sonuçlar (%)**")
-                st.dataframe(summary, use_container_width=True)
+                st.dataframe(summary, hide_index=True, use_container_width=True)
+            else:
+                st.info("Fiyat sonucu tam pozitif olay bulunmadığından pozitif özet boş.")
+            st.download_button("Pozitif olay özetini indir (CSV)", files["halley_pozitif_ozet.csv"],
+                               file_name="halley_pozitif_ozet.csv", mime="text/csv", key="bt_summary_download")
             st.write(f"**Tüm olay/vade satırları:** {len(frame)} · eksik: {(frame['eksik'] != '').sum()}")
+            st.caption("Buradaki 'eksik' yalnızca fiyat sonuçlarını gösterir. Belgesi eksik veya henüz denetlenmemiş "
+                       "bildirimler aşağıdaki ayrı listededir; 'eksik: 0' bütün belgelerin tam olduğu anlamına gelmez.")
             st.dataframe(frame, hide_index=True, use_container_width=True)
-            st.download_button("Pilot sonuçlarını indir", frame.to_csv(index=False).encode("utf-8-sig"),
+            st.download_button("Tüm olay sonuçlarını indir (CSV)", files["halley_pilot.csv"],
                                file_name="halley_pilot.csv", mime="text/csv", key="bt_download")
         with st.expander("Belge eksikleri ve yöntem"):
-            details = conn.execute("SELECT n.id,n.title,n.note,d.issues FROM news n "
-                                   "JOIN pilot_selection s ON s.news_id=n.id "
-                                   "LEFT JOIN pilot_documents d ON d.news_id=n.id WHERE d.issues IS NULL OR d.issues!='[]'").fetchall()
-            if details:
-                st.dataframe(pd.DataFrame([dict(r) for r in details]), hide_index=True, use_container_width=True)
+            details = exported["gaps"]
+            if not details.empty:
+                st.dataframe(details, hide_index=True, use_container_width=True)
+            else:
+                st.info("Seçili örnekte belge eksiği görünmüyor.")
+            st.download_button("Belge eksiklerini indir (CSV)", files["halley_belge_eksikleri.csv"],
+                               file_name="halley_belge_eksikleri.csv", mime="text/csv", key="bt_gaps_download")
+            st.download_button("Yöntem açıklamasını indir (TXT)", files["halley_yontem.txt"],
+                               file_name="halley_yontem.txt", mime="text/plain", key="bt_methods_download")
             for item in backtest.LIMITATIONS:
                 st.write("• " + item)
             st.caption("API fiyat varsayımı (2026-11-06): milyon girdi tokenı 0,25 USD; "

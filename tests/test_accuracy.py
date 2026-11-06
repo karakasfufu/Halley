@@ -475,6 +475,7 @@ class PanelTests(unittest.TestCase):
                 at.run(timeout=30)
                 self.assertEqual(len(at.exception), 0, str(at.exception))
                 self.assertTrue(at.button(key="bt_analyze").disabled)
+                self.assertEqual(len(at.get("download_button")), 5)
                 with patch.object(backtest, "prepare", return_value={}) as prepare:
                     at.button(key="bt_prepare").click().run(timeout=30)
                 prepare.assert_called_once()

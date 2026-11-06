@@ -66,10 +66,15 @@ with st.sidebar:
         st.success("OpenAI bağlantısı hazır", icon="✅")
 
     days = st.select_slider("KAP: kaç günlük bildirim taransın?", options=[1, 2, 3, 5, 7], value=1)
+    analysis_limit = st.selectbox("Güncellemede en fazla kaç haber analiz edilsin?", [1, 3, 5, 10], index=3,
+                                  help="KAP ve haber siteleri birlikte bu adede dahildir. Kalan haberler bekler; "
+                                       "bu adet sınırıdır, parasal tavan değildir.", key="live_analysis_limit")
+    st.caption("KAP + " + ", ".join(config.RSS_SOURCE_LABELS.get(n, n) for n in config.RSS_FEEDS))
     if st.button("🔄 Verileri güncelle", type="primary", use_container_width=True):
         bar = st.progress(0.0, text="Başlıyor...")
         try:
-            res = pipeline.update_all(conn, days=days, progress=lambda m, p: bar.progress(min(p, 1.0), text=m))
+            res = pipeline.update_all(conn, days=days, analysis_limit=analysis_limit,
+                                      progress=lambda m, p: bar.progress(min(p, 1.0), text=m))
             st.session_state["last_update"] = datetime.now(config.TR_TZ).strftime("%H:%M")
             st.session_state["last_result"] = res
         except Exception as e:
@@ -82,6 +87,10 @@ with st.sidebar:
             st.warning(f"KAP geçici olarak istek sınırı uyguladı; {kap_res.get('bodies_pending', 0)} bildirimin "
                        "metni sonraki güncellemede okunacak. Birkaç dakika sonra tekrar deneyin.")
         an = st.session_state.get("last_result", {}).get("analyze", {})
+        if an.get("waiting"):
+            st.caption(f"{an['waiting']} haber sonraki analiz turunu bekliyor.")
+        if st.session_state.get("last_result", {}).get("rss", {}).get("failed_feeds"):
+            st.warning("Bazı haber kaynakları okunamadı. Kaynak ayrıntıları Durum sekmesinde.")
         if an.get("errors"):
             st.error(f"{an['errors']} haber analiz edilemedi (Durum sekmesine bakın).")
     st.caption("KAP sınırı yüzünden bildirim metinleri ~1 sn/bildirim hızında okunur; ilk güncelleme birkaç dakika sürebilir.")
@@ -214,6 +223,16 @@ with tab_state:
                 f"(modeller: `{config.MODEL_FILTER}` / `{config.MODEL_ANALYSIS}`). Tutarı OpenAI hesabınızdan takip edin.")
     st.markdown(f"**Takip edilen hisse sayısı:** {len(uni)} (listeyi daraltmak için `data/universe.txt`)")
     if "last_result" in st.session_state:
+        sources = st.session_state["last_result"].get("rss", {}).get("sources", {})
+        if sources:
+            st.markdown("**Son taramada haber kaynakları**")
+            state_labels = {"ok": "Okundu", "empty": "Akış boş", "error": "Okunamadı"}
+            st.dataframe(pd.DataFrame([{"Kaynak": config.RSS_SOURCE_LABELS.get(name, name),
+                                       "Durum": state_labels.get(s["state"], s["state"]),
+                                       "Görülen": s["seen"], "Yeni kayıt": s["new"],
+                                       "Tarih eksiği": s["undated"], "İleri tarihli": s["future_dated"],
+                                       "Açıklama": s["error"]} for name, s in sources.items()]),
+                         hide_index=True, use_container_width=True)
         with st.expander("Son güncellemenin ayrıntıları"):
             st.json(st.session_state["last_result"])
 
