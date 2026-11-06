@@ -194,3 +194,64 @@ Kullanıcı doğruluğu önceliklendirdi; model gpt-5-mini kalacak ve gider dü�
   Bu dosyadaki ilk hazırlığa ait sayaçlar ve sıfır harcama ifadeleri güncel kullanım defteri yerine geçmez.
 - Claude geliştirici asistan olacak; uygulamanın API modeli gpt-5-mini kalacak.
   Yalnızca dokümantasyon değiştirildi; yeni model çağrısı başlatılmadı.
+
+## Claude incelemesi: mevcut pilot çıktısı, ücretsiz (2026-11-06)
+
+Yeni model çağrısı yapılmadı ve kod değiştirilmedi. Kullanıcının yerel `pilot.db` dosyası kopyalanarak
+salt okunur incelendi; CSV/rapor dosyaları depoya eklenmedi. GitHub'daki güncel kodla 50 test bu makinede de geçti.
+
+### Maliyet defteri
+- 11 çağrı (10 ilk görüş + 1 ikinci görüş), hepsi `done`; açık/belirsiz rezerv yok.
+- Toplam harcama ≈ **0.081 USD** (1 USD tavanın ~%8'i). Bildirim başına ortalama ≈ 0.008 USD.
+- Kalan 68 temiz belgenin hepsi analiz edilirse kabaca +0.55 USD (toplam ≈ 0.64 USD) tahmin ediliyor;
+  bu tahmin belge uzunluğu ve ikinci görüş sıklığına göre değişir.
+
+### Fiyat hesapları: doğrulandı
+- 40 satırın tamamı ham `pilot_bars` verisinden bağımsız olarak yeniden hesaplandı; giriş/çıkış tarihleri,
+  brüt/net getiri, endekse göre fark ve dönem içi en düşük değer **birebir** tuttu (0 fark).
+- `endekse_göre_%` = **net** getiri (%0.2 maliyet düşülmüş) − endeks getirisi. Yöntem metninde açıkça yazılmalı.
+- Büyük 10 günlük düşüşler (−%15…−%41) bölünme/bedelsiz düzeltme hatası değil; gerçek ardışık düşüşler.
+- **Yeni risk:** Bazı günlerde açılış = en yüksek = en düşük = kapanış (tavan/taban kilidi; örnekte 2 olayda
+  9 gün). Bu günlerde fiilen alım/satım yapılamamış olabilir. Backtest şu an bunu işaretlemiyor;
+  kilitli giriş/çıkış günü olan sonuçlar "uygulanamaz olabilir" diye işaretlenmeli.
+
+### Model yorumlarının belgeyle karşılaştırılması (10 olay, el ile)
+- 6 olay makul (rutin bildirimlere nötr/küçük etki).
+- **Yön veren 5 karardan 4'ü sorunlu.** Tekrarlayan hata türleri:
+  1. **Güncelleme bildirimi:** Eski olumsuz olay (sözleşmenin askıya alınması) yeni bilgi gibi yeniden
+     cezalandırıldı; yeni bilgi aslında yenileme görüşmelerinin başlamasıydı.
+  2. **Kümülatif ve dönemsel rakam karışması:** Aylık rutin satış raporunda, yıllar içinde biriken toplam
+     tutar yeni haber gibi büyük pozitif (etki 3) sayıldı; asıl yeni bilgi yalnızca bir aylık satıştı.
+  3. **Finansal sıkıntı sinyalini kaçırma:** "Finansal yükümlülüklerin yerine getirilmesini teminen"
+     yapılan işten çıkarma, maliyet tasarrufu diye pozitif yorumlandı; metin sıkıntıya işaret ediyordu.
+  4. **Şirket büyüklüğü bilgisi yok:** Çok büyük bir şirketin küçük bir uzlaşma tutarı, bir soruşturmanın
+     ihlalsiz kapanmasına rağmen negatif etki 2 aldı. Pilot bilerek güncel piyasa değeri kullanmıyor.
+- Bu 10 olay ve el ile yapılan değerlendirme istatistiksel kanıt değildir; ama hata türleri somut ve düzeltilebilir.
+
+### Belge eksikleri (22) ve seçilim yanlılığı
+- Sorun türleri: PDF metni uzun (11), okunamayan sayfa (10), ek sayısı sınırı (7), sayfa sınırı (5),
+  analiz metni sınırı (4), PDF hiç okunamadı (2), metin yok (1). Bir belgede birden çok sorun olabilir.
+- Önem sınıflaması (konuya göre):
+  - **Önemli, mutlaka okunmalı:** Pay alım teklifi (2) ve birleşme (3).
+  - **Orta:** Pay geri alım (4), olağanüstü genel kurul (4), değerleme raporu (1), bedelsiz tadil (1).
+  - **Düşük/rutin:** Bilgilendirme politikası, esas sözleşme, haftalık rapor, ihraç tavanı (2), izahname ekleri (2).
+- **Yanlılık:** Önemli olaylar uzun belgeli olduğu için eksik listesinde yoğunlaşıyor. Pilot bu hâliyle rutin
+  bildirimlere kayıyor; sonuçlar "tüm önemli haberler" için geçerli sayılmamalı.
+- Örneğin %22'si pay geri alım bildirimi, %5'i borsa yatırım fonu piyasa yapıcılığı (tamamen rutin;
+  analiz edilen 10'un 2'si bu türdendi, ücret boşa gitti).
+
+### Önerilen düzeltmeler (onay bekliyor, henüz uygulanmadı)
+Hepsi ücretsiz kod değişikliği; gpt-5-mini, high düşünme ve ikinci görüş korunur.
+1. **Talimat:** Güncelleme/düzeltme bildirimlerinde yalnızca önceki açıklamaya göre yeni bilgiyi değerlendir;
+   kümülatif değil dönemsel rakama odaklan; finansal sıkıntı ifadelerini negatif işaret say.
+2. **Rutin konu atlama:** "Piyasa Yapıcılığı Kapsamında Gerçekleştirilen İşlemler", "Likidite Sağlayıcılık",
+   "Bilgilendirme Politikası", "Haftalık Rapor", "Sürdürülebilirlik Raporu" vb. hem günlük akışta hem pilotta atlansın.
+3. **İngilizce tekrarını çıkar:** KAP metinlerinin çoğu Türkçe + İngilizce çeviri; çeviri kısmı atılırsa metin
+   yaklaşık yarıya iner, bilgi kaybı olmaz, uzunluk sınırı sorunlarının bir kısmı ücretsiz çözülür.
+4. **Ek seçimi:** Hazirun, vekaletname, imza sirküleri gibi ekler isimden tanınıp atlansın; ek sayısı
+   sınırı önemli eklere kalsın. Yalnızca son sayfa (imza/kaşe) okunamıyorsa engelleme yerine uyarı.
+5. **Tarihli şirket büyüklüğü:** Olay tarihindeki fiyat (pilot_bars) × o tarihteki pay sayısı ile yaklaşık piyasa
+   değeri; pay sayısı kaynağı (KAP sermaye bilgisi) ayrıca doğrulanmalı.
+6. **Kilitli gün işareti:** Tavan/taban kilidi olan giriş/çıkış günleri sonuç tablosunda işaretlensin.
+- Bu düzeltmeler önceki 10 analizi değiştirmez (önbellek). Etkisini görmek için aynı 10 olayın yeniden analizi
+  ~0.08 USD tutar ve yalnızca kullanıcı onayıyla yapılmalı. Eşikler hâlâ değiştirilmemeli.
