@@ -302,3 +302,13 @@ Skor eşikleri ve yarılanma süreleri değiştirilmedi.
 - Python 3.9.13 ile **65 test geçti**, `compileall` temiz. Streamlit'in `use_container_width` uyarıları önceden de vardı.
 - Kullanıcının panel klasörü (`Documents\ChatGPT\…\work\Halley`) git kopyası değil; bu değişiklikler orada
   otomatik görünmez. Panelde görmek için o klasör GitHub'dan güncellenmeli ve panel yeniden başlatılmalı.
+
+## İstenmeden inen ZIP dosyaları düzeltildi (2026-11-06)
+- Kullanıcının bilgisayarında Internet Download Manager (IDM) çalışıyor. Pilot sekmesi her açıldığında indirme
+  düğmesi için ZIP önceden sayfaya konuyordu; `Downloads\Compressed` altına kullanıcı istemeden 3 ZIP indi
+  (16:11'deki ilki geliştiricinin panel ekranını tarayıcı bölmesinde açmasıyla aynı anda).
+- Artık indirme dosyaları yalnızca "📦 Raporu indirmeye hazırla" (pilot) ve "⬇️ Listeyi indirmeye hazırla"
+  (sinyaller) düğmelerine basınca hazırlanır; "İndirme düğmelerini gizle" ile kaldırılır. Sayfayı açmak hiçbir şey indirmez.
+- AppTest: açılışta 0 indirme düğmesi, hazırla sonrası 5, gizle sonrası 0. 65 test geçti.
+- Geliştirici notu: Kullanıcının makinesinde panel ekranını tarayıcıda açmak IDM yüzünden dosya indirebilir;
+  gerekmedikçe panel sayfası otomatik araçlarla açılmamalı.

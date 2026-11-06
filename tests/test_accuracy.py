@@ -475,7 +475,13 @@ class PanelTests(unittest.TestCase):
                 at.run(timeout=30)
                 self.assertEqual(len(at.exception), 0, str(at.exception))
                 self.assertTrue(at.button(key="bt_analyze").disabled)
+                # Sayfa açılınca hiçbir indirme dosyası hazırlanmaz; kullanıcı isteyince 5 düğme çıkar.
+                self.assertEqual(len(at.get("download_button")), 0)
+                at.button(key="bt_export_prepare").click().run(timeout=30)
+                self.assertEqual(len(at.exception), 0, str(at.exception))
                 self.assertEqual(len(at.get("download_button")), 5)
+                at.button(key="bt_export_hide").click().run(timeout=30)
+                self.assertEqual(len(at.get("download_button")), 0)
                 with patch.object(backtest, "prepare", return_value={}) as prepare:
                     at.button(key="bt_prepare").click().run(timeout=30)
                 prepare.assert_called_once()

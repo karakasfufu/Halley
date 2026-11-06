@@ -162,8 +162,14 @@ with tab_sig:
                                                          "ya da etki belirsiz, haberi elle okuyun"),
                 "last_news": st.column_config.TextColumn("Son haber", width="large"),
             })
-        st.download_button("⬇️ Listeyi indir (Excel uyumlu CSV)", view.to_csv(index=False).encode("utf-8-sig"),
-                           file_name=f"sinyaller_{datetime.now(config.TR_TZ).date()}.csv", mime="text/csv")
+        # Dosya yalnızca istenince sayfaya konur (indirme yöneticileri hazır dosyayı kendiliğinden indirebiliyor).
+        if st.session_state.get("signals_export_ready"):
+            st.download_button("⬇️ Listeyi indir (Excel uyumlu CSV)", view.to_csv(index=False).encode("utf-8-sig"),
+                               file_name=f"sinyaller_{datetime.now(config.TR_TZ).date()}.csv", mime="text/csv",
+                               key="signals_download")
+        elif st.button("⬇️ Listeyi indirmeye hazırla", key="signals_export_prepare"):
+            st.session_state["signals_export_ready"] = True
+            st.rerun()
 
         picked = sel.selection.rows if sel and sel.selection else []
         if picked:

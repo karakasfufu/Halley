@@ -92,11 +92,23 @@ def render():
         results = backtest.evaluate(conn, cost_bps=cost)
         exported = pilot_export.build_report(conn, results, cost_bps=cost)
         files = exported["files"]
-        st.download_button("📦 Bütün pilot tablolarını ve yöntemi indir (ZIP)",
-                           pilot_export.zip_bytes(files), file_name="halley_pilot_raporu.zip",
-                           mime="application/zip", key="bt_all_download")
-        st.caption("ZIP içinde dört dosya bulunur: olay sonuçları, pozitif olay özeti, belge eksikleri ve yöntem açıklaması. "
-                   "İndirmek mevcut sonuçları kullanır; yeni analiz veya OpenAI harcaması başlatmaz.")
+        # İndirme dosyaları yalnızca kullanıcı isteyince sayfaya konur. Sayfada hazır duran ZIP'i
+        # bilgisayardaki indirme yöneticisi (ör. IDM) kendiliğinden indirebiliyordu.
+        ready = st.session_state.get("bt_export_ready", False)
+        if not ready:
+            if st.button("📦 Raporu indirmeye hazırla", key="bt_export_prepare"):
+                st.session_state["bt_export_ready"] = True
+                st.rerun()
+            st.caption("İndirme dosyaları ancak bu düğmeye basınca hazırlanır; sayfayı açmak hiçbir şey indirmez.")
+        else:
+            st.download_button("📦 Bütün pilot tablolarını ve yöntemi indir (ZIP)",
+                               pilot_export.zip_bytes(files), file_name="halley_pilot_raporu.zip",
+                               mime="application/zip", key="bt_all_download")
+            if st.button("İndirme düğmelerini gizle", key="bt_export_hide"):
+                st.session_state["bt_export_ready"] = False
+                st.rerun()
+            st.caption("ZIP içinde dört dosya bulunur: olay sonuçları, pozitif olay özeti, belge eksikleri ve yöntem "
+                       "açıklaması. İndirmek mevcut sonuçları kullanır; yeni analiz veya OpenAI harcaması başlatmaz.")
         if results:
             frame = exported["frame"]
             st.caption("Giriş: haberin yayımlandığı günden sonraki ilk endeks işlem gününün açılışı. "
@@ -110,8 +122,9 @@ def render():
                 st.dataframe(summary, hide_index=True, use_container_width=True)
             else:
                 st.info("Fiyat sonucu tam pozitif olay bulunmadığından pozitif özet boş.")
-            st.download_button("Pozitif olay özetini indir (CSV)", files["halley_pozitif_ozet.csv"],
-                               file_name="halley_pozitif_ozet.csv", mime="text/csv", key="bt_summary_download")
+            if ready:
+                st.download_button("Pozitif olay özetini indir (CSV)", files["halley_pozitif_ozet.csv"],
+                                   file_name="halley_pozitif_ozet.csv", mime="text/csv", key="bt_summary_download")
             locked = int((frame["uygulanabilirlik"].fillna("") != "").sum())
             st.write(f"**Tüm olay/vade satırları:** {len(frame)} · eksik: {(frame['eksik'] != '').sum()}"
                      f" · tavan/taban kilidi şüphesi: {locked}")
@@ -121,18 +134,20 @@ def render():
             st.caption("Buradaki 'eksik' yalnızca fiyat sonuçlarını gösterir. Belgesi eksik veya henüz denetlenmemiş "
                        "bildirimler aşağıdaki ayrı listededir; 'eksik: 0' bütün belgelerin tam olduğu anlamına gelmez.")
             st.dataframe(frame, hide_index=True, use_container_width=True)
-            st.download_button("Tüm olay sonuçlarını indir (CSV)", files["halley_pilot.csv"],
-                               file_name="halley_pilot.csv", mime="text/csv", key="bt_download")
+            if ready:
+                st.download_button("Tüm olay sonuçlarını indir (CSV)", files["halley_pilot.csv"],
+                                   file_name="halley_pilot.csv", mime="text/csv", key="bt_download")
         with st.expander("Belge eksikleri ve yöntem"):
             details = exported["gaps"]
             if not details.empty:
                 st.dataframe(details, hide_index=True, use_container_width=True)
             else:
                 st.info("Seçili örnekte belge eksiği görünmüyor.")
-            st.download_button("Belge eksiklerini indir (CSV)", files["halley_belge_eksikleri.csv"],
-                               file_name="halley_belge_eksikleri.csv", mime="text/csv", key="bt_gaps_download")
-            st.download_button("Yöntem açıklamasını indir (TXT)", files["halley_yontem.txt"],
-                               file_name="halley_yontem.txt", mime="text/plain", key="bt_methods_download")
+            if ready:
+                st.download_button("Belge eksiklerini indir (CSV)", files["halley_belge_eksikleri.csv"],
+                                   file_name="halley_belge_eksikleri.csv", mime="text/csv", key="bt_gaps_download")
+                st.download_button("Yöntem açıklamasını indir (TXT)", files["halley_yontem.txt"],
+                                   file_name="halley_yontem.txt", mime="text/plain", key="bt_methods_download")
             for item in backtest.LIMITATIONS:
                 st.write("• " + item)
             st.caption("API fiyat varsayımı (2026-11-06): milyon girdi tokenı 0,25 USD; "
