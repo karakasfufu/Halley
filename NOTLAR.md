@@ -418,3 +418,10 @@ Kullanıcının onayladığı taslağa göre `app.py` yeniden düzenlendi; iş m
   KAP bildirimleri bekliyor. SOKM "pozitif" ama aynı gün fiyat %-10 (taban) — fiyat ters yönde hareket ettiğinde
   uyarı gösterilmesi ileride değerlendirilebilir (eşik/skor değişikliği değil, bilgi notu).
 - AppTest: ücretsiz düğme tıklanır, yapay zekâ çağrılırsa test düşer. Python 3.9.13 ile **80 test geçti**.
+
+## Analiz sırası: en yeni haber önce (2026-11-06)
+- Kullanıcı isteğiyle `analyzer.pending` artık `ORDER BY published_at DESC` (önce en yeni). Güncelleme başına adet
+  sınırı (1/3/5/10) olduğundan eski haberler sırada bekleyebilir; 3 günden eski RSS haberleri zaten atlanır.
+  Pilot kendi sorgusunu kullanır, etkilenmez. 1 yeni test; **81 test geçti**.
+- Gözlem: Sıradaki bazı KAP kayıtları (ör. "MERKEZİ KAYIT KURULUŞU: DÖNÜŞÜM", "BORSA İSTANBUL: Hak Kullanımı",
+  borçlanma aracı ihraç limiti) rutin olabilir; kullanıcı geri bildirimiyle atlama listesine eklenebilir.

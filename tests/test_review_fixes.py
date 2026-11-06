@@ -303,3 +303,13 @@ class FreeCheckTests(unittest.TestCase):
         self.assertGreater(est["high_usd"], est["low_usd"])
         self.assertGreater(est["low_usd"], 0)
         self.assertEqual(conn.execute("SELECT COUNT(*) FROM analyses").fetchone()[0], 0)
+
+
+class QueueOrderTests(unittest.TestCase):
+    def test_newest_news_is_analyzed_first(self):
+        conn = memory_db()
+        add_news(conn, nid="kap:eski", body="Eski haber metni " * 10, published="2026-11-05T09:00:00+03:00")
+        add_news(conn, nid="kap:yeni", body="Yeni haber metni " * 10, published="2026-11-06T15:00:00+03:00")
+        add_news(conn, nid="kap:orta", body="Orta haber metni " * 10, published="2026-11-06T09:00:00+03:00")
+        self.assertEqual([r["id"] for r in analyzer.pending(conn)], ["kap:yeni", "kap:orta", "kap:eski"])
+        self.assertEqual([r["id"] for r in analyzer.pending(conn, 1)], ["kap:yeni"])

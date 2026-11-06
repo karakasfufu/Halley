@@ -217,9 +217,11 @@ def _save(conn, news_id, stage, model, result: BaseModel, tin, tout):
 
 
 def pending(conn, limit: Optional[int] = None) -> List:
-    # body NULL: KAP metni henüz alınamadı → metin gelene kadar bekle
+    # body NULL: KAP metni henüz alınamadı → metin gelene kadar bekle.
+    # En yeni haber önce (2026-11-06, kullanıcı isteği): swing için taze haber daha değerli; güncelleme başına
+    # adet sınırı olduğundan eski haberler sırada bekleyebilir (çok eskiler zaten RSS_MAX_AGE_DAYS ile atlanır).
     sql = ("SELECT * FROM news WHERE status='new' AND body IS NOT NULL "
-           "AND LENGTH(TRIM(body, char(9)||char(10)||char(13)||' '))>0 ORDER BY published_at")
+           "AND LENGTH(TRIM(body, char(9)||char(10)||char(13)||' '))>0 ORDER BY published_at DESC, id")
     return conn.execute(sql + (f" LIMIT {int(limit)}" if limit else "")).fetchall()
 
 
