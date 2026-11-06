@@ -359,3 +359,12 @@ Kullanıcı onayıyla uygulandı. Model, düşünme düzeyi, ikinci görüş, b�
   kalır, 10 analiz / 40 sonuç satırı / 0.081 USD harcama korunur. Kullanıcı panelde aynı tarihlerle (1–30 Eylül 2026)
   "1 · Belgeleri hazırla / eksikleri yeniden dene" düğmesine basmalı (KAP isteği, birkaç dakika, API ücreti yok).
 - 1 yeni test; Python 3.9.13 ile **72 test geçti**.
+
+## Yeniden hazırlık sonrası pilot durumu (2026-11-06 17:03 raporu)
+- Kullanıcı "Belgeleri hazırla"yı çalıştırdı; KAP istek sınırı 16:50'de durdurdu, 1 belge yeniden denetim bekliyor
+  (düğmeye tekrar basınca tamamlanır). Rutin konular dışlandığı için uygun bildirim 2563 → 2337; örnek 100.
+- Canlı durum: analize hazır 71 (66'sının 10 günlük fiyatı hazır; 5 yeni hisse için "Fiyatları al" gerekli),
+  gerçek belge eksiği 20 (15'i taranmış sayfa), seçimde analiz edilmiş 8. Rutin 2 fon bildiriminin analizi
+  veritabanında kaldı ama artık örnekte değil. Harcama değişmedi: 0.081 USD, belirsiz çağrı yok, kalan 0.919 USD.
+- Rapor düzeltmeleri: belge eksikleri " | " ile ayrılıyor (mesajların içinde ";" var); yöntem metnindeki
+  sabit "40 satır" ifadesi gerçek satır sayısıyla yazılıyor. 1 yeni test; **73 test geçti**.

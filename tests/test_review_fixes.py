@@ -241,6 +241,28 @@ class DocumentCheckMigrationTests(unittest.TestCase):
             conn.close()
 
 
+class ReportTextTests(unittest.TestCase):
+    def test_gap_messages_with_semicolon_stay_whole_and_row_count_is_dynamic(self):
+        from bist_haber import pilot_export
+        with tempfile.TemporaryDirectory() as temp:
+            conn = backtest.connect(Path(temp) / "pilot.db")
+            add_news(conn, nid="kap:1")
+            conn.execute("INSERT INTO pilot_selection VALUES('kap:1')")
+            conn.execute("INSERT INTO pilot_documents VALUES('kap:1','h',?,1,'now')",
+                         ('["PDF okunamadı; resim/bozuk/şifreli olabilir.", "PDF sayfa sınırını aşıyor."]',))
+            conn.commit()
+            row = {"bildirim": "kap:1", "hisse": "TEST", "yön": 1, "vade": 1, "giriş": "2026-09-02",
+                   "çıkış": "2026-09-02", "getiri_%": 1.0, "net_getiri_%": 0.8, "endekse_göre_%": 0.1,
+                   "en_düşük_%": -1.0, "eksik": "", "uygulanabilirlik": ""}
+            report = pilot_export.build_report(conn, [dict(row, vade=v) for v in (1, 3, 5)])
+            conn.close()
+        self.assertEqual(report["gaps"].iloc[0]["eksikler"],
+                         "PDF okunamadı; resim/bozuk/şifreli olabilir. | PDF sayfa sınırını aşıyor.")
+        methods = report["files"]["halley_yontem.txt"].decode("utf-8-sig")
+        self.assertIn("3 satır 3 bağımsız olay", methods)
+        self.assertNotIn("40 satır", methods)
+
+
 class PromptRuleTests(unittest.TestCase):
     def test_prompt_contains_review_rules(self):
         p = analyzer.ANALYSIS_PROMPT

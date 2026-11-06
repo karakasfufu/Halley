@@ -33,7 +33,7 @@ def document_gaps(conn):
     records = []
     for row in rows:
         issues = json.loads(row["issues"]) if row["issues"] is not None else ["Belge henüz denetlenmedi."]
-        records.append({"bildirim": row["id"], "başlık": row["title"], "eksikler": "; ".join(issues)})
+        records.append({"bildirim": row["id"], "başlık": row["title"], "eksikler": " | ".join(issues)})  # mesajların içinde ";" olabiliyor
     return pd.DataFrame(records, columns=["bildirim", "başlık", "eksikler"])
 
 
@@ -76,7 +76,8 @@ def build_report(conn, results, cost_bps=20):
         "ana sonuç dosyasında kalır; açığa satış kârı hesaplanmaz.",
         "Oranlar ve getiri sütunları yüzde birimindedir. Boş özet dosyası, koşullara uyan pozitif "
         "olay bulunmadığını gösterir.",
-        "Her bildirim dört vadede tekrar görünür; 40 satır 40 bağımsız olay anlamına gelmez.",
+        "Her bildirim dört vadede tekrar görünür; {} satır {} bağımsız olay anlamına gelmez "
+        "({} farklı bildirim).".format(len(frame), len(frame), frame["bildirim"].nunique()),
         "Küçük örnekle eşik seçilmez veya yatırım kararı verilmez. Bu çıktı yatırım tavsiyesi değildir.",
         "YÖNTEMİN DİĞER SINIRLARI:",
     ] + ["- " + item for item in backtest.LIMITATIONS]
