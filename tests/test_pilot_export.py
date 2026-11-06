@@ -39,7 +39,8 @@ class ExportTests(unittest.TestCase):
         packed = pilot_export.zip_bytes(report["files"])
         with zipfile.ZipFile(io.BytesIO(packed)) as archive:
             self.assertEqual(set(archive.namelist()), {"halley_pilot.csv", "halley_pozitif_ozet.csv",
-                                                       "halley_belge_eksikleri.csv", "halley_yontem.txt"})
+                                                       "halley_belge_eksikleri.csv", "halley_yontem.txt",
+                                                       "halley_esik_ayari.txt"})
             full = pd.read_csv(io.BytesIO(archive.read("halley_pilot.csv")), encoding="utf-8-sig")
             summary = pd.read_csv(io.BytesIO(archive.read("halley_pozitif_ozet.csv")), encoding="utf-8-sig")
             gaps = pd.read_csv(io.BytesIO(archive.read("halley_belge_eksikleri.csv")), encoding="utf-8-sig")

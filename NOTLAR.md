@@ -368,3 +368,26 @@ Kullanıcı onayıyla uygulandı. Model, düşünme düzeyi, ikinci görüş, b�
   veritabanında kaldı ama artık örnekte değil. Harcama değişmedi: 0.081 USD, belirsiz çağrı yok, kalan 0.919 USD.
 - Rapor düzeltmeleri: belge eksikleri " | " ile ayrılıyor (mesajların içinde ";" var); yöntem metnindeki
   sabit "40 satır" ifadesi gerçek satır sayısıyla yazılıyor. 1 yeni test; **73 test geçti**.
+
+## Faz 3: ön kayıtlı eşik ayarı aracı (2026-11-06, Claude)
+
+**Rol dağılımı:** Kullanıcı temeli ve geliştirmeleri yapıyor; programı başka birine verecek. O kişi pilotu büyütecek
+(ücretli analizleri kendi OpenAI anahtarıyla çalıştıracak) ve geri bildirim gönderecek. Geliştirme bu geri bildirimle sürer.
+
+- **`bist_haber/calibration.py`:** Kurallar veri görülmeden önce yazıldı (modül başındaki 8 madde); sonuçlara
+  bakarak değiştirilmemeli. Olay skoru = yön × etki × güven; eşik ailesi 0.5–3.0 (6 değer); seçim vadesi 5 gün;
+  ölçüt XU100'e göre net getiri; tavan/taban kilidi şüpheli satırlar hariç; zaman sırasına göre %60 geliştirme /
+  %40 doğrulama; geliştirme sonuçlarından doğrulamaya taşanlar ambargo ile atılır; eşik yalnız geliştirmede,
+  en az 20 pozitif olay şartıyla seçilir (eşitlikte daha temkinli eşik); doğrulama bir kez ölçülür.
+- **Canlı eşikler (`report.THRESHOLDS`) değişmez.** Araç yalnızca öneri raporu üretir; uygulamak kullanıcı onayı ister.
+- Panel: pilot sekmesinde "📐 Skor eşiği ayarı (Faz 3)" bölümü. ZIP'e `halley_esik_ayari.txt` eklendi (5 dosya);
+  programı kullanan kişi ZIP'i geri bildirim olarak gönderebilir.
+- Gerçek pilot verisinde (kopya): 8 ölçülebilir olay → "yetersiz veri; eşik seçilmedi". Beklenen ve doğru sonuç.
+- **Yapısal sınır / sonraki geliştirme:** Pilot tek seferde ≤32 günlük tek dönem tutuyor ve yeni hazırlık seçimi
+  değiştiriyor. Tek ayda 10 günlük vadeler zaman bölmesine taştığı için geliştirme döneminin 5/10 günlük sonuçlarının
+  çoğu ambargoyla düşer. Sağlam ayar için birden çok ayın analiz edilmiş olaylarının birikmesi (çok dönemli pilot) gerekir.
+  Kaba hedef: ~400 olay, birkaç ay; maliyet tahmini standart API ile 3–5 USD, Batch ile yaklaşık yarısı (güncel fiyat
+  doğrulanmalı). Bu, 1 USD pilot tavanını aşar; ayrı plan ve onay gerektirir.
+- Testler: `tests/test_calibration.py` (6 test: küçük örnekte seçim yok, yalnız geliştirmede seçim + temkinli eşitlik,
+  doğrulamanın seçimi değiştirememesi, ambargo, kilitli satırların dışlanması, canlı eşiklerin korunması).
+  Python 3.9.13 ile **79 test geçti**.

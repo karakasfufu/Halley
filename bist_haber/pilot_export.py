@@ -5,7 +5,7 @@ import zipfile
 
 import pandas as pd
 
-from . import backtest
+from . import backtest, calibration
 
 RESULT_COLUMNS = ["bildirim", "hisse", "yön", "vade", "giriş", "çıkış", "getiri_%",
                   "net_getiri_%", "endekse_göre_%", "en_düşük_%", "eksik", "uygulanabilirlik"]
@@ -53,6 +53,7 @@ def build_report(conn, results, cost_bps=20):
     frame = pd.DataFrame(results, columns=RESULT_COLUMNS)
     summary = positive_summary(frame)
     gaps = document_gaps(conn)
+    calib = calibration.calibrate(conn, results)
     selection = backtest.metadata(conn).get("selection", {})
     missing_prices = int((frame["eksik"] != "").sum())
     methods = [
@@ -86,5 +87,7 @@ def build_report(conn, results, cost_bps=20):
         "halley_pozitif_ozet.csv": csv_bytes(summary),
         "halley_belge_eksikleri.csv": csv_bytes(gaps),
         "halley_yontem.txt": ("\n\n".join(methods) + "\n").encode("utf-8-sig"),
+        # Faz 3 ön kayıtlı eşik testi: programı kullanan kişi ZIP'i geri bildirim olarak gönderebilir.
+        "halley_esik_ayari.txt": calibration.as_text(calib).encode("utf-8-sig"),
     }
-    return {"frame": frame, "summary": summary, "gaps": gaps, "files": files}
+    return {"frame": frame, "summary": summary, "gaps": gaps, "calibration": calib, "files": files}

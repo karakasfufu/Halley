@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta
 import pandas as pd
 import streamlit as st
 
-from . import backtest, config, pipeline, pilot_export
+from . import backtest, calibration, config, pipeline, pilot_export
 
 
 def render():
@@ -107,8 +107,9 @@ def render():
             if st.button("İndirme düğmelerini gizle", key="bt_export_hide"):
                 st.session_state["bt_export_ready"] = False
                 st.rerun()
-            st.caption("ZIP içinde dört dosya bulunur: olay sonuçları, pozitif olay özeti, belge eksikleri ve yöntem "
-                       "açıklaması. İndirmek mevcut sonuçları kullanır; yeni analiz veya OpenAI harcaması başlatmaz.")
+            st.caption("ZIP içinde beş dosya bulunur: olay sonuçları, pozitif olay özeti, belge eksikleri, yöntem "
+                       "açıklaması ve skor eşiği ayarı raporu. Geri bildirim için geliştiriciye bu ZIP'i gönderin. "
+                       "İndirmek mevcut sonuçları kullanır; yeni analiz veya OpenAI harcaması başlatmaz.")
         if results:
             frame = exported["frame"]
             st.caption("Giriş: haberin yayımlandığı günden sonraki ilk endeks işlem gününün açılışı. "
@@ -137,6 +138,14 @@ def render():
             if ready:
                 st.download_button("Tüm olay sonuçlarını indir (CSV)", files["halley_pilot.csv"],
                                    file_name="halley_pilot.csv", mime="text/csv", key="bt_download")
+        with st.expander("📐 Skor eşiği ayarı (Faz 3) — ön kayıtlı test"):
+            calib = exported["calibration"]
+            st.write(f"**Durum:** {calib['durum']}")
+            st.caption("Geçmiş olaylar zamana göre ikiye bölünür: eşik eski olaylarla seçilir, yeni olaylarla bir kez "
+                       f"sınanır. Seçim için eşik başına en az {calib['kurallar']['en_az_olay']} pozitif olay gerekir. "
+                       "Bu bölüm canlı eşikleri değiştirmez; sonuç geliştiriciye geri bildirim olarak gönderilir.")
+            st.metric("Ölçülebilir olay", calib["toplam_olay"])
+            st.code(calibration.as_text(calib), language=None)
         with st.expander("Belge eksikleri ve yöntem"):
             details = exported["gaps"]
             if not details.empty:
