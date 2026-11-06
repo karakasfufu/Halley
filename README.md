@@ -57,11 +57,15 @@ python -m bist_haber init | collect | analyze --dry-run | analyze | prices | rep
 Panelde **Geçmiş veri pilotu** sekmesini açın:
 1. En az 21 gün önce biten, en fazla 32 günlük bir tarih aralığı seçip **Belgeleri hazırla** düğmesine basın.
 2. **Fiyatları al** düğmesine basın. Bu iki adım OpenAI harcaması yapmaz.
-3. **Pilotu analiz et** düğmesi yalnızca belgesi ve 10 işlem günlük fiyatı hazır olayları işler.
+3. **En fazla 10 bildirimi analiz et** düğmesi yalnızca belgesi ve 10 işlem günlük fiyatı hazır olayları işler.
    Model gpt-5-mini; yüksek düşünme ve gerektiğinde ayrı ikinci görüş korunur.
+   Bir basışta en fazla 10 bildirim işlenir; sonraki grup otomatik başlamaz. İlk küçük tur
+   yöntem/analiz kontrolü içindir; bu kadar az olayla başarı oranı veya eşik seçilmez.
 
 - 100 veya 200 bildirim, fiyat sonuçlarına bakılmadan tekrar üretilebilir biçimde örneklenir.
-- Toplam pilot API bütçesi **5 USD**; kullanım ve belirsiz çağrı rezervleri diskte tutulur.
+- Toplam pilot API bütçesi **1 USD**; kullanım ve belirsiz çağrı rezervleri diskte tutulur.
+  Eski 5 USD sınırı düşürülmüştür; önceki harcama/rezervler silinmez. Önceden 1 USD veya üstü
+  kullanılmışsa yeni ücretli çağrı açılmaz.
   Yeniden açmak veya tarih değiştirmek bütçeyi sıfırlamaz. Bu sınır günlük güncelleme akışına uygulanmaz.
 - İstek içeriği/talimat/model/görüş aynıysa saklanan sonuç kullanılır. İlk ve ikinci görüşün önbelleği ayrıdır.
   Bağlantı kopması/yarım yanıt otomatik ücretli tekrar başlatmaz; gerekiyorsa kayıt geliştirici tarafından incelenir.
@@ -97,7 +101,7 @@ swing. Emirleri Midas'tan elle giriyor (otomatik emir yok, Faz 6 iptal). Model *
 | `bist_haber/report.py` | Skorlama (sönme, çift sayım önleme), eşikler |
 | `bist_haber/prices.py` | yfinance fiyat + piyasa değeri (günlük önbellek) |
 | `bist_haber/config.py` | Tüm ayarlar ve KAP atlama listesi |
-| `bist_haber/backtest.py` | Belge denetimi, 5 USD bütçe/istek önbelleği, geçmiş fiyat ve olay ölçümü |
+| `bist_haber/backtest.py` | Belge denetimi, 1 USD bütçe/istek önbelleği, 10 bildirimlik turlar ve olay ölçümü |
 | `bist_haber/backtest_ui.py` | Panelin geçmiş veri pilotu sekmesi |
 
 **Bilinmesi gerekenler**

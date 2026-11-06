@@ -13,7 +13,8 @@ from typing import Optional
 from . import analyzer, config, db, kap
 
 MODEL = "gpt-5-mini"
-BUDGET_NANO = 5_000_000_000  # bütün pilot veritabanı için 5 USD, yeniden açılışta sıfırlanmaz
+BUDGET_NANO = 1_000_000_000  # bütün pilot veritabanı için 1 USD; önceki harcamalar korunur
+MAX_NEWS_PER_RUN = 10
 INPUT_NANO = 250             # 1M token için 0.25 USD (2026-11-06)
 OUTPUT_NANO = 2000           # 1M token için 2 USD, düşünme tokenları dahil
 MAX_OUTPUT = 16000           # kesilen yanıt sonuç sayılmaz, otomatik yeniden denenmez
@@ -271,7 +272,7 @@ class PilotLLM:
         try:
             used = self.conn.execute("SELECT COALESCE(SUM(charged_nano+reserved_nano),0) FROM pilot_calls").fetchone()[0]
             if used + reserve > BUDGET_NANO:
-                raise BudgetStop("5 USD pilot sınırında duruldu; sonuçlar saklandı.")
+                raise BudgetStop("1 USD pilot sınırında duruldu; sonuçlar saklandı.")
             self.conn.execute("INSERT INTO pilot_calls(fingerprint,news_id,purpose,state,reserved_nano,request_json,created_at) "
                               "VALUES(?,?,?,'reserved',?,?,?)",
                               (fingerprint, self.news_id, purpose, reserve, raw, datetime.now(config.TR_TZ).isoformat()))
@@ -308,7 +309,9 @@ class PilotLLM:
             raise
 
 
-def analyze(conn, progress=None, client=None):
+def analyze(conn, progress=None, client=None, max_items=MAX_NEWS_PER_RUN):
+    if not isinstance(max_items, int) or not 1 <= max_items <= MAX_NEWS_PER_RUN:
+        raise ValueError("Bir turda en fazla 10 bildirim analiz edilebilir.")
     if config.MODEL_ANALYSIS != MODEL:
         raise ValueError("Model ayarı gpt-5-mini olmalı.")
     if not config.SECOND_OPINION:
@@ -320,6 +323,8 @@ def analyze(conn, progress=None, client=None):
                         "ORDER BY n.published_at,n.id").fetchall()
     covered = price_coverage(conn)
     for i, row in enumerate(rows):
+        if stats["analyzed"] >= max_items:
+            break
         if progress:
             progress(f"Pilot analiz ediliyor ({i + 1}/{len(rows)})...", i / max(1, len(rows)))
         if row["id"] not in covered:

@@ -215,6 +215,43 @@ class PilotTests(unittest.TestCase):
             backtest.PilotLLM(self.conn, "kap:1", client).parse("other", "p", "u", analyzer.FullAnalysis)
         self.assertFalse(client.calls)
 
+    def test_ten_news_batch_stops_and_resume_keeps_second_opinion(self):
+        import hashlib
+        body = "Ayrıntılı belge " * 30
+        for i in range(11):
+            nid = f"kap:{i}"
+            add_news(self.conn, nid=nid, body=body)
+            self.conn.execute("INSERT INTO pilot_selection VALUES(?)", (nid,))
+            self.conn.execute("INSERT INTO pilot_documents VALUES(?,?,'[]',?,'now')",
+                              (nid, hashlib.sha256(body.encode()).hexdigest(), len(body)))
+        self.conn.commit()
+        client = FakeClient()
+        first = backtest.analyze(self.conn, client=client)
+        self.assertEqual(first["analyzed"], 10)
+        self.assertEqual(len(client.calls), 20)
+        self.assertTrue(all(c["reasoning_effort"] == "high" for c in client.calls))
+        second = backtest.analyze(self.conn, client=client)
+        self.assertEqual(second["analyzed"], 1)
+        self.assertEqual(len(client.calls), 22)
+        self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM impacts WHERE flag='teyitli'").fetchone()[0], 11)
+
+    def test_lowered_budget_preserves_old_usage_and_blocks_new_calls(self):
+        self.assertEqual(backtest.BUDGET_NANO, 1_000_000_000)
+        self.conn.execute("INSERT INTO pilot_calls VALUES('old','kap:0','primary','done',0,1200000000,0,0,NULL,'{}','now')")
+        self.conn.commit()
+        self.assertEqual(backtest.wallet(self.conn)["remaining_usd"], 0)
+        self.assertEqual(backtest.wallet(self.conn)["charged_usd"], 1.2)
+        client = FakeClient()
+        with self.assertRaises(backtest.BudgetStop):
+            self.call(backtest.PilotLLM(self.conn, "kap:1", client))
+        self.assertFalse(client.calls)
+
+    def test_oversized_batch_is_rejected_before_calls(self):
+        client = FakeClient()
+        with self.assertRaises(ValueError):
+            backtest.analyze(self.conn, client=client, max_items=100)
+        self.assertFalse(client.calls)
+
     def test_sampling_does_not_depend_on_list_order_or_future_prices(self):
         items = [{"disclosureIndex": i, "stockCodes": "TEST", "subject": "Yeni İş İlişkisi"} for i in range(250)]
         a, count = backtest.select_items(items, 100)

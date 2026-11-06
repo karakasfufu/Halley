@@ -48,10 +48,12 @@ def render():
         money = overview["wallet"]
         st.write(f"**Pilot API bütçesi:** {money['charged_usd']:.4f} USD bilinen kullanım · "
                  f"{money['reserved_usd']:.4f} USD ayrılmış/belirsiz · "
-                 f"{money['remaining_usd']:.4f} USD kalan (toplam sınır 5 USD).")
+                 f"{money['remaining_usd']:.4f} USD kalan (toplam sınır 1 USD).")
         st.caption("Model gpt-5-mini. Büyük/belirsiz kararlar ayrı ikinci analizle kontrol edilir. "
                    "Aynı belge, talimat ve görüş yeniden ücretlendirilmez. Bağlantısı kesilen çağrı "
                    "için ayrılan tutar korunur; otomatik tekrar yapılmaz. Kesilen yanıt sonuç sayılmaz.")
+        st.caption("Her basışta en fazla 10 hazır bildirim işlenir. Sonraki grup kendiliğinden başlamaz. "
+                   "Bu küçük tur veri/analiz kontrolü içindir; başarı oranı veya eşik seçimi için yeterli değildir.")
         if st.button("2 · Fiyatları al / yenile (OpenAI harcaması yok)", key="bt_prices"):
             try:
                 with st.spinner("Geçmiş fiyatlar alınıyor..."):
@@ -69,7 +71,7 @@ def render():
         can_analyze = pipeline.has_api_key() and overview["priced_ready"] > 0 and money["remaining_usd"] > 0
         if not pipeline.has_api_key():
             st.caption("Pilot analizi için soldaki alana OpenAI API anahtarınızı girin.")
-        if st.button("3 · Pilotu analiz et / kaldığı yerden sürdür (ücretli)", disabled=not can_analyze, key="bt_analyze"):
+        if st.button("3 · En fazla 10 bildirimi analiz et (ücretli)", disabled=not can_analyze, key="bt_analyze"):
             bar = st.progress(0.0, text="Başlıyor...")
             try:
                 result = backtest.analyze(conn, lambda m, p: bar.progress(min(1.0, p), text=m))
