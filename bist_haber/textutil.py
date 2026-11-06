@@ -64,6 +64,22 @@ def strip_translation(text: str) -> str:
     return result
 
 
+_STAMP_LINE = re.compile(r"doğrulama kodu|dogrulama kodu|spk\.gov\.tr|dokuman-dogrulama", re.I)
+_PAGE_NO = re.compile(r"^[\s\d|/.\-]{0,12}$")  # yalnızca kısa sayfa numarası satırı (ör. "3", "01 07")
+
+
+def page_is_blank(text: str) -> bool:
+    """Sayfa okunabilir içerik taşımıyor mu?
+
+    SPK onaylı belgeler taranmış resimdir; her sayfada yalnızca "Doğrulama Kodu … spk.gov.tr"
+    damgası metin olarak okunur. Damga ve kısa sayfa numarası satırları atılınca 40 karakterden
+    az metin kalıyorsa sayfa boş (taranmış) sayılır. Rakam tablosu satırları atılmaz.
+    """
+    kept = [ln for ln in (text or "").splitlines()
+            if not _STAMP_LINE.search(ln) and not _PAGE_NO.match(ln.strip())]
+    return len("".join(kept).strip()) < 40
+
+
 def title_key(title: str) -> str:
     """Farklı sitelerdeki aynı haberi yakalamak için normalize başlık."""
     return re.sub(r"[^0-9a-zçğıöşü]+", "", tr_lower(title))[:80]

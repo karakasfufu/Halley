@@ -80,6 +80,8 @@ KURALLAR
   şirket (aday listesi) her zaman "etkiler"de yer almalı; etkisizse yon=notr, etki=1.
 - Metnin TAMAMINI oku: [EK: ...] (PDF ek) ve [TAM METİN] (haberin tamamı) bölümleri asıl bilgiyi
   içerebilir. Rakam, beklenti, tarih, karşı taraf gibi ayrıntıları gerekçede kullan.
+- Metinde bir ekin "taranmış görüntü" olduğu ya da "okunamadı" notu varsa, o ekteki bilgiyi bilmiyorsun:
+  tahmin etme, eksikliği gerekçede belirt ve güveni en fazla 0.6 ver.
 
 ŞİRKET BÜYÜKLÜĞÜ
 - Aday listesinde piyasa değeri ve son fiyat verildiyse tutarları buna göre ölçekle
@@ -301,7 +303,8 @@ def _work(llm: LLM, row, universe: Dict[str, str], stats: Dict[str, dict]):
             res["article"] = article
             body = f"{row['body'] or ''}\n\n[TAM METİN]\n{article}"
 
-    msg = _user_message(row, universe, config.MAX_BODY_CHARS, stats, body)
+    # Önemli konularda (pay alım teklifi, birleşme...) daha uzun metin okunur; diğerleri varsayılan sınırda.
+    msg = _user_message(row, universe, config.reading_limits(row["subject"] or "")["body_chars"], stats, body)
     a = call(config.MODEL_ANALYSIS, ANALYSIS_PROMPT, msg, FullAnalysis, config.ANALYSIS_REASONING_EFFORT)
     if config.SECOND_OPINION and _needs_second_opinion(a):
         a2 = call(config.MODEL_ANALYSIS, ANALYSIS_PROMPT, msg, FullAnalysis, config.ANALYSIS_REASONING_EFFORT)

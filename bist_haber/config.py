@@ -46,6 +46,26 @@ KAP_ATTACHMENT_CHARS = 8000   # ek başına en fazla kaç karakter
 KAP_ATTACHMENT_PAGES = 10     # PDF başına en fazla kaç sayfa (yatırımcı sunumları uzun)
 FINANCIAL_SUMMARY_CHARS = 9000  # finansal rapor özeti üst sınırı
 
+# Konuya göre okuma sınırları (2026-11-06). Önemli olayların belgeleri uzun olduğu için varsayılan
+# sınırlarda dışarıda kalıyordu (seçilim yanlılığı). Sınır yalnızca bu konularda büyür; diğerleri değişmez.
+# Konu adında geçen metinle eşleşir; ilk eşleşen grup kullanılır.
+READING_PROFILES = [
+    (("Pay Alım Teklifi", "Birleşme", "Payların Geri Alınmasına", "Yeni İş İlişkisi"),
+     {"attachment_chars": 30000, "pages": 25, "attachments": 4, "body_chars": 60000}),
+    (("Genel Kurul",),
+     {"attachment_chars": KAP_ATTACHMENT_CHARS, "pages": KAP_ATTACHMENT_PAGES, "attachments": 4,
+      "body_chars": 25000}),
+]
+
+
+def reading_limits(subject):
+    """{"attachment_chars", "pages", "attachments", "body_chars"} — konuya göre okuma sınırları."""
+    for keys, limits in READING_PROFILES:
+        if any(k in (subject or "") for k in keys):
+            return dict(limits)
+    return {"attachment_chars": KAP_ATTACHMENT_CHARS, "pages": KAP_ATTACHMENT_PAGES,
+            "attachments": KAP_MAX_ATTACHMENTS, "body_chars": MAX_BODY_CHARS}
+
 # Bu konulardaki KAP bildirimleri yapay zekâya hiç gönderilmez ve metinleri de çekilmez
 # (maliyet + KAP istek sınırı). Konu adında geçen metinle eşleşir. 2026-11-06 verisinde
 # bu türlerin hepsi ya elendi ya da "yönsüz" çıktı; token'ların ~%70'ini bunlar harcıyordu.

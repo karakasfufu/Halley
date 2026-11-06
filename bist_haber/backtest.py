@@ -99,7 +99,7 @@ def document_issues(body, subject):
     issues = []
     if not body or len(body.strip()) < 100:
         issues.append("Metin yok veya güvenilir analiz için çok kısa.")
-    if len(body or "") > config.MAX_BODY_CHARS:
+    if len(body or "") > config.reading_limits(subject)["body_chars"]:
         issues.append("Metin analiz sınırını aşıyor; sessizce kesilerek analiz edilmedi.")
     if "Finansal Rapor" in subject and "[FİNANSAL TABLO ÖZETİ" not in (body or ""):
         issues.append("Finansal tablo özeti alınamadı.")
@@ -119,45 +119,56 @@ def fetch_document(index, subject):
     body, attachments = kap._parse_page(kap._get(kap.DETAIL_URL.format(index=index)).text)
     # Pilotta tüm ekleri denetle; eksik materyal olan bildirime para harcama.
     import time
-    from .textutil import strip_translation
+    from .textutil import page_is_blank, strip_translation
+    limits = config.reading_limits(subject)  # önemli konularda daha geniş okuma sınırı
     # Rutin ekler (hazirun, vekaletname...) ve Türkçesi olan İngilizce kopyalar sınırı doldurmaz;
     # atlananlar metinde açıkça listelenir.
     pdfs, skipped = kap.select_attachments(attachments)
     if any(str(a.get("fileExtension", "")).lower() not in ("pdf",) for a in attachments):
         issues.append("PDF dışındaki ekler okunmadı.")
-    if len(pdfs) > config.KAP_MAX_ATTACHMENTS:
+    if len(pdfs) > limits["attachments"]:
         issues.append("PDF ek sayısı okuma sınırını aşıyor.")
     if skipped:
         body += "\n\n[ATLANAN RUTİN/ÇEVİRİ EKLER: " + "; ".join(skipped) + "]"
-    for a in pdfs[:config.KAP_MAX_ATTACHMENTS]:
+    scanned, readable_chars = [], 0
+    for a in pdfs[:limits["attachments"]]:
         time.sleep(config.KAP_REQUEST_DELAY)
         if not a.get("objId"):
             issues.append("PDF ek adresi yok.")
             continue
+        name = a.get("fileName", "PDF")
         data = kap._get(f"{config.KAP_BASE}/tr/api/file/download/{a['objId']}").content
         try:
-            import io
-            from pypdf import PdfReader
-            start = data.find(b"%PDF")
-            if start < 0 or len(data) > 5_000_000:
-                raise ValueError("PDF dosyası okunamadı veya boyut sınırını aşıyor.")
-            reader = PdfReader(io.BytesIO(data[start:]))
-            if len(reader.pages) > config.KAP_ATTACHMENT_PAGES:
+            if len(data) > 5_000_000:
+                raise ValueError("PDF dosyası boyut sınırını aşıyor.")
+            texts, total = kap.pdf_pages(data, limits["pages"])
+            if total > limits["pages"]:
                 issues.append("PDF sayfa sınırını aşıyor.")
-            texts = [p.extract_text() or "" for p in reader.pages[:config.KAP_ATTACHMENT_PAGES]]
-            blank = [i for i, t in enumerate(texts) if not t.strip()]
+            # Boş ya da yalnızca SPK doğrulama damgası okunan (taranmış) sayfalar.
+            blank = [i for i, t in enumerate(texts) if page_is_blank(t)]
             note = ""
-            if blank == [len(reader.pages) - 1] and len(texts) >= 2:
+            if texts and len(blank) == len(texts):
+                scanned.append(name)  # tamamen taranmış ek: aşağıda karar verilir
+                continue
+            if blank == [len(texts) - 1] and len(texts) == total and total >= 2:
                 # Yalnızca son sayfa boşsa bu genelde imza/kaşe sayfasıdır: engelleme, modele bildir.
                 note = "\n[NOT: Son sayfada metin yok; muhtemelen imza/kaşe sayfası.]"
             elif blank:
                 issues.append("PDF içinde metni okunamayan sayfa var.")
-            text = strip_translation("\n".join(texts)) + note
-            if len(text) > config.KAP_ATTACHMENT_CHARS:
+            text = strip_translation("\n".join(t for i, t in enumerate(texts) if i not in blank)) + note
+            if len(text) > limits["attachment_chars"]:
                 issues.append("PDF metni uzunluk sınırını aşıyor.")
-            body += f"\n\n[EK: {a.get('fileName', 'PDF')}]\n{text[:config.KAP_ATTACHMENT_CHARS]}"
+            readable_chars += len(text)
+            body += f"\n\n[EK: {name}]\n{text[:limits['attachment_chars']]}"
         except Exception:
             issues.append("PDF okunamadı; resim/bozuk/şifreli olabilir.")
+    if scanned:
+        if readable_chars >= 1000:
+            # Yanında okunabilir, içerikli ek var: engelleme; modele eksikliği açıkça bildir.
+            body += ("\n\n[NOT: Şu ekler taranmış görüntü olduğu için okunamadı: " + "; ".join(scanned)
+                     + ". Bilgi eksik olabilir; güveni buna göre düşür.]")
+        else:
+            issues.append("PDF içinde metni okunamayan sayfa var.")
     issues.extend(document_issues(body, subject))
     return body, sorted(set(issues))
 

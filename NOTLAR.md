@@ -312,3 +312,29 @@ Skor eşikleri ve yarılanma süreleri değiştirilmedi.
 - AppTest: açılışta 0 indirme düğmesi, hazırla sonrası 5, gizle sonrası 0. 65 test geçti.
 - Geliştirici notu: Kullanıcının makinesinde panel ekranını tarayıcıda açmak IDM yüzünden dosya indirebilir;
   gerekmedikçe panel sayfası otomatik araçlarla açılmamalı.
+
+## Konuya özel okuma sınırları ve taranmış sayfa tespiti (2026-11-06, Claude)
+
+Kullanıcı onayıyla uygulandı. Model, düşünme düzeyi, ikinci görüş, bütçe, 10 bildirim ve KAP beklemesi aynı.
+
+- **Ölçüm (KAP, API ücreti yok):** Kalan 17 eksik belgenin ekleri indirilip ölçüldü. Pay alım teklifi notu
+  8.003 karakter (sınır 8.000), pay geri alım programları 8.5–20.5 bin, bir birleşme belgesi toplam ~42 bin
+  karakter; genel kurul eklerinde sorun ek sayısı (2) idi.
+- **Gizli eksik bulundu:** SPK onaylı belgeler (onaylı duyuru metni/bilgi formu/ihraç belgesi) taranmış resim;
+  her sayfada yalnızca "Doğrulama Kodu … spk.gov.tr" damgası metin olarak okunuyor. Eski kontrol bu sayfaları
+  dolu sanıyordu. Mevcut "temiz" pilot belgelerinden 3'ünün ekinde bu durum var (borçlanma aracı ihraç belgeleri).
+- **`config.reading_limits(subject)`:** Önemli konular (pay alım teklifi, birleşme, pay geri alım, yeni iş ilişkisi):
+  ek 30.000 karakter, 25 sayfa, 4 ek, toplam metin 60.000. Genel kurul: 4 ek, toplam 25.000. Diğerleri değişmedi.
+  Günlük okuyucu, pilot belge kontrolü, `document_issues` ve analiz mesajı aynı sınırı kullanır.
+- **`textutil.page_is_blank`:** Damga ve kısa sayfa numarası satırları atılınca <40 karakter kalan sayfa boş sayılır.
+  Rakam tablosu satırları atılmaz.
+- **Taranmış ek kuralı (pilot):** Ek tamamen taranmışsa ve yanında ≥1.000 karakter okunabilir ek varsa belge
+  engellenmez; metne "taranmış görüntü, okunamadı" notu eklenir. Okunabilir içerik yoksa belge eskisi gibi engellenir.
+  Günlük akışta okunamayan ek sessizce atlanmaz, metne not düşülür. Talimat: böyle notta güven en fazla 0.6.
+- Talimat değiştiği için yeni pilot çağrılarının önbellek anahtarı da değişir; önceki 10 analiz etkilenmez.
+- **Beklenen etki (henüz gerçek belgeyle sınanmadı):** 17 eksikten ~9'u çözülebilir; ama damga tespiti bazı
+  "temiz" belgeleri dürüstçe eksik/notlu hâle getirebilir. Gerçek kontrol KAP isteği gerektirir; kullanıcı izniyle yapılacak.
+- **Testler:** 6 yeni test (konu sınırları, uzun teklif belgesinin geçmesi, damga sayfası, taranmış ek kuralı,
+  günlük okuyucu notu). Python 3.9.13 ile **71 test geçti**, `compileall` temiz.
+- **Maliyet tahmini:** Önemli belgelerde pilot analizi bildirim başına ~0.012–0.02 USD (önceki ortalama 0.008).
+  Yeni çözülen ~9 belge için toplam ~0.10–0.18 USD. Günlük akışta ek maliyet günde <0.10 USD tahmini.

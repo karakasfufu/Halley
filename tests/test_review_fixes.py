@@ -146,6 +146,75 @@ class LockedDayTests(unittest.TestCase):
         self.assertTrue(all(r["uygulanabilirlik"] == "" for r in backtest.evaluate(self.conn)))
 
 
+STAMP = "Doğrulama Kodu: 8199240d-da90-49cc-baed-8c372a205c53https://spk.gov.tr/dokuman-dogrulama\n01  07"
+
+
+def _reader(pages):
+    return SimpleNamespace(pages=[SimpleNamespace(extract_text=(lambda t=t: t)) for t in pages])
+
+
+class SubjectLimitTests(unittest.TestCase):
+    def test_important_subjects_get_wider_limits_others_unchanged(self):
+        big = config.reading_limits("Pay Alım Teklifi Yoluyla Pay Toplanmasına İlişkin Bildirim")
+        self.assertEqual((big["attachment_chars"], big["pages"], big["attachments"], big["body_chars"]),
+                         (30000, 25, 4, 60000))
+        self.assertEqual(config.reading_limits("Birleşme İşlemlerine İlişkin Bildirim")["pages"], 25)
+        gk = config.reading_limits("Genel Kurul İşlemlerine İlişkin Bildirim")
+        self.assertEqual((gk["attachment_chars"], gk["attachments"], gk["body_chars"]), (8000, 4, 25000))
+        default = config.reading_limits("Özel Durum Açıklaması (Genel)")
+        self.assertEqual((default["attachment_chars"], default["pages"], default["attachments"],
+                          default["body_chars"]),
+                         (config.KAP_ATTACHMENT_CHARS, config.KAP_ATTACHMENT_PAGES,
+                          config.KAP_MAX_ATTACHMENTS, config.MAX_BODY_CHARS))
+
+    def test_long_tender_offer_passes_but_same_length_ordinary_is_flagged(self):
+        pages = ["Pay alım teklifi fiyatı ve koşulları bu bölümde ayrıntılı olarak açıklanmıştır. " * 18] * 15
+        atts = [{"fileExtension": "pdf", "objId": "x", "fileName": "Bilgilendirme Notu.pdf"}]
+        with patch.object(kap, "_get", return_value=SimpleNamespace(text="page", content=b"%PDF")), \
+                patch.object(kap, "_parse_page", return_value=("Belge metni " * 30, atts)), \
+                patch("pypdf.PdfReader", return_value=_reader(pages)), patch("time.sleep"):
+            _, important = backtest.fetch_document(1, "Pay Alım Teklifi Yoluyla Pay Toplanmasına İlişkin Bildirim")
+            _, ordinary = backtest.fetch_document(1, "Özel Durum Açıklaması (Genel)")
+        self.assertEqual(important, [])
+        self.assertIn("PDF sayfa sınırını aşıyor.", ordinary)
+        self.assertIn("PDF metni uzunluk sınırını aşıyor.", ordinary)
+
+
+class ScannedPageTests(unittest.TestCase):
+    def test_stamp_only_page_is_blank_but_number_table_is_not(self):
+        from bist_haber.textutil import page_is_blank
+        self.assertTrue(page_is_blank(STAMP))
+        self.assertTrue(page_is_blank(""))
+        self.assertFalse(page_is_blank("05/11/2026 472.450 0 472.450 11.526.639 11.999.089 6,00 6,00 6,25 6,25"))
+
+    def _fetch(self, readers, names):
+        atts = [{"fileExtension": "pdf", "objId": str(i), "fileName": n} for i, n in enumerate(names)]
+        with patch.object(kap, "_get", return_value=SimpleNamespace(text="page", content=b"%PDF")), \
+                patch.object(kap, "_parse_page", return_value=("Belge metni " * 30, atts)), \
+                patch("pypdf.PdfReader", side_effect=readers), patch("time.sleep"):
+            return backtest.fetch_document(1, "Pay Alım Teklifi Yoluyla Pay Toplanmasına İlişkin Bildirim")
+
+    def test_scanned_form_next_to_readable_note_is_a_warning(self):
+        readable = _reader(["Pay Alım Teklifi Fiyatı : 104,00 TL. Teklif süresi on iş günüdür. " * 20])
+        scanned = _reader([STAMP] * 5)
+        body, issues = self._fetch([readable, scanned], ["Bilgilendirme Notu.pdf", "Onaylı Bilgi Formu.pdf"])
+        self.assertEqual(issues, [])
+        self.assertIn("taranmış görüntü", body)
+        self.assertIn("Onaylı Bilgi Formu.pdf", body)
+
+    def test_only_scanned_attachments_still_block(self):
+        _, issues = self._fetch([_reader([STAMP] * 5)], ["Onaylı Duyuru Metni.pdf"])
+        self.assertIn("PDF içinde metni okunamayan sayfa var.", issues)
+
+    def test_daily_reader_marks_scanned_attachment(self):
+        atts = [{"fileExtension": "pdf", "objId": "x", "fileName": "SPK Onaylı İhraç Belgesi.pdf"}]
+        with patch.object(kap, "_get", return_value=SimpleNamespace(content=b"%PDF")), \
+                patch("pypdf.PdfReader", return_value=_reader([STAMP] * 3)), patch("time.sleep"):
+            text = kap._attachment_texts(atts)
+        self.assertIn("taranmış görüntü", text)
+        self.assertNotIn("Doğrulama Kodu", text)
+
+
 class PromptRuleTests(unittest.TestCase):
     def test_prompt_contains_review_rules(self):
         p = analyzer.ANALYSIS_PROMPT

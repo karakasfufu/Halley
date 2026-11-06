@@ -13,7 +13,7 @@ from typing import Callable, Dict, List, Optional
 import requests
 
 from . import config
-from .textutil import effective_date, html_to_text, strip_translation, tr_lower
+from .textutil import effective_date, html_to_text, page_is_blank, strip_translation, tr_lower
 
 LIST_URL = config.KAP_BASE + "/tr/api/disclosure/members/byCriteria"
 DETAIL_URL = config.KAP_BASE + "/tr/Bildirim/{index}"
@@ -103,17 +103,27 @@ def _parse_page(html: str):
     return _clean(html_to_text(body)), attachments
 
 
-def _pdf_text(data: bytes) -> str:
+def pdf_pages(data: bytes, max_pages: int):
+    """(ilk max_pages sayfanın metinleri, toplam sayfa sayısı). PDF değilse ValueError."""
     # KAP dosyanın başına fazladan bayt ekleyebiliyor; PDF başlığından itibaren al.
     start = data.find(b"%PDF")
     if start < 0:
-        return ""
+        raise ValueError("PDF değil")
     import io
     import logging
     from pypdf import PdfReader
     logging.getLogger("pypdf").setLevel(logging.ERROR)
     reader = PdfReader(io.BytesIO(data[start:]))
-    text = "\n".join((p.extract_text() or "") for p in reader.pages[:config.KAP_ATTACHMENT_PAGES])
+    return [p.extract_text() or "" for p in reader.pages[:max_pages]], len(reader.pages)
+
+
+def _pdf_text(data: bytes, max_pages: Optional[int] = None) -> str:
+    """Okunabilir sayfaların metni. Taranmış (yalnızca SPK damgası okunan) sayfalar atlanır."""
+    try:
+        texts, _ = pdf_pages(data, max_pages or config.KAP_ATTACHMENT_PAGES)
+    except ValueError:
+        return ""
+    text = "\n".join(t for t in texts if not page_is_blank(t))
     return strip_translation(re.sub(r"[ \t]+", " ", text).strip())
 
 
@@ -149,24 +159,32 @@ def select_attachments(attachments: List[dict]):
     return keep, skipped
 
 
-def _attachment_texts(attachments: List[dict]) -> str:
-    """Ana metin "açıklama ekte" diyorsa asıl bilgi PDF ektedir; ilk birkaç PDF'yi okur."""
+def _attachment_texts(attachments: List[dict], limits: Optional[dict] = None) -> str:
+    """Ana metin "açıklama ekte" diyorsa asıl bilgi PDF ektedir; ilk birkaç PDF'yi okur.
+
+    Okunamayan (taranmış) ekler sessizce atlanmaz; modele "okunamadı" notu düşülür.
+    """
+    limits = limits or config.reading_limits("")
     out = []
     pdfs, skipped = select_attachments(attachments)
     pdfs = [a for a in pdfs if a.get("objId")]
     if skipped:
         out.append("[ATLANAN RUTİN/ÇEVİRİ EKLER: " + "; ".join(skipped) + "]")
-    for a in pdfs[:config.KAP_MAX_ATTACHMENTS]:
+    for a in pdfs[:limits["attachments"]]:
+        name = a.get("fileName", "dosya")
         time.sleep(config.KAP_REQUEST_DELAY)
         r = _get(f"{config.KAP_BASE}/tr/api/file/download/{a['objId']}")
         if len(r.content) > 5_000_000:
+            out.append(f"[EK: {name} — dosya çok büyük, okunmadı]")
             continue
         try:
-            text = _pdf_text(r.content)
-        except Exception:  # bozuk/şifreli PDF: atla
-            continue
+            text = _pdf_text(r.content, limits["pages"])
+        except Exception:  # bozuk/şifreli PDF
+            text = ""
         if text:
-            out.append(f"[EK: {a.get('fileName', 'dosya')}]\n{text[:config.KAP_ATTACHMENT_CHARS]}")
+            out.append(f"[EK: {name}]\n{text[:limits['attachment_chars']]}")
+        else:
+            out.append(f"[EK: {name} — taranmış görüntü veya okunamayan PDF; içeriği okunamadı]")
     return "\n\n".join(out)
 
 
@@ -189,7 +207,7 @@ def fetch_body(index: int, subject: str = "") -> str:
         time.sleep(config.KAP_REQUEST_DELAY)
     body, attachments = _parse_page(_get(DETAIL_URL.format(index=index)).text)
     if attachments and (len(body) < config.KAP_SHORT_BODY_CHARS or _POINTS_TO_ATTACHMENT.search(body)):
-        extra = _attachment_texts(attachments)
+        extra = _attachment_texts(attachments, config.reading_limits(subject))
         if extra:
             body = f"{body}\n\n{extra}" if body else extra
     return body
