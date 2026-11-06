@@ -338,3 +338,24 @@ Kullanıcı onayıyla uygulandı. Model, düşünme düzeyi, ikinci görüş, b�
   günlük okuyucu notu). Python 3.9.13 ile **71 test geçti**, `compileall` temiz.
 - **Maliyet tahmini:** Önemli belgelerde pilot analizi bildirim başına ~0.012–0.02 USD (önceki ortalama 0.008).
   Yeni çözülen ~9 belge için toplam ~0.10–0.18 USD. Günlük akışta ek maliyet günde <0.10 USD tahmini.
+
+### Gerçek belgelerle kontrol sonucu (kullanıcı izniyle, KAP isteği, API ücreti yok)
+- İlk 22 eksik belgeden: **6 tamamen temiz** (pay geri alım 4, genel kurul 2), **3 okunabilir + taranmış ek notu**
+  (pay alım teklifi 2, genel kurul 1), **2 rutin konu** (atlanır), **11 hâlâ eksik**. Tahmin edilen ~9 çözüm tuttu.
+- Hâlâ eksik olanlar: taranmış birleşme sözleşmesi/SPK onaylı metinler (2), bir birleşmede okunamayan büyük PDF
+  (5 MB sınırı olabilir; doğrulanmadı), değerleme raporu (109 bin karakter) ve esas sözleşme (30 bin; düşük önem),
+  6 ekli genel kurul (ek sayısı + uzunluk), taranmış ihraç/izahname/esas sözleşme tadil ekleri.
+- Önceden "temiz" sayılan 3 belge (2 sermaye artırımı tadil eki, 1 ihraç belgesi) artık doğru şekilde
+  "okunamayan sayfa" diye engelleniyor. Hiçbiri daha önce ücretli analize girmemişti.
+- Kontrol kullanıcının veritabanına yazılmadı.
+
+### Eski kontrollerin yeniden denetimi (`backtest.DOCUMENT_CHECK_VERSION = 2`)
+- "Belgeleri hazırla" daha önce temiz işaretlenen belgeleri yeniden denetlemiyordu; gizli taranmış belgeler
+  ücretli analize girebilirdi. Pilot veritabanı yeni kodla ilk açıldığında, eski kurallarla temiz sayılan ve
+  henüz analiz edilmemiş belgelerden yalnızca etkilenebilecek olanlar (PDF eki okunmuş ya da okuma sınırı değişen
+  konu) "yeniden denetlenmeli" diye işaretlenir; analize alınmazlar. Analiz edilmiş belgeler, sonuçlar ve harcama
+  kayıtları değişmez. Tek seferliktir (`pilot_meta.document_check_version`).
+- Kullanıcının pilot örneğinde (kopya üzerinde denendi): 28 belge yeniden denetime alınır, 40 belge analize hazır
+  kalır, 10 analiz / 40 sonuç satırı / 0.081 USD harcama korunur. Kullanıcı panelde aynı tarihlerle (1–30 Eylül 2026)
+  "1 · Belgeleri hazırla / eksikleri yeniden dene" düğmesine basmalı (KAP isteği, birkaç dakika, API ücreti yok).
+- 1 yeni test; Python 3.9.13 ile **72 test geçti**.

@@ -59,7 +59,32 @@ def connect(path=None):
             PRIMARY KEY(ticker,date)
         );
     """)
+    _migrate_document_checks(conn)
     return conn
+
+
+# Belge kontrol kuralları değiştikçe artırılır. 2: taranmış (yalnızca SPK damgası okunan) sayfa tespiti
+# ve konuya özel okuma sınırları (2026-11-06). Eski kurallarla "temiz" sayılmış, henüz analiz edilmemiş
+# belgeler yeniden denetlenene kadar analize alınmaz; analiz edilmiş belgelere ve harcama kayıtlarına dokunulmaz.
+DOCUMENT_CHECK_VERSION = 2
+RECHECK_NOTE = "Belge kontrol kuralları güncellendi; 'Belgeleri hazırla' ile yeniden denetlenmeli."
+
+
+def _migrate_document_checks(conn):
+    row = conn.execute("SELECT value FROM pilot_meta WHERE key='document_check_version'").fetchone()
+    if row is not None and json.loads(row["value"]) >= DOCUMENT_CHECK_VERSION:
+        return
+    # Yalnızca yeni kurallardan etkilenebilecekler: PDF eki okunmuş belgeler (taranmış sayfa tespiti) ve
+    # okuma sınırı değişen konular. Eki olmayan sıradan belgeler yeniden indirilmez.
+    subjects = [k for keys, _ in config.READING_PROFILES for k in keys]
+    rows = conn.execute("SELECT d.news_id, n.body, n.subject FROM pilot_documents d JOIN news n ON n.id=d.news_id "
+                        "WHERE d.issues='[]' AND n.status!='analyzed'").fetchall()
+    for r in rows:
+        if "[EK:" in (r["body"] or "") or any(k in (r["subject"] or "") for k in subjects):
+            conn.execute("UPDATE pilot_documents SET issues=? WHERE news_id=?",
+                         (json.dumps([RECHECK_NOTE], ensure_ascii=False), r["news_id"]))
+    _meta(conn, "document_check_version", DOCUMENT_CHECK_VERSION)
+    conn.commit()
 
 
 def _meta(conn, key, value):

@@ -215,6 +215,32 @@ class ScannedPageTests(unittest.TestCase):
         self.assertNotIn("Doğrulama Kodu", text)
 
 
+class DocumentCheckMigrationTests(unittest.TestCase):
+    def test_old_clean_unanalyzed_documents_need_recheck_analyzed_untouched(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "pilot.db"
+            conn = backtest.connect(path)
+            add_news(conn, nid="kap:1", body="Eski kurallarla temiz " * 10)
+            add_news(conn, nid="kap:2", body="Analiz edilmiş " * 10)
+            conn.execute("UPDATE news SET status='analyzed' WHERE id='kap:2'")
+            for nid in ("kap:1", "kap:2"):
+                conn.execute("INSERT INTO pilot_documents VALUES(?,'h','[]',200,'now')", (nid,))
+            backtest._meta(conn, "document_check_version", 1)  # eski kurallarla hazırlanmış veritabanı
+            conn.commit()
+            conn.close()
+            conn = backtest.connect(path)
+            issues = dict(conn.execute("SELECT news_id, issues FROM pilot_documents").fetchall())
+            self.assertIn("yeniden denetlenmeli", issues["kap:1"])
+            self.assertEqual(issues["kap:2"], "[]")
+            client = FakeClient()
+            self.assertEqual(backtest.analyze(conn, client=client)["analyzed"], 0)
+            self.assertFalse(client.calls)
+            conn.close()
+            conn = backtest.connect(path)  # ikinci açılış tekrar işaretlemez
+            self.assertEqual(backtest.metadata(conn)["document_check_version"], backtest.DOCUMENT_CHECK_VERSION)
+            conn.close()
+
+
 class PromptRuleTests(unittest.TestCase):
     def test_prompt_contains_review_rules(self):
         p = analyzer.ANALYSIS_PROMPT
