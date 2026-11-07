@@ -431,7 +431,7 @@ class PanelTests(unittest.TestCase):
             root = Path(temp)
             with patch.object(config, "DB_PATH", root / "live.db"), patch.object(config, "DATA", root / "data"), \
                     patch.object(config, "UNIVERSE_FILE", root / "universe.txt"), \
-                    patch.dict(os.environ, {"OPENAI_API_KEY": ""}):
+                    patch.dict(os.environ, {"OPENAI_API_KEY": "", "HALLEY_OFFLINE": "1"}):
                 conn = db.connect()
                 conn.execute("INSERT INTO companies VALUES('TEST','Deneme',NULL)")
                 conn.commit()
@@ -469,7 +469,7 @@ class PanelTests(unittest.TestCase):
             root = Path(temp)
             with patch.object(config, "DB_PATH", root / "live.db"), patch.object(config, "DATA", root / "data"), \
                     patch.object(config, "UNIVERSE_FILE", root / "universe.txt"), \
-                    patch.dict(os.environ, {"OPENAI_API_KEY": ""}):
+                    patch.dict(os.environ, {"OPENAI_API_KEY": "", "HALLEY_OFFLINE": "1"}):
                 live = db.connect()
                 live.execute("INSERT INTO companies VALUES('TEST','Deneme',NULL)")
                 live.commit()

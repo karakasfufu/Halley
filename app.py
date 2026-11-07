@@ -3,13 +3,15 @@
 Sade düzen (2026-11-06): tek "Haberleri güncelle" düğmesi, 3 özet kutusu, olumlu/olumsuz hisse listeleri.
 Ayarlar katlanır bölümde; durum ve geçmiş veri pilotu "Gelişmiş" sekmesinde.
 """
+import os
 from datetime import date, datetime
 from html import escape as esc
 
 import pandas as pd
 import streamlit as st
 
-from bist_haber import analyzer, config, db, pipeline, report, technical, tradeplan, entries, macro_calendar
+from bist_haber import (analyzer, calendar_sync, config, db, entries, macro_calendar, pipeline, report, technical,
+                        tradeplan)
 
 st.set_page_config(page_title="Halley", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
 
@@ -161,6 +163,11 @@ m1, m2, m3 = st.columns(3)
 m1.metric("Olumlu haber", f"{len(positives)} hisse")
 m2.metric("Olumsuz haber", f"{len(negatives)} hisse")
 m3.metric("Son güncelleme", last_update_text())
+
+if calendar_sync.due() and not os.environ.get("HALLEY_OFFLINE"):
+    # Kullanıcı isteği: takvim her açılışta (günde en fazla bir kez) resmi kaynaklardan kontrol edilsin.
+    with st.spinner("Takvim resmi kaynaklardan kontrol ediliyor (günde bir kez, birkaç saniye)..."):
+        calendar_sync.auto_check()
 
 tab_list, tab_news, tab_adv = st.tabs(["📈 Bugünün listesi", "📰 Haberler", "🔧 Gelişmiş"])
 
@@ -398,18 +405,20 @@ def macro_block() -> None:
     tr_date = lambda d: f"{int(d[8:10])} {AYLAR[int(d[5:7]) - 1]}"
     if u["olaylar"]:
         items = "; ".join(f"**{tr_date(e['tarih'])}** {e['ad']}"
-                          + ("" if e["tur"] == "tatil" else f" saat {e['saat']}" if e["tur"] != "yarim" else f", {e['saat']}")
+                          + ("" if e["tur"] == "tatil" or not e["saat"] else f" saat {e['saat']}" if e["saat"][0].isdigit()
+                             else f", {e['saat']}")
                           + (" (bugün)" if e["bugun"] else "" if e["is_gunu_sonra"] is None
                              else f" ({e['is_gunu_sonra']} işlem günü sonra)")
                           + (" — tek kaynak" if e["dogrulama"] == "tek kaynak" else "") for e in u["olaylar"])
         text = f"📅 **Önümüzdeki 15 işlem günü** ({tr_date(u['bitis'])} dahil): {items}."
     else:
         text = f"📅 **Önümüzdeki 15 işlem günü** ({tr_date(u['bitis'])} dahil): piyasa geneli planlı makro olay yok."
-    later = [e for e in macro_calendar.next_of_each(today) if not any(x["tarih"] == e.get("tarih") for x in u["olaylar"])]
+    later = sorted((e for e in macro_calendar.next_of_each(today) if not any(x["tarih"] == e.get("tarih") for x in u["olaylar"])),
+                   key=lambda e: e["tarih"] or "9999")
     if later:
         text += " Sonraki: " + "; ".join(
             (f"{e['ad'].split(' (')[0]} {tr_date(e['tarih'])} ({macro_calendar.business_days_between(today, date.fromisoformat(e['tarih']))} işlem günü sonra)"
-             if e["tarih"] else f"{e['ad']} — takvimde yok (henüz yayımlanmadı)") for e in later) + "."
+             if e["tarih"] else f"{e['ad']} — sonraki tarih takvimimizde yok (yeni yıl takvimi henüz eklenmedi)") for e in later) + "."
     if u["bilinmeyen"]:
         text += " Bu pencerede takvimi henüz bilinmeyen: " + ", ".join(u["bilinmeyen"]) + "."
     if u.get("tatil_notu"):
@@ -419,6 +428,7 @@ def macro_block() -> None:
     warn = macro_calendar.stale(today)
     if warn:
         st.caption("🛠️ " + warn)
+    st.caption("🔎 " + calendar_sync.summary_line() + " — yenilemek için: Gelişmiş → Takvim kontrolü.")
 
 
 AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
@@ -549,6 +559,31 @@ with tab_adv:
     if last:
         with st.expander("Son güncellemenin teknik ayrıntıları"):
             st.json(last)
+
+    st.divider()
+    st.markdown("#### 📅 Takvim kontrolü")
+    st.caption("TCMB (faiz kararı, PPK özeti, Enflasyon ve Finansal İstikrar raporları) ve Fed takvimleri resmi "
+               "sayfalardan okunur; panel açılışında günde bir kez kendiliğinden de kontrol edilir. Sayfa yapısı "
+               "değişmişse ya da bir tarih okunamazsa hiçbir şey değiştirilmez. Ücretsizdir, yapay zekâ kullanmaz.")
+    if st.button("📅 Takvimi şimdi kontrol et", key="calendar_check"):
+        with st.spinner("Resmi sayfalar okunuyor..."):
+            try:
+                calendar_sync.check()
+            except Exception as e:
+                st.error(f"Kontrol tamamlanamadı: {e}")
+    cal_state = calendar_sync.load()
+    st.write(calendar_sync.summary_line())
+    cal_rep = cal_state.get("report", {})
+    if cal_rep:
+        rows_cal = []
+        for key, label in (("tcmb", "TCMB takvimi"), ("fed", "Fed (FOMC) takvimi")):
+            r_ = cal_rep.get(key, {})
+            detail = r_.get("neden") or ("; ".join(r_.get("farklar") or []) or "yerleşik takvimle aynı")
+            rows_cal.append({"Kaynak": label, "Durum": r_.get("durum", "—"), "Ayrıntı": detail})
+        for item in cal_rep.get("elle", []):
+            rows_cal.append({"Kaynak": item.split(" (")[0], "Durum": "elle kontrol gerekir",
+                             "Ayrıntı": item.split(" (", 1)[1].rstrip(")") if " (" in item else ""})
+        st.dataframe(pd.DataFrame(rows_cal), hide_index=True, use_container_width=True)
 
     st.divider()
     st.markdown("#### 🧪 Ucuz test analizi")

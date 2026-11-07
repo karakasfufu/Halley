@@ -596,3 +596,32 @@ sermaye artırımı; eldeki KAP bildirimlerinden) → B4 panel "önümüzdeki 15
   yok; sonraki TÜFE 3 Aralık (19 işlem günü), PPK 10 Aralık (24). 26 Kasım ve 20 Aralık için de denendi.
 - Testler: `tests/test_macro_calendar.py` (12; veri tutarlılığı: hafta içi, PPK çarşamba/perşembe, TÜFE ayın ilk
   5 günü ve önceki ayın verisi). **187 test geçti.**
+
+## 2026-11-07 — Takvim genişletme ("önemli olabilecek her detay") ve otomatik takvim kontrolü
+
+**Borsa İstanbul tatil/yarım gün takvimi (`market_calendar.py`):** 2026 listesi Midas destek sayfası ve hisse.net
+(06.12.2025) ile birebir; yarım günlerde pay piyasası 12:40'ta kapanır. 2027: yalnız yasayla sabit milli tatiller +
+28 Ekim yarım gün; dini bayram kapanışları borsa açıklayınca eklenmeli (aralık 2027'ye taşınca panel uyarır).
+Gerçek veriyle doğrulandı: Yahoo XU100 1 Ocak–6 Kasım 2026 seansları (212) listeyle BİREBİR (kapalı günde işlem yok,
+açık günde eksik yok); yarım günlerde endeks hacmi medyanın %18–46'sı. Bağlananlar: işlem günü sayımı, haberin etki
+günü (`effective_date`: tatil ve 12:40 kapanışı), fiyat güncelliği kontrolü. Eski kayıtlar: canlı DB'de 2 haberin
+(23 Nisan, 28 Ekim; ikisi de analiz edilmemiş) kayıtlı etki günü eski kurala göre; pilotta etkilenen yok → veri
+değiştirilmedi.
+
+**Makro takvime eklenenler (`macro_calendar.py`):** TCMB Enflasyon Raporu ve Finansal İstikrar Raporu, PPK
+toplantı özetleri, Fed (FOMC; resmi site; TR 21:00/22:00 ABD yaz saatine göre; BIST kapandıktan sonra → etki ertesi
+işlem günü; projeksiyonlu toplantılar işaretli), Türkiye kredi notu planlı tarihleri 2026 (Moody's, S&P, Fitch; iki
+kaynak), VİOP BIST 30 endeks vade sonları (kural: çift ayların son işlem günü, yarım günse önceki iş günü). Bugün
+penceresinde: 12 Kasım Enflasyon Raporu, 27 Kasım Finansal İstikrar Raporu.
+
+**Otomatik takvim kontrolü (`calendar_sync.py`, kullanıcı isteği):** Panel açılışında günde bir kez + Gelişmiş →
+"📅 Takvimi şimdi kontrol et". Kullanıcının bilgisayarından erişilebilen RESMİ sayfalar okunur: TCMB takvim tablosu
+(PPK, özet, Enflasyon Raporu, FİR) ve federalreserve.gov FOMC. Sayfa yapısı/başlıklar beklenenden farklıysa, bir
+tarih okunamazsa, hafta sonuna düşerse ya da özet karardan beklenmedik uzaklıktaysa o kaynak için HİÇBİR ŞEY
+değişmez ("kontrol edilemedi"); önceki geçerli veri korunur. Resmi veri kapsadığı dönemde yerleşik takvimin önüne
+geçer, farklar raporlanır. Otomatik okunamayanlar: Borsa İstanbul (bağlantıyı reddediyor), TÜİK (JavaScript
+uygulaması) → "elle kontrol gerekir". Canlı deneme: 4,3 sn, TCMB ve Fed yerleşik takvimle aynı (fark 0). Bu kontrol
+TCMB tablosu üzerinden 2027 ilk yarısını ve PPK özetlerini resmi olarak doğruladı ("tek kaynak" işaretleri kalktı).
+Gerçek Fed sayfasında 2023 "Jan/Feb 31-1" kısaltması yakalandı ve desteklendi. Sonuç `data/takvim_guncel.json`
+(GitHub'a yüklenmez). Testler ağa çıkmaz (`HALLEY_OFFLINE`, kaydedilmiş gerçek sayfalar `tests/fixtures`).
+**215 test geçti.**

@@ -10,6 +10,26 @@ def tr(y, m, d, h=12, mi=0):
     return datetime(y, m, d, h, mi, tzinfo=config.TR_TZ)
 
 
+import tempfile as _tempfile
+from pathlib import Path as _Path
+from unittest.mock import patch as _patch
+from bist_haber import config as _config
+
+_TMP, _P = None, None
+
+
+def setUpModule():  # kayıtlı resmi takvim (data/takvim_guncel.json) testleri etkilemesin
+    global _TMP, _P
+    _TMP = _tempfile.TemporaryDirectory()
+    _P = _patch.object(_config, "DATA", _Path(_TMP.name))
+    _P.start()
+
+
+def tearDownModule():
+    _P.stop()
+    _TMP.cleanup()
+
+
 class DataTests(unittest.TestCase):
     def test_closed_days_are_weekdays_and_half_days_are_trading_days(self):
         for d in C.CLOSED:
