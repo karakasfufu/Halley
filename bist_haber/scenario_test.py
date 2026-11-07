@@ -52,8 +52,10 @@ def run(conn, max_days: int = MAX_DAYS) -> List[dict]:
         entry_day = sessions[idx]
         history = [b for b in series if b["date"] < entry_day]  # geleceği görmeden
         t = technical.analyze(history, today=datetime.fromisoformat(entry_day).date()) if history else None
+        move = technical.news_moves(history, imp["effective_date"], t["atr"]) if t else {}  # yalnız girişten önceki fiyatlar
         p = tradeplan.plan(t, {"score": score, "direction": imp["direction"], "confidence": imp["confidence"],
-                               "flags": imp["flag"] or "", "persistence": imp["persistence"], "reason": imp["reason"]})
+                               "flags": imp["flag"] or "", "persistence": imp["persistence"], "reason": imp["reason"],
+                               "hareket": move})
         if p["durum"] != "senaryo":
             rec.update(sonuç="senaryo yok", **{"not": p.get("neden_yok", "")})
             out.append(rec)

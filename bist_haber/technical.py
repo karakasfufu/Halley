@@ -144,11 +144,12 @@ def relative_strength(bars: List[dict], bench: Optional[List[dict]], days: int) 
     return ((bars[-1]["close"] / bars[-days - 1]["close"]) / (by_date[end] / by_date[start]) - 1) * 100
 
 
-def news_moves(bars: List[dict], published_day: str, atr_value: Optional[float] = None) -> Dict:
-    """Haber fiyatlanmış mı? Taban = yayın gününden ÖNCEKİ son kapanış.
+def news_moves(bars: List[dict], effective_day: str, atr_value: Optional[float] = None) -> Dict:
+    """Haber fiyatlanmış mı? Taban = haberin etki gününden (effective_date) ÖNCEKİ son kapanış. Seans kapanışından
+    sonra yayınlanan haberde etki günü ertesi iş günüdür; yayın gününün kapanışı haber öncesi sayılır.
     once_5g_% : tabanın 5 işlem günü öncesine göre değişimi (beklenti/sızıntı)
     sonra_%   : tabandan son kapanışa değişim; sonra_atr: aynı hareketin ATR cinsinden büyüklüğü."""
-    base_i = max((i for i, b in enumerate(bars) if b["date"] < published_day), default=None)
+    base_i = max((i for i, b in enumerate(bars) if b["date"] < effective_day), default=None)
     if base_i is None:
         return {}
     base = bars[base_i]["close"]
@@ -326,9 +327,9 @@ def for_ticker(conn, ticker: str, today: Optional[date] = None) -> Optional[Dict
     return t
 
 
-def news_moves_for(conn, ticker: str, published_at: str, atr_value: Optional[float] = None) -> Dict:
-    """Panel için: hissenin kayıtlı fiyatlarıyla haber öncesi/sonrası hareket (yayın günü TR saatine göre)."""
-    day = datetime.fromisoformat(published_at).astimezone(config.TR_TZ).date().isoformat()
+def news_moves_for(conn, ticker: str, effective_day: str, atr_value: Optional[float] = None) -> Dict:
+    """Panel için: hissenin kayıtlı fiyatlarıyla haber öncesi/sonrası hareket (etki gününe göre)."""
+    day = effective_day
     bars = [dict(r) for r in conn.execute("SELECT date, close FROM prices WHERE ticker=? ORDER BY date", (ticker,))]
     return news_moves(bars, day, atr_value)
 

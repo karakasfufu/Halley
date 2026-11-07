@@ -537,3 +537,26 @@ seviyenin üstünde → ertesi gün açılış; limit = en düşük ≤ limit; a
 "yaklaşık" kullanıldı; kod metinleri `md()` ile kaçırılıyor. Testler: `tests/test_entries.py` (20). **157 test geçti.**
 Not: Yahoo gün içinde son barı yalnız kapanışla (açılış/en yüksek/en düşük boş) verebiliyor; ATR bunu kapanışla
 dolduruyor, etkisi küçük.
+
+## 2026-11-07 — Parça A3: fiyatlanma, likidite, "bugün fırsat yok"
+
+**Eşikler gerçek veriyle seçildi (sonuca göre ayarlanmadı):**
+- Likidite (20 günlük ort. kapanış × hacim): 630 işlem gören BIST hissesinde %8'i < 2 mn TL, %24'ü < 10 mn TL,
+  medyan 28 mn TL. < 2 mn TL → senaryo üretilmez; 2–10 mn TL → "Düşük likidite" riski (2 puan). Hacim bilgisi
+  yoksa (pilot barları) uyarı uydurulmaz.
+- Fiyatlanma (ATR cinsinden): 44 hissede rastgele günlerin %1–6'sında 1–3 günde ≥ +2 ATR, %3'ünde 5 günde ≥ +3 ATR
+  yükseliş → olağandışı. Olumlu haberde: haberden bu yana ≥ +2 ATR → "etkinin önemli kısmı fiyatlanmış olabilir"
+  (2 puan); haberden önceki 5 günde ≥ +3 ATR → "beklenti/sızıntı" (1 puan); haberden bu yana ≤ −2 ATR → "haber
+  olumlu ama fiyat düştü; kontrol edin" (2 puan). Sonuncusu gerçek veride yakalandı: SOKM bilanço beklentiyi aştı
+  ("olumlu", teyitli) ama ertesi gün −%9,8 — önceki kural yalnız yükselişe bakıyordu, risk "düşük" görünüyordu.
+- **Düzeltilen hata:** haber öncesi/sonrası taban artık `effective_date` (haberin etki edebileceği ilk işlem günü)
+  ile belirleniyor. Önceden yayın günü kullanılıyordu; seans kapanışından sonra (SOKM 22:29) çıkan haberde yayın
+  gününün kapanışı yanlışlıkla "haber sonrası" sayılıyordu (−%10,8 yerine doğrusu −%9,8). Pilot senaryo testi de
+  aynı ölçümü (yalnız girişten önceki fiyatlarla) kullanıyor.
+
+**"Bugün fırsat" özeti (`tradeplan.opportunity_summary`):** listenin başında; olumlu haberli hisselerden en az bir
+giriş senaryosu elverişsiz olmayanlar risk seviyesine göre sıralı. Yoksa "Bugün uygun işlem fırsatı bulunamadı.
+Her gün işlem yapmak gerekmez." + neden sayıları (haber zayıf / likidite / veri / senaryolar elverişsiz).
+
+Canlı veri kopyasında: 3 hissede uygun senaryo (SOKM destekten tepki risk orta — çelişki notuyla; FROTO ve ISCTR
+kırılım risk orta). Testler: `tests/test_a3_rules.py` (+ etki günü testi). Python 3.9.13 ile **170 test geçti**.

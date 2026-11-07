@@ -225,12 +225,12 @@ def technical_block(t) -> None:
 
 def news_move_block(ticker: str) -> None:
     """Haber fiyatlanmış mı? Son olumlu/olumsuz haberden önceki ve sonraki fiyat hareketi (yalnız ölçüm)."""
-    imp = conn.execute("SELECT published_at FROM impacts WHERE ticker=? AND direction!=0 ORDER BY published_at DESC LIMIT 1",
+    imp = conn.execute("SELECT published_at, effective_date FROM impacts WHERE ticker=? AND direction!=0 ORDER BY published_at DESC LIMIT 1",
                        (ticker,)).fetchone()
     t = tech(ticker)
     if not imp or not t:
         return
-    m = technical.news_moves_for(conn, ticker, imp["published_at"], t.get("atr"))
+    m = technical.news_moves_for(conn, ticker, imp["effective_date"], t.get("atr"))
     if not m:
         return
     pct = lambda v: "—" if v is None else f"{v:+.1f}%"
@@ -261,12 +261,14 @@ _PLAN_CACHE = {}
 def scenario(r: dict) -> dict:
     """Haber + teknik + risk → SL/TP/vade senaryosu (kodla, kredi harcamaz)."""
     if r["ticker"] not in _PLAN_CACHE:
-        imp = conn.execute("SELECT confidence, persistence, reason FROM impacts WHERE ticker=? AND direction!=0 "
+        imp = conn.execute("SELECT confidence, persistence, reason, published_at, effective_date FROM impacts WHERE ticker=? AND direction!=0 "
                            "ORDER BY published_at DESC LIMIT 1", (r["ticker"],)).fetchone()
+        t_ = tech(r["ticker"])
+        move = technical.news_moves_for(conn, r["ticker"], imp["effective_date"], t_.get("atr")) if imp and t_ else {}
         news_info = {"score": r["score"], "direction": 1 if r["score"] > 0 else (-1 if r["score"] < 0 else 0),
                      "confidence": imp["confidence"] if imp else None, "flags": r.get("flags", ""),
                      "persistence": imp["persistence"] if imp else "orta",
-                     "reason": imp["reason"] if imp else "", "summary": r["last_news"]}
+                     "reason": imp["reason"] if imp else "", "summary": r["last_news"], "hareket": move}
         _PLAN_CACHE[r["ticker"]] = tradeplan.plan(tech(r["ticker"]), news_info)
     return _PLAN_CACHE[r["ticker"]]
 
@@ -390,6 +392,15 @@ with tab_list:
     if not rows:
         st.info("Henüz liste yok. Yukarıdaki **Haberleri güncelle** düğmesine basın.")
     else:
+        summary_ = tradeplan.opportunity_summary({r["ticker"]: scenario(r) for r in positives})
+        if summary_["uygun"]:
+            st.success(f"Bugün {len(summary_['uygun'])} hissede uygun görünen giriş senaryosu var: "
+                       + ", ".join(f"{tk} ({name.split(' (')[0].lower()}, risk {risk})" for tk, name, risk in summary_["uygun"])
+                       + ". Ayrıntı için hisseye tıklayın. Bu bir senaryodur, yatırım tavsiyesi değildir.")
+        else:
+            st.info("**Bugün uygun işlem fırsatı bulunamadı.** Her gün işlem yapmak gerekmez. "
+                    + ("Nedenler: " + "; ".join(f"{k} ({v} hisse)" for k, v in summary_["nedenler"].items()) + "."
+                       if summary_["nedenler"] else "Olumlu haber alan hisse yok."))
         st.markdown("#### 🟢 Olumlu haber alanlar")
         stock_list(positives, "Bu dönemde olumlu haber alan hisse yok.")
         st.markdown("#### 🔴 Olumsuz haber alanlar")

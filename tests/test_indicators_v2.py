@@ -115,7 +115,7 @@ class NewsMoveTests(unittest.TestCase):
         self.bars = [{"date": f"2025-03-{d:02d}", "close": c} for d, c in
                      zip(range(3, 15), [100, 100, 101, 102, 104, 108, 110, 112, 111, 115, 116, 118])]
 
-    def test_base_is_last_close_before_publication_day(self):
+    def test_base_is_last_close_before_effective_day(self):
         m = T.news_moves(self.bars, "2025-03-09", atr_value=2.0)  # taban: 03-08 kapanışı 108
         self.assertAlmostEqual(m["once_5g_%"], (108 / 100 - 1) * 100)  # 03-03 → 03-08
         self.assertAlmostEqual(m["sonra_%"], (118 / 108 - 1) * 100)
@@ -125,6 +125,16 @@ class NewsMoveTests(unittest.TestCase):
         m = T.news_moves(self.bars, "2025-03-08")  # gün içi yayın: o günün kapanışı "sonra"ya girer
         self.assertAlmostEqual(m["sonra_%"], (118 / 104 - 1) * 100)  # taban 03-07 kapanışı 104
         self.assertIsNone(m["once_5g_%"])  # tabandan önce 5 işlem günü yok → hesaplanmaz, uydurulmaz
+
+    def test_after_close_news_counts_that_days_close_as_before(self):
+        # Gerçek örnek (SOKM): 2026-11-05 22:29 yayın → etki günü 11-06; 11-05 kapanışı haber ÖNCESİ.
+        from datetime import datetime
+        from bist_haber.textutil import effective_date
+        from bist_haber import config
+        eff = effective_date(datetime(2025, 3, 12, 22, 29, tzinfo=config.TR_TZ))
+        self.assertEqual(eff, "2025-03-13")
+        m = T.news_moves(self.bars, eff)
+        self.assertAlmostEqual(m["sonra_%"], (118 / 115 - 1) * 100)  # taban 03-12 kapanışı 115
 
     def test_no_history_before_publication(self):
         self.assertEqual(T.news_moves(self.bars, "2025-03-01"), {})
