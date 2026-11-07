@@ -695,16 +695,15 @@ with tab_adv:
     st.markdown("#### 📥 Takvim için KAP geçmişi")
     ctx_total = conn.execute("SELECT COUNT(*) FROM news WHERE status='context'").fetchone()[0]
     ctx_missing = conn.execute("SELECT COUNT(*) FROM news WHERE status='context' AND body IS NULL").fetchone()[0]
-    st.caption("Bilanço durumu ve şirket olayları (genel kurul, kâr payı, sermaye artırımı) için son 45 günün KAP "
+    st.caption(f"Bilanço durumu ve şirket olayları (genel kurul, kâr payı, sermaye artırımı) için son {config.KAP_HISTORY_DAYS} günün KAP "
                "bildirimlerini alır. Yapay zekâ KULLANMAZ, kredi harcamaz; kayıtlar analiz sırasına girmez. KAP bekleme "
                "süresi korunur. KAP sınır uygularsa okuyucu 3–10 dk bekleyip KENDİLİĞİNDEN devam eder; tamamlanınca "
                "üstte özet çıkar. Tekrar basmanız gerekmez.")
     st.write(f"Kayıtlı takvim bildirimi: {ctx_total} · form alanları okunmayı bekleyen: {ctx_missing}")
-    if st.button("📥 Takvim için KAP geçmişini al (son 45 gün, ücretsiz)", key="kap_history"):
+    if st.button(f"📥 Takvim için KAP geçmişini tamamla (son {config.KAP_HISTORY_DAYS} gün, ücretsiz)", key="kap_history"):
         bar = st.progress(0.0, text="KAP bildirim listesi alınıyor...")
         try:
-            res = kap_history.backfill(conn, uni, days=45, fetch_pages=False,
-                                       progress=lambda m, p_: bar.progress(min(1.0, p_), text=m))
+            res = kap_history.fill_gaps(conn, uni)   # yalnız listesi alınmamış günler (taranan günler kaydı)
             started = kap_worker.start(force=True) if not os.environ.get("HALLEY_OFFLINE") else False
             st.success(f"{res['eklenen']} yeni takvim bildirimi listeye eklendi. "
                        + ("Olay sayfaları arka planda okunuyor; ilerleme sayfanın üstündeki kutuda."

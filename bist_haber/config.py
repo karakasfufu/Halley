@@ -53,6 +53,7 @@ SESSION_CLOSE_HOUR = 18
 
 HTTP_HEADERS = {"User-Agent": "Mozilla/5.0 (bist-haber prototype)"}
 KAP_BASE = "https://www.kap.org.tr"
+KAP_HISTORY_DAYS = 180  # takvim için KAP geçmişi (2026-11-07, kullanıcı: 45 → 180 gün; uzun süreçler, 2. taksitler)
 KAP_REQUEST_DELAY = 1.5  # saniye; KAP hızlı isteklerde HTTP 429 ile engelliyor
 # Ana metni bundan kısa olan bildirimlerde ("açıklama ekte yer almaktadır") PDF ekleri okunur.
 KAP_SHORT_BODY_CHARS = 800

@@ -100,11 +100,12 @@ def backfill(conn, universe: Dict[str, str], days: int = 45, progress: Optional[
     return st
 
 
-def fill_gaps(conn, universe: Dict[str, str], lookback_days: int = 45, today=None, list_fn=None) -> Dict:
+def fill_gaps(conn, universe: Dict[str, str], lookback_days: Optional[int] = None, today=None, list_fn=None) -> Dict:
     """Son N günde listesi alınmamış günleri takvim için doldurur (yalnız liste; sayfaları kap_worker okur).
     Uygulama birkaç gün açılmadıysa aradaki bildirimler bilanço/olay takviminden kaçmasın. Yapay zekâya gitmez."""
     today = today or datetime.now(config.TR_TZ).date()
-    gaps = kap.coverage_gaps(conn, today - timedelta(days=lookback_days - 1), today)
+    lookback_days = lookback_days or config.KAP_HISTORY_DAYS
+    gaps = kap.coverage_gaps(conn, today - timedelta(days=lookback_days - 1), today, today)
     if not gaps:
         return {"bosluk_gun": 0, "eklenen": 0}
     ranges, start, prev = [], gaps[0], gaps[0]

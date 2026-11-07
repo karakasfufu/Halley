@@ -102,7 +102,12 @@ class BackfillTests(unittest.TestCase):
         self.assertEqual(asked, [("2026-11-01", "2026-11-07")])
         self.assertEqual(res["bosluk_gun"], 7)
         self.assertEqual(kap.coverage_gaps(self.conn, date(2026, 9, 24), date(2026, 11, 7), date(2026, 11, 7)), [])
-        self.assertEqual(kap_history.fill_gaps(self.conn, self.uni, today=date(2026, 11, 7), list_fn=listing)["bosluk_gun"], 0)
+        self.assertEqual(kap_history.fill_gaps(self.conn, self.uni, lookback_days=45, today=date(2026, 11, 7),
+                                               list_fn=listing)["bosluk_gun"], 0)
+        # Varsayılan pencere 180 gün (config): 45 günlük kayıtla 135 gün eksik görünür
+        from bist_haber import config
+        self.assertEqual(config.KAP_HISTORY_DAYS, 180)
+        self.assertEqual(kap_history.fill_gaps(self.conn, self.uni, today=date(2026, 11, 7), list_fn=listing)["bosluk_gun"], 135)
 
 
 class DailyCollectPromotionTests(unittest.TestCase):

@@ -41,7 +41,7 @@ def for_ticker(conn, ticker: str, today: Optional[date] = None, days: int = 15) 
     for x in items:
         x["is_gunu_sonra"] = market_calendar.trading_days_between(today, date.fromisoformat(x["tarih"]))
     from .kap import coverage_gaps
-    gaps = coverage_gaps(conn, today - timedelta(days=45), today, today)
+    gaps = coverage_gaps(conn, today - timedelta(days=config.KAP_HISTORY_DAYS - 1), today, today)
     gap_note = (f"KAP listesi {len(gaps)} gün için alınmamış: bu günlerde açıklanan şirket olayları eksik olabilir "
                 "(bir sonraki güncellemede kendiliğinden tamamlanır)." if gaps else None)
     return {"olaylar": items, "bitis": end, "bilinmeyen": up["bilinmeyen"], "tatil_notu": up.get("tatil_notu"),

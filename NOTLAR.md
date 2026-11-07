@@ -750,3 +750,13 @@ tekrar eden risk satırı, takvim sırası/penceresi/kaynağı → sorun 0. A s�
 kopyayla hatasız; "None/nan" metni yok. Takvim modülleri dışında kodda elle yazılmış tarih yok. **282 test geçti.**
 **Bilinen sınır:** takvim geçmişi 45 gün; daha önce duyurulmuş uzun süreçler (ör. 2. taksit, uzun sermaye artırımı)
 kaçabilir — daha uzun pencere KAP isteği gerektirir, onay alınmadı.
+
+## 2026-11-07 — Takvim geçmişi 180 gün (kullanıcı onayı)
+
+`config.KAP_HISTORY_DAYS = 180` (önce 45). Uzun süreçler (2. taksit, aylar süren sermaye artırımı) kaçmasın diye.
+Güncellemedeki boşluk doldurma ve Gelişmiş düğmesi ("takvim için KAP geçmişini tamamla") yalnız LİSTESİ ALINMAMIŞ
+günleri çeker (`kap_coverage`). Canlı: yedek `data/yedek/bist_haber_2026-11-07_oncesi_180_gun.db`; 12.05–23.09 (135
+gün) 90 sn'de listelendi, +4.112 takvim kaydı; kapsam 180 gün (12.05–07.11). Okunacak sayfa 2.506 = 1.655 takvim +
+851 günlük haber metni (kullanıcının 15:02 güncellemesinde KAP sınırı nedeniyle yarım kalanlar; analiz yine
+"Haberleri güncelle" ve haber sınırıyla). Sayfaları panel içindeki okuyucu KAP sınırına göre bekleyerek okuyor; 4 saati
+aşarsa bir sonraki açılışta sürer. Yeni ilk kurulumda ilk güncelleme 180 günü kendiliğinden listeler (~2 dk).
