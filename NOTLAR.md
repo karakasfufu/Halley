@@ -916,3 +916,23 @@ dokunulmadı). Test artık geçici dosyaya yönlendiriyor; ayar dosyasının de�
 27.10 yeniden kurulmuş test kopyasında akşam akışı: `missed_day_stats` = HABER_YOK 584/4 (%0,7), öneri yok; akış 12 sn.
 357 test, ağsız 0 bağlantı. **W (bekçi) planı tamamlandı.** İsteğe bağlı W6 (yapay zekâ yorumu) yalnız maliyet
 tahmini ve onayla.
+
+## 2026-11-07 — W6: yapay zekâ yorumu (`bist_haber/ai_comment.py`) — kullanıcı onayı: aylık 5–10 $ sorun değil
+Üç kullanım, panelde iki kutu (varsayılan KAPALI): 🤖 rapor yorumu (sabah/akşam, 1 çağrı) ve 🤖 kaçırılan fırsat
+açıklaması (akşam; yalnız haber metni olan kaçırılanlar — "haber yok / veri / likidite" kodla açık, çağrı yapılmaz;
+en fazla 5 YENİ çağrı/akşam, daha önce açıklanan önbellekten ücretsiz gösterilir).
+- Model gpt-5-mini (değişmedi), mevcut `analyzer.LLM`, düşünme seviyesi "low", yapılandırılmış çıktı.
+- **Sayı uydurma denetimi:** yorumdaki her sayı girdide aranır (Türkçe/İngilizce ondalık biçimi, yuvarlama); 0–10 tam
+  sayıları hariç. Bulunamayan sayılar "güvenmeyin" uyarısıyla gösterilir. Kodla hesaplanan bölümler değişmez (testle:
+  yorumlu raporun ilk kısmı yorumsuz raporla birebir aynı); dipnot "yalnız 🤖 bölümler yapay zekâ" olarak değişir.
+- **Geriye dönük bilgi yok:** kaçırılan açıklamasına yalnız karar anına kadar yayımlanmış haber METNİ verilir; sonraki
+  haberlerin yalnız başlığı "KARAR ANINDAN SONRA (o an bilinemezdi)" etiketiyle.
+- **Bütçe:** Ayarlar → "Bekçi yapay zekâ yorumu aylık bütçesi" (varsayılan 10 $). Çağrının en kötü durum maliyeti
+  (13.000 çıktı tokenı varsayımı) bütçeyi aşacaksa çağrı yapılmaz. Harcama `ai_comments` tablosunda (yalnız eklenir).
+  Bütçe yalnız bu yorumlar için; haber analizi maliyeti ayrı.
+- **Maliyet tahmini (onaydan önce sunulan):** rapor yorumu 0,005–0,03 $/çalıştırma; kaçırılan açıklaması 0,005–0,03 $/
+  hisse → üçü birlikte ayda ≈ 0,7–4,1 $. **Gerçek ölçüm (1 ücretli çağrı, test kopyası, 06.11 akşam raporu):** 2.549
+  girdi + 695 çıktı token = **0,0020 $**, doğrulanamayan sayı yok → tahminin altında (Türkçe rapor ~2,6 karakter/token;
+  düşük düşünme). Kaçırılan açıklaması gerçek veride denenemedi: kopyadaki 4 kaçırılanın hepsi "haber yok" (metin yok,
+  kurala göre çağrı yapılmadı); sahte istemcili testlerle doğrulandı.
+- Testler `tests/test_ai_comment.py` (sahte istemci, ücretsiz). 368 test, ağsız 0 bağlantı.

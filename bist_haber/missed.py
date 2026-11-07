@@ -174,7 +174,7 @@ def analyze_day(conn, b_day: str, run_id: int, today: date) -> Dict:
             tags.append("FIYATLANMIS")
         mod, text = EXPLAIN.get(code, ("?", code))
         out["kacirilan"].append({
-            "hisse": t, "baz_gun": b_day, "baz_kapanis": c0, "zirve_gunu": peak["date"], "zirve_kapanis": peak["close"],
+            "hisse": t, "baz_gun": b_day, "run_id": run_id, "baz_kapanis": c0, "zirve_gunu": peak["date"], "zirve_kapanis": peak["close"],
             "kazanc_%": (peak["close"] / c0 - 1) * 100,
             "endeks_%": (bench_px[peak["date"]] / bench0 - 1) * 100, "endekse_gore_atr": best,
             "neden_kodu": code, "modul": mod, "aciklama": text, "etiketler": tags,

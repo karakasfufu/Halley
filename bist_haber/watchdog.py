@@ -233,9 +233,33 @@ def run_session(conn, universe: Dict[str, str], kind: str, settings: Dict, ai: b
             out["yeni_sanal"].append({"id": rid, "hisse": r["ticker"]})
     say("Rapor hazırlanıyor...", 0.95)
     md, data = (morning_report if kind == "sabah" else evening_report)(conn, ctx, out)
+    md, data = _ai_sections(conn, kind, now, md, data, out, settings, steps.get("llm"), say)
     out["rapor"] = archive(now.date().isoformat(), kind, md, data)
     say("Tamamlandı.", 1.0)
     return out
+
+
+def _ai_sections(conn, kind, now, md, data, out, settings, llm, say):
+    """W6: kullanıcı kutuyu açtıysa yapay zekâ yorumu (bütçe denetimli). Kodla hesaplanan bölümler değişmez."""
+    from . import ai_comment
+    extra = ""
+    if settings.get("yz_rapor"):
+        say("Yapay zekâ raporu yorumluyor...", 0.96)
+        r = ai_comment.comment_report(conn, kind, f"{now.date().isoformat()}_{kind}", md, settings, llm=llm)
+        extra += ai_comment.report_md(r)
+        data["yz_yorum"] = r
+        out["yz_yorum"] = r
+    if kind == "aksam" and settings.get("yz_kacirilan") and out.get("kacirilan"):
+        items = out["kacirilan"]["ham"]["liste"]
+        el = ai_comment.eligible(items)
+        say(f"Yapay zekâ kaçırılan fırsatları açıklıyor ({min(len(el), ai_comment.MAX_MISSED)} hisse)...", 0.97)
+        rs = ai_comment.explain_missed(conn, items, settings, llm=llm)
+        extra += ai_comment.missed_md(rs, len(el))
+        data["yz_kacirilan"] = rs
+        out["yz_kacirilan"] = rs
+    if extra:
+        md = md.replace(DISCLAIMER, extra + DISCLAIMER_AI) if DISCLAIMER in md else md + extra + DISCLAIMER_AI
+    return md, data
 
 
 def _recommended(conn, run_id):
@@ -246,6 +270,11 @@ def _recommended(conn, run_id):
 def _watchlist(conn, run_id):
     return [dict(r) for r in conn.execute("SELECT * FROM signal_log WHERE run_id=? AND karar='onerilmedi' AND "
                                           "haber_skoru>=1.0 ORDER BY haber_skoru DESC", (run_id,))]
+
+
+DISCLAIMER_AI = ("\n---\n_Bu rapor kayıtlı veriden kodla üretildi; yalnız 🤖 işaretli bölümler yapay zekâ yorumudur "
+                 "(kodla hesaplanan bölümleri değiştirmez). Senaryolar bilgi amaçlıdır; yatırım tavsiyesi değildir. "
+                 "Emirleri kullanıcı Midas'tan elle verir._\n")
 
 
 def _header(kind, now_iso, tm):

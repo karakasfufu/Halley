@@ -13,7 +13,7 @@ import streamlit as st
 
 from bist_haber import (analyzer, calendar_sync, config, corp_events, db, earnings, entries, journal, kap_history,
                         kap_worker, macro_calendar, pipeline, report, signals, technical, timeline, tradeplan,
-                        trends, watchdog)
+                        trends, watchdog, ai_comment)
 
 st.set_page_config(page_title="Halley", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
 
@@ -127,6 +127,13 @@ with st.expander("⚙️ Ayarlar"):
     if (commission, slippage, capital, risk_pct) != (saved.get("komisyon_pct"), saved.get("kayma_pct"),
                                                       saved.get("sermaye"), saved.get("risk_pct")):
         pipeline.save_settings(komisyon_pct=commission, kayma_pct=slippage, sermaye=capital, risk_pct=risk_pct)
+    # W6: bekçinin yapay zekâ yorumları için aylık bütçe (haber analizi maliyeti bunun dışında)
+    ai_budget = st.number_input("Bekçi yapay zekâ yorumu aylık bütçesi ($)", 0.0, 100.0,
+                                float(saved.get("yz_butce_usd", ai_comment.DEFAULT_BUDGET_USD)), 1.0, format="%.2f",
+                                key="ai_budget", help="Rapor yorumu ve kaçırılan fırsat açıklamaları bu bütçeyi aşmaz: "
+                                                     "bir çağrının en kötü durum maliyeti bütçeyi aşacaksa çağrı yapılmaz.")
+    if ai_budget != saved.get("yz_butce_usd"):
+        pipeline.save_settings(yz_butce_usd=ai_budget)
     if quality != config.DEFAULT_QUALITY:
         st.caption("⚠️ Bu ayarda maliyet düşer ama analizler daha az ayrıntılı ve hata payı daha yüksek olabilir.")
     st.caption("Kaynaklar: KAP + " + ", ".join(config.RSS_SOURCE_LABELS.get(n, n) for n in config.RSS_FEEDS)
@@ -198,6 +205,20 @@ def watch_box() -> None:
                        "(gece gelen yeni haberler toplanınca sıra değişebilir; üst sınır analiz adedidir).")
         else:
             w3.caption("API anahtarı yok: yapay zekâ analizi yapılamaz, rapor ücretsiz kısımla hazırlanır.")
+    a1, a2 = st.columns(2)
+    ai_report = a1.checkbox("🤖 Raporu yapay zekâ ile yorumla (sabah/akşam)", value=False, key="watch_ai_report")
+    ai_missed = a2.checkbox("🤖 Kaçırılan fırsatları yapay zekâ ile açıkla (akşam, en fazla 5 hisse)", value=False,
+                            key="watch_ai_missed")
+    if ai_report or ai_missed:
+        if pipeline.has_api_key():
+            e1 = ai_comment.estimate(6300)
+            spent_ = ai_comment.month_spend(conn)
+            st.caption(f"Tahmini maliyet: rapor yorumu {e1['low']:.3f}–{e1['high']:.3f} $ / çalıştırma"
+                       + (f" · kaçırılan açıklaması {e1['low']:.3f}–{e1['high']:.3f} $ / hisse (en fazla "
+                          f"{ai_comment.MAX_MISSED}; daha önce açıklanan ücretlendirilmez)" if ai_missed else "")
+                       + f" · bu ay harcanan {spent_:.3f} $ / bütçe {ai_budget:.2f} $")
+        else:
+            st.caption("API anahtarı yok: yapay zekâ yorumu yapılamaz; rapor kodla hazırlanır.")
     for kind, col, label in (("sabah", w1, "🌅 Sabah analizi"), ("aksam", w2, "🌙 Akşam analizi")):
         tm = watchdog.timing(kind)
         if col.button(label, use_container_width=True, key=f"watch_{kind}",
@@ -211,7 +232,9 @@ def watch_box() -> None:
                 out = watchdog.run_session(
                     conn, uni, kind, {"gun": days, "analiz_siniri": analysis_limit, "analiz_kalitesi": quality,
                                       "komisyon_pct": commission, "kayma_pct": slippage, "pencere": window,
-                                      "sermaye": capital, "risk_pct": risk_pct},
+                                      "sermaye": capital, "risk_pct": risk_pct, "yz_butce_usd": ai_budget,
+                                      "yz_rapor": bool(ai_report and pipeline.has_api_key()),
+                                      "yz_kacirilan": bool(ai_missed and pipeline.has_api_key())},
                     ai=bool(use_ai and pipeline.has_api_key()),
                     progress=lambda m, p_: bar.progress(min(max(p_, 0.0), 1.0), text=m))
                 st.session_state["watch_last"] = out["rapor"]

@@ -170,6 +170,23 @@ WHEN OLD.durum != 'bekliyor' OR NEW.anahtar != OLD.anahtar OR NEW.metin != OLD.m
 BEGIN SELECT RAISE(ABORT, 'öneri kaydı değiştirilemez (karar yalnız bir kez verilir)'); END;
 CREATE TRIGGER IF NOT EXISTS suggestions_no_delete BEFORE DELETE ON suggestions
 BEGIN SELECT RAISE(ABORT, 'öneri kaydı silinemez'); END;
+-- W6: yapay zekâ yorumları ve maliyetleri (aylık bütçe denetimi buradan). YALNIZ EKLENİR.
+CREATE TABLE IF NOT EXISTS ai_comments (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind                TEXT NOT NULL,      -- sabah | aksam | kacirilan
+    ref                 TEXT NOT NULL,      -- rapor günü_türü ya da HISSE:baz_gun
+    model               TEXT NOT NULL,
+    input_tokens        INTEGER,
+    output_tokens       INTEGER,
+    usd                 REAL NOT NULL,
+    result_json         TEXT NOT NULL,
+    dogrulanamayan_json TEXT,
+    created_at          TEXT NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS ai_comments_no_update BEFORE UPDATE ON ai_comments
+BEGIN SELECT RAISE(ABORT, 'yapay zekâ kaydı değiştirilemez'); END;
+CREATE TRIGGER IF NOT EXISTS ai_comments_no_delete BEFORE DELETE ON ai_comments
+BEGIN SELECT RAISE(ABORT, 'yapay zekâ kaydı silinemez'); END;
 CREATE TABLE IF NOT EXISTS prices (
     ticker TEXT NOT NULL,
     date   TEXT NOT NULL,
