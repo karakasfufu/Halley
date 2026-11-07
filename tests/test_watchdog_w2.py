@@ -180,6 +180,80 @@ class UpdateUniverseTests(unittest.TestCase):
         self.assertEqual(r["basarisiz"], 1)
 
 
+class EveningReportTests(unittest.TestCase):
+    """Elle hesaplanmış örnek: rapordaki her sayı burada bağımsız olarak hesaplandı."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        p = patch.object(config, "DATA", Path(self.tmp.name))
+        p.start()
+        self.addCleanup(p.stop)
+        c = self.conn = db.connect(Path(self.tmp.name) / "t.db")
+        self.addCleanup(c.close)
+        bars = {"XU100": [(1000, 1000, 1000, 1000, 0), (1010, 1010, 1010, 1010, 0)],
+                "A": [(100, 101, 99.5, 100, 1e6), (100, 110.5, 100, 110, 1e6)],      # +%10 (tavana yakın)
+                "B": [(50, 50, 49, 50, 1e6), (50, 50, 48.5, 49, 1e6)],               # −%2
+                "C": [(10, 10, 10, 10, 10), (10, 13, 10, 13, 10)]}                   # +%30 ama sığ → sıralamada yok
+        for t, xs in bars.items():
+            for d, (o, h, l, cl, v) in zip(("2026-11-05", "2026-11-06"), xs):
+                c.execute("INSERT INTO prices(ticker,date,open,high,low,close,volume) VALUES(?,?,?,?,?,?,?)",
+                          (t, d, o, h, l, cl, v))
+        # açık: geri çekilme limiti 05.11'de 100'den doldu; 06.11'de TP1 (108) görüldü → yarısı satıldı, stop girişe
+        c.execute("INSERT INTO trade_journal(created_at,signal_day,ticker,kaynak,senaryo,emir,giris,sl,tp1,tp2,gecerlilik)"
+                  " VALUES('x','2026-11-04','A','otomatik','geri_cekilme','limit',100.5,95,108,120,5)")
+        # bugün TP2 ile kapanmış (sonuç sabit kayıt)
+        res = {"durum": "kapandı", "sonuc": "TP2", "giris_gunu": "2026-11-03", "giris_fiyati": 100.0,
+               "cikis_gunu": "2026-11-06", "brut_getiri_pct": 7.5, "net_getiri_pct": 7.2, "r": 2.4, "olaylar": []}
+        c.execute("INSERT INTO trade_journal(created_at,signal_day,ticker,kaynak,senaryo,emir,giris,sl,tp1,tp2,gecerlilik,"
+                  "durum,sonuc_json) VALUES('x','2026-11-02','B','otomatik','destek','limit',100,95,104,110,5,'kapandı',?)",
+                  (json.dumps(res),))
+        c.commit()
+        self.uni = {"A": "A", "B": "B", "C": "C"}
+
+    def run_e(self, settings):
+        out = watchdog.run_session(self.conn, self.uni, "aksam", settings, now=at(TODAY, 19),
+                                   steps={"prices": lambda: {"hisse": 3, "son_gun": "2026-11-06"}})
+        d = watchdog.report_dir()
+        return out, d.joinpath(out["rapor"] + ".md").read_text(encoding="utf-8"), \
+            json.loads(d.joinpath(out["rapor"] + ".json").read_text(encoding="utf-8"))
+
+    def test_ten_sections_and_hand_computed_numbers(self):
+        out, md, data = self.run_e({"komisyon_pct": 0.2, "kayma_pct": 0.1, "sermaye": 100000, "risk_pct": 1})
+        for i in range(1, 11):
+            self.assertIn(f"## {i}. ", md)
+        ms = data["piyasa"]
+        self.assertAlmostEqual(ms["xu100_%"], 1.0)
+        self.assertEqual((ms["hisse"], ms["yukselen"], ms["dusen"], ms["tavana_yakin"], ms["likit_hisse"]), (3, 2, 1, 2, 2))
+        self.assertEqual([x["hisse"] for x in ms["limit_disi"]], ["C"])                   # %30: limit dışı → uyarı
+        self.assertIn("±%10 fiyat limitini aşmış görünen 1 hisse: C %+30.0", md)
+        self.assertEqual([r["hisse"] for r in ms["en_cok_yukselen"]], ["A", "B"])     # C sığ: sıralamada yok
+        self.assertIn("BIST 100: 1010.00 (+1.00%)", md)
+        a = self.conn.execute("SELECT durum FROM trade_journal WHERE ticker='A'").fetchone()[0]
+        self.assertEqual(a, "açık (TP1 görüldü)")
+        self.assertEqual(data["tp1_bugun"], [1])
+        # gerçekleşmemiş: açık yarı 0,5×(110/100−1)=%5; TP1'de alınan 0,5×%8=%4; maliyet %0,3 → %8,70
+        self.assertIn("| 1 | Sanal | A | +5.00 | +4.00 | +8.70 |", md)
+        # TL: adet = floor(1000 / ((100,5−95) + 100,5×0,003)) = 172; 172 × 100 × %8,7 = 1.496 TL
+        self.assertIn("+1,496", md)
+        # kapanan B: adet floor(1000/5,3)=188; 188 × 100 × %7,2 = 1.354 TL
+        self.assertIn("| 2 | Sanal | B | TP2 | +7.50 | +7.20 | 2.40 | +1,354 |", md)
+        self.assertIn("maliyetin getiriye etkisi toplam %0.30 puan", md)
+        self.assertIn("Hazırlanıyor (W4)", md)
+        self.assertIn("örnek az (1 < 30)", md)
+
+    def test_without_capital_no_tl_and_note(self):
+        _, md, _ = self.run_e({})
+        self.assertIn("TL karşılığı için Ayarlar'da sermaye", md)
+        self.assertNotIn("+1,354", md)
+
+    def test_weekend_uses_last_trading_day(self):
+        out = watchdog.run_session(self.conn, self.uni, "aksam", {}, now=datetime(2026, 11, 7, 19, tzinfo=TZ),
+                                   steps={"prices": lambda: {}})
+        md = watchdog.report_dir().joinpath(out["rapor"] + ".md").read_text(encoding="utf-8")
+        self.assertIn("son işlem günü **2026-11-06**", md)
+
+
 class PanelButtonTests(unittest.TestCase):
     def test_morning_button_runs_and_shows_report(self):
         import os
@@ -207,6 +281,13 @@ class PanelButtonTests(unittest.TestCase):
             self.assertEqual(len(at_.error), 0, [e.value for e in at_.error])
             self.assertTrue(any("Sabah analizi" in m.value for m in at_.markdown))
             self.assertEqual(len(watchdog.list_reports()), 1)
+            at_.button(key="watch_aksam").click().run(timeout=60)
+            self.assertEqual(len(at_.exception), 0, str(at_.exception))
+            self.assertEqual(len(watchdog.list_reports()), 2)
+            self.assertEqual(len(at_.selectbox(key="rep_pick").options), 2)          # Raporlar sekmesi
+            self.assertTrue(any("## 10. Sistem iyileştirme önerileri" in m.value for m in at_.markdown))
+            at_.radio(key="rep_kind").set_value("Sabah").run(timeout=60)
+            self.assertEqual(len(at_.selectbox(key="rep_pick").options), 1)
 
 
 if __name__ == "__main__":

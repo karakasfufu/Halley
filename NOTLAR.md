@@ -842,3 +842,28 @@ EKLENİR (tetikleyiciler UPDATE/DELETE'i reddeder). Canlı kopya: 761 hisse 9,7 
 - Testler: `tests/test_watchdog_w2.py` (saat/tatil/yarım gün, akışlar, arşiv değişmezliği, artımlı/eksik fiyat, panel
   düğmesi AppTest). Toplam 332 test, ağ bağlantısı engelliyken 0 bağlantı denemesi.
 - **Sırada:** W3 akşam raporu 10 bölüm + "📋 Raporlar" sekmesi; W4 kaçırılan fırsatlar; W5 eğilim/öneri listesi.
+
+## 2026-11-07 — W3: 10 bölümlü akşam raporu ve "📋 Raporlar" sekmesi
+**Akşam raporu** (kullanıcının istediği 10 bölüm; yalnız kayıtlı veri, yapay zekâ yok):
+1. Piyasa özeti: XU100 değişimi, yükselen/düşen/değişmeyen, medyan, toplam hacim, %9,5+ hareketler; ±%10 limiti
+   aşmış görünenler ayrıca uyarılır (bedelsiz/temettü düzeltmesi, halka arz ya da veri hatası olabilir). En çok
+   yükselen/düşen 5 hisse yalnız likitlerden (20 gün ort. hacim ≥ 2 mn TL).
+2. Öneriler: o günün sabah önerileri + akşam (kapanış verisiyle) önerilenler.
+3. Gerçekleşen/devam eden işlemler (bugün girilen, kapanan, süresi dolan, devam eden; sanal/gerçek ayrı).
+4. TP1/TP2/SL: bugün görülenler + toplam sonuç dağılımı; temkinli kural notu.
+5. Net K/Z: bugün kapananlar (brüt/net %, R, plan büyüklüğüyle TL), gerçekleşmiş toplam, gerçekleşmemiş (açık
+   işlem; TP1'de satılan yarı ayrı, çıkış maliyeti düşülmüş tahmini). TL yalnız Ayarlar'da sermaye + risk girildiyse.
+6. Maliyetler: varsayım (komisyon + kayma) ve kapanan işlemlerde getiriye etkisi.
+7–8. Kaçırılan fırsatlar ve nedenleri: **W4'te** (şimdilik "hazırlanıyor" yazar — uydurma yok).
+9. Başarılı/başarısız: son 30 günde kapananlar + sanal toplam metrikler; 30 işlemden az örnekte uyarı.
+10. Öneriler: karar izinden kodla gözlemler (analiz bekleyen hisse oranı, senaryo/likidite elemesi, veri hatası);
+    hiçbir ayar kendiliğinden değişmez.
+Hafta sonu/tatilde çalıştırılırsa son işlem günü verisi kullanılır ve bu yazılır.
+
+**Raporlar sekmesi:** arşivdeki tüm sabah/akşam raporları (en yeni üstte, türe göre süzme), .md ve .json indirme.
+Yalnız okunur.
+
+**Doğrulama:** elle hesaplanmış örnek (TP1'de yarı satış, TP2 kapanış, sığ hisse, %30 sıçrama) — rapordaki her sayı
+testte bağımsız hesaplandı (ör. 172 adet × 100 × %8,7 = 1.496 TL). Canlı kopya (06.11 verisi): XU100 +%1,32 ham
+fiyattan ayrıca hesaplandı, aynı; 630 hissede 424 yükselen / 177 düşen; 580 likit hisse. 335 test, ağsız 0 bağlantı.
+**Sırada:** W4 kaçırılan fırsatlar (eşik gerçek dağılımdan, o günkü karar izine göre neden), W5 eğilim + onay listesi.

@@ -210,7 +210,8 @@ def watch_box() -> None:
             try:
                 out = watchdog.run_session(
                     conn, uni, kind, {"gun": days, "analiz_siniri": analysis_limit, "analiz_kalitesi": quality,
-                                      "komisyon_pct": commission, "kayma_pct": slippage, "pencere": window},
+                                      "komisyon_pct": commission, "kayma_pct": slippage, "pencere": window,
+                                      "sermaye": capital, "risk_pct": risk_pct},
                     ai=bool(use_ai and pipeline.has_api_key()),
                     progress=lambda m, p_: bar.progress(min(max(p_, 0.0), 1.0), text=m))
                 st.session_state["watch_last"] = out["rapor"]
@@ -291,8 +292,8 @@ if calendar_sync.due() and not os.environ.get("HALLEY_OFFLINE"):
     with st.spinner("Takvim resmi kaynaklardan kontrol ediliyor (günde bir kez, birkaç saniye)..."):
         calendar_sync.auto_check()
 
-tab_list, tab_journal, tab_news, tab_adv = st.tabs(["📈 Bugünün listesi", "📒 İşlem günlüğü", "📰 Haberler",
-                                                     "🔧 Gelişmiş"])
+tab_list, tab_journal, tab_reports, tab_news, tab_adv = st.tabs(["📈 Bugünün listesi", "📒 İşlem günlüğü",
+                                                                  "📋 Raporlar", "📰 Haberler", "🔧 Gelişmiş"])
 
 
 # W1: panel ve bekçi aynı hesabı kullanır (bist_haber/signals.py)
@@ -879,6 +880,31 @@ with tab_adv:
     st.markdown("### 🧪 Geçmiş veri pilotu")
     from bist_haber.backtest_ui import render as render_backtest
     render_backtest()
+
+with tab_reports:
+    # W3: bekçi rapor arşivi — yalnız okunur; dosyalar değiştirilmez, silinmez
+    names = watchdog.list_reports()
+    if not names:
+        st.info("Henüz bekçi raporu yok. Üstteki **🌅 Sabah analizi** ya da **🌙 Akşam analizi** düğmesiyle ilk raporu "
+                "oluşturun; her rapor tarihiyle arşive kaydedilir.")
+    else:
+        f1, f2 = st.columns([1, 3])
+        kind_f = f1.radio("Tür", ["Hepsi", "Sabah", "Akşam"], horizontal=False, key="rep_kind")
+        shown = [n for n in names if kind_f == "Hepsi" or ("_sabah" in n) == (kind_f == "Sabah")]
+        label = lambda n: (("🌅 " if "_sabah" in n else "🌙 ") + n[:10] + (" sabah" if "_sabah" in n else " akşam")
+                           + (f" ({n.rsplit('_', 1)[1]}. çalıştırma)" if n.rsplit("_", 1)[1].isdigit() else ""))
+        if shown:
+            pick = f2.selectbox(f"Rapor ({len(shown)} kayıt, en yeni üstte)", shown, format_func=label, key="rep_pick")
+            path = watchdog.report_dir() / f"{pick}.md"
+            d1, d2 = st.columns(2)
+            d1.download_button("Raporu indir (.md)", path.read_bytes(), file_name=path.name, key="rep_dl_md")
+            jp = path.with_suffix(".json")
+            if jp.exists():
+                d2.download_button("Ham veriyi indir (.json)", jp.read_bytes(), file_name=jp.name, key="rep_dl_json")
+            st.caption("Arşivdeki raporlar o anki veriyle üretildi ve sonradan değiştirilmez (geriye dönük bilgi karışmaz).")
+            st.markdown(path.read_text(encoding="utf-8"))
+        else:
+            f2.info("Bu türde rapor yok.")
 
 st.markdown("<div class='disclaimer'>Halley haberleri otomatik olarak özetler ve puanlar; yatırım tavsiyesi değildir. "
             "Puan eşikleri henüz geçmiş veriyle ayarlanmadı. Karar ve emir sorumluluğu kullanıcıdadır.</div>",

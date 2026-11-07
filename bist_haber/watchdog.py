@@ -9,7 +9,7 @@ botun BİLDİĞİ ile yapılır, geriye dönük bilgi karışmaz.
 """
 import json
 from collections import Counter
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Dict, Optional
 
 from . import config, report, signals
@@ -198,7 +198,8 @@ def run_session(conn, universe: Dict[str, str], kind: str, settings: Dict, ai: b
     now = now or datetime.now(config.TR_TZ)
     steps = steps or {}
     tm = timing(kind, now)
-    out = {"tur": kind, "zaman": tm, "yz": ai}
+    out = {"tur": kind, "zaman": tm, "yz": ai, "evren": sorted(universe),
+           "ayarlar": {k: settings[k] for k in ("komisyon_pct", "kayma_pct", "sermaye", "risk_pct") if k in settings}}
     commission = float(settings.get("komisyon_pct", journal.DEFAULT_COMMISSION_PCT))
     slippage = float(settings.get("kayma_pct", journal.DEFAULT_SLIPPAGE_PCT))
     if kind == "sabah":
@@ -301,11 +302,296 @@ def morning_report(conn, ctx, out) -> tuple:
     return md, data
 
 
+def market_summary(conn, universe, today: date) -> Dict:
+    """Bölüm 1: son işlem gününün piyasa özeti (kayıtlı OHLCV'den; tahmin yok).
+    Sıralamalar likit hisselerle yapılır (20 günlük ort. işlem hacmi ≥ tradeplan.LIQ_MIN_TL): sığ hisselerin
+    sıçramaları özeti bozmasın."""
+    from . import tradeplan
+    bench = "XU100"
+    days = [r[0] for r in conn.execute("SELECT DISTINCT date FROM prices WHERE ticker=? AND date<=? ORDER BY date DESC "
+                                       "LIMIT 21", (bench, today.isoformat()))]
+    if len(days) < 2:
+        return {"yok": "Endeks (XU100) fiyatı kayıtlı değil: piyasa özeti hesaplanamadı."}
+    d, prev = days[0], days[1]
+    px = {}
+    for r in conn.execute("SELECT ticker, date, close, volume FROM prices WHERE date IN (?,?)", (d, prev)):
+        px.setdefault(r["ticker"], {})[r["date"]] = (r["close"], r["volume"] or 0)
+    liq = dict(conn.execute("SELECT ticker, AVG(close*volume) FROM prices WHERE date>=? AND date<=? GROUP BY ticker",
+                            (days[-1], d)).fetchall())
+    out = {"gun": d, "onceki_gun": prev, "bugun_islem_gunu_degil": d != today.isoformat()}
+    b = px.get(bench, {})
+    if d in b and prev in b:
+        out["xu100"] = b[d][0]
+        out["xu100_%"] = (b[d][0] / b[prev][0] - 1) * 100
+    moves = []
+    for t in universe:
+        p = px.get(t, {})
+        if d in p and prev in p and p[prev][0]:
+            moves.append({"hisse": t, "kapanis": p[d][0], "degisim_%": (p[d][0] / p[prev][0] - 1) * 100,
+                          "hacim_tl": p[d][0] * p[d][1], "ort_hacim_tl": liq.get(t)})
+    if not moves:
+        out["yok"] = f"{d} için hisse fiyatı yok."
+        return out
+    ch = sorted(m["degisim_%"] for m in moves)
+    out.update({"hisse": len(moves), "yukselen": sum(1 for x in ch if x > 0.005),
+                "dusen": sum(1 for x in ch if x < -0.005), "medyan_%": ch[len(ch) // 2],
+                "toplam_hacim_tl": sum(m["hacim_tl"] for m in moves),
+                "tavana_yakin": sum(1 for x in ch if x >= 9.5), "tabana_yakin": sum(1 for x in ch if x <= -9.5)})
+    out["esit"] = len(ch) - out["yukselen"] - out["dusen"]
+    out["limit_disi"] = sorted((m for m in moves if abs(m["degisim_%"]) > 10.5), key=lambda m: -abs(m["degisim_%"]))
+    liquid = [m for m in moves if (m["ort_hacim_tl"] or 0) >= tradeplan.LIQ_MIN_TL]
+    liquid.sort(key=lambda m: m["degisim_%"])
+    out["likit_hisse"] = len(liquid)
+    out["en_cok_yukselen"] = list(reversed(liquid[-5:]))
+    out["en_cok_dusen"] = liquid[:5]
+    return out
+
+
+def _journal_all(conn):
+    out = []
+    for r in conn.execute("SELECT * FROM trade_journal ORDER BY id"):
+        x = dict(r)
+        x["res"] = json.loads(r["sonuc_json"]) if r["sonuc_json"] else {}
+        out.append(x)
+    return out
+
+
+def _unrealized(rec, last):
+    """Açık işlemin gerçekleşmemiş getirisi (%): TP1'de yarısı satıldıysa o yarı TP1'den sayılır (o kısım gerçekleşmiş)."""
+    res = rec["res"]
+    fill = res.get("giris_fiyati")
+    if not fill or not last:
+        return None, None
+    if res.get("tp1_goruldu"):
+        return 0.5 * (last / fill - 1) * 100, 0.5 * (rec["tp1"] / fill - 1) * 100
+    return (last / fill - 1) * 100, 0.0
+
+
+def _tl(settings, rec, pct):
+    """Plan büyüklüğüyle TL karşılığı (Ayarlar'da sermaye ve risk yüzdesi girildiyse)."""
+    from . import journal
+    cap, risk = float(settings.get("sermaye") or 0), float(settings.get("risk_pct") or 0)
+    if pct is None or not (cap > 0 and risk > 0):
+        return None
+    entry = rec["res"].get("giris_fiyati") or rec["giris"]
+    try:
+        ps = journal.position_size(cap, risk, rec["giris"], rec["sl"],
+                                   float(settings.get("komisyon_pct", 0.2)) + float(settings.get("kayma_pct", 0.1)))
+    except ValueError:
+        return None
+    return ps["adet"] * entry * pct / 100
+
+
+def _closed_class(res) -> str:
+    s = res.get("sonuc")
+    if s == "TP2":
+        return "başarılı"
+    if s == "başabaş (TP1 sonrası)":
+        return "başarılı (TP1 alındı, kalan başabaş)"
+    if s == "SL":
+        return "başarısız"
+    return "olumlu" if (res.get("net_getiri_pct") or 0) > 0 else "olumsuz"   # süre doldu
+
+
 def evening_report(conn, ctx, out) -> tuple:
-    """W3'te 10 bölümle genişletilecek; şimdilik temel bölümler."""
+    """Akşam raporu — kullanıcının istediği 10 bölüm. Yalnız kayıtlı veri; yapay zekâ yok."""
+    from . import journal
+    settings = out.get("ayarlar") or {}
+    cost = float(settings.get("komisyon_pct", journal.DEFAULT_COMMISSION_PCT)) + \
+        float(settings.get("kayma_pct", journal.DEFAULT_SLIPPAGE_PCT))
     run_id = out["calistirma"]["run_id"]
-    rec = _recommended(conn, run_id)
+    uni = out.get("evren") or []
+    ms = market_summary(conn, uni, ctx.today)
+    D = ms.get("gun") or ctx.today.isoformat()
     md = _header("aksam", out["zaman"]["zaman"], out["zaman"])
-    md += "## Botun önerileri\n" + _md_table(rec, [("Hisse", lambda r: r["ticker"]), ("Senaryo", lambda r: r["senaryo"])])
+    if ms.get("bugun_islem_gunu_degil"):
+        md += f"> ℹ️ Bugün için fiyat yok; rapor son işlem günü **{D}** verisiyle hazırlandı.\n\n"
+
+    # 1 — piyasa özeti
+    md += "## 1. Günlük piyasa özeti\n"
+    if ms.get("yok") and "hisse" not in ms:
+        md += f"_{ms['yok']}_\n\n"
+    else:
+        md += (f"- BIST 100: {_fmt(ms.get('xu100'))} ({_fmt(ms.get('xu100_%'), '{:+.2f}')}%) · {D} (önceki: "
+               f"{ms['onceki_gun']})\n- {ms['hisse']} hissede: {ms['yukselen']} yükselen, {ms['dusen']} düşen, "
+               f"{ms['esit']} değişmeyen · medyan değişim %{ms['medyan_%']:+.2f} · toplam işlem hacmi "
+               f"{ms['toplam_hacim_tl'] / 1e9:.1f} milyar TL\n- %9,5 ve üzeri yükselen: {ms['tavana_yakin']} · %9,5 ve "
+               f"üzeri düşen: {ms['tabana_yakin']}\n")
+        if ms.get("limit_disi"):
+            md += (f"- ⚠️ Günlük ±%10 fiyat limitini aşmış görünen {len(ms['limit_disi'])} hisse: "
+                   + ", ".join(f"{x['hisse']} %{x['degisim_%']:+.1f}" for x in ms["limit_disi"][:10])
+                   + " — bedelsiz/temettü düzeltmesi, yeni halka arz ya da veri hatası olabilir; kontrol edin.\n")
+        md += "\n"
+        cols = [("Hisse", lambda r: r["hisse"]), ("Kapanış", lambda r: _fmt(r["kapanis"])),
+                ("Değişim %", lambda r: _fmt(r["degisim_%"], "{:+.2f}")),
+                ("Günlük hacim (mn TL)", lambda r: _fmt(r["hacim_tl"] / 1e6, "{:.1f}"))]
+        md += (f"En çok yükselen / düşen likit hisseler ({ms['likit_hisse']} hisse; 20 günlük ortalama işlem hacmi ≥ 2 "
+               "milyon TL):\n\n**En çok yükselen**\n\n" + _md_table(ms["en_cok_yukselen"], cols)
+               + "\n**En çok düşen**\n\n" + _md_table(ms["en_cok_dusen"], cols) + "\n")
+
+    # 2 — botun önerileri (bugünkü çalıştırmalar)
+    rec = _recommended(conn, run_id)
+    morning = conn.execute("SELECT run_id FROM watch_runs WHERE kind='sabah' AND day=? ORDER BY run_id DESC LIMIT 1",
+                           (ctx.today.isoformat(),)).fetchone()
+    m_rec = _recommended(conn, morning["run_id"]) if morning else []
+    last_px = {r["ticker"]: r for r in conn.execute(
+        "SELECT ticker, close FROM prices WHERE date=?", (D,))}
+    md += "## 2. Botun ürettiği hisse önerileri\n"
+    if morning:
+        md += f"Sabah analizinde {len(m_rec)} öneri vardı" + (": " + ", ".join(r["ticker"] for r in m_rec) if m_rec else "") + ".\n\n"
+    else:
+        md += "_Bugün sabah analizi çalıştırılmamış._\n\n"
+    md += "Akşam (kapanış verisiyle) önerilen:\n\n" + _md_table(rec, [
+        ("Hisse", lambda r: r["ticker"]), ("Senaryo", lambda r: r["senaryo"]), ("Giriş", lambda r: _fmt(r["giris"])),
+        ("SL", lambda r: _fmt(r["sl"])), ("TP1", lambda r: _fmt(r["tp1"])), ("TP2", lambda r: _fmt(r["tp2"])),
+        ("Risk", lambda r: r["risk_seviyesi"] or "—"), ("Haber skoru", lambda r: _fmt(r["haber_skoru"]))]) + "\n"
+
+    # 3–6 — işlem günlüğü
+    rows = _journal_all(conn)
+    for r in rows:
+        r["son"] = last_px[r["ticker"]]["close"] if r["ticker"] in last_px else None
+    opened = [r for r in rows if r["res"].get("giris_gunu") == D and r["durum"] != "iptal"]
+    closed_today = [r for r in rows if r["res"].get("cikis_gunu") == D]
+    ongoing = [r for r in rows if r["durum"] in journal.OPEN_STATES]
+    changes = {c["id"]: c for c in (out.get("gunluk") or {}).get("degisenler", [])}
+    cancelled = [r for r in rows if r["id"] in changes and changes[r["id"]]["yeni"] == "iptal"]
+    tur = lambda r: "Gerçek" if r["kaynak"] == "gercek" else "Sanal"
+    md += "## 3. Gerçekleşen ve devam eden işlemler\n"
+    md += (f"Bugün ({D}) girişi gerçekleşen: {len(opened)} · kapanan: {len(closed_today)} · süresi dolup iptal olan: "
+           f"{len(cancelled)} · devam eden (açık + giriş bekleyen): {len(ongoing)}\n\n")
+    for r in ongoing:
+        r["gerc_disi_%"], r["gerc_%"] = _unrealized(r, r["son"]) if r["durum"] != "bekliyor" else (None, None)
+    md += _md_table(ongoing, [
+        ("No", lambda r: r["id"]), ("Tür", tur), ("Hisse", lambda r: r["ticker"]), ("Senaryo", lambda r: r["senaryo"]),
+        ("Durum", lambda r: r["durum"] + (" (bugün girildi)" if r in opened else "")),
+        ("Giriş", lambda r: _fmt(r["res"].get("giris_fiyati") or r["giris"])),
+        ("Stop", lambda r: _fmt(r["res"].get("stop", r["sl"]))), ("Son kapanış", lambda r: _fmt(r["son"]))]) + "\n"
+    if cancelled:
+        md += "".join(f"- ⌛ #{r['id']} {r['ticker']} ({tur(r)}): {r['gecerlilik']} işlem gününde giriş koşulu oluşmadı\n"
+                      for r in cancelled) + "\n"
+
+    md += "## 4. TP1, TP2 ve SL sonuçları\n"
+    tp1_today = [r for r in rows if any(str(e).startswith(D) and "TP1" in str(e) for e in r["res"].get("olaylar", []))]
+    md += (f"Bugün: TP1 görülen {len(tp1_today)}" + (f" ({', '.join(r['ticker'] for r in tp1_today)})" if tp1_today else "")
+           + " · kapanış sonuçları: " + (", ".join(f"{r['ticker']} {r['res']['sonuc']}" for r in closed_today) or "yok")
+           + "\n\n")
+    closed = [r for r in rows if r["durum"] == "kapandı"]
+    for k in ("otomatik", "gercek"):
+        m = journal.metrics(conn, k)
+        if m["kayit"]:
+            md += (f"- Toplam ({'sanal' if k == 'otomatik' else 'gerçek'}): {m['kayit']} kayıt, {m['kapanan']} kapandı, "
+                   f"{m['acik_bekleyen']} açık/bekliyor, {m['iptal']} gerçekleşmedi"
+                   + (" · sonuçlar: " + ", ".join(f"{s} {n}" for s, n in m["sonuc_dagilimi"].items())
+                      if m.get("sonuc_dagilimi") else "") + "\n")
+    md += ("_Aynı gün hem SL hem TP görülürse SL sayılır; limit emrin dolduğu gün TP sayılmaz (mum içi sıra bilinmez — "
+           "temkinli kural)._\n\n")
+
+    md += "## 5. Gerçekleşmiş ve gerçekleşmemiş net kâr/zarar\n"
+    real_today = [r for r in closed_today]
+    tl_note = not (float(settings.get("sermaye") or 0) > 0 and float(settings.get("risk_pct") or 0) > 0)
+    md += _md_table(real_today, [
+        ("No", lambda r: r["id"]), ("Tür", tur), ("Hisse", lambda r: r["ticker"]), ("Sonuç", lambda r: r["res"]["sonuc"]),
+        ("Brüt %", lambda r: _fmt(r["res"].get("brut_getiri_pct"), "{:+.2f}")),
+        ("Net %", lambda r: _fmt(r["res"].get("net_getiri_pct"), "{:+.2f}")), ("R", lambda r: _fmt(r["res"].get("r"))),
+        ("Net TL (plan büyüklüğü)", lambda r: _fmt(_tl(settings, r, r["res"].get("net_getiri_pct")), "{:+,.0f}"))])
+    tot = {k: [r for r in closed if r["kaynak"] == k] for k in ("otomatik", "gercek")}
+    for k, xs in tot.items():
+        if xs:
+            nets = [r["res"]["net_getiri_pct"] for r in xs]
+            rs = [r["res"]["r"] for r in xs if r["res"].get("r") is not None]
+            tls = [_tl(settings, r, r["res"]["net_getiri_pct"]) for r in xs]
+            md += (f"- Gerçekleşmiş toplam ({'sanal' if k == 'otomatik' else 'gerçek'}): {len(xs)} işlem, net getiri "
+                   f"toplamı %{sum(nets):+.2f}, toplam {sum(rs):+.2f} R"
+                   + (f", plan büyüklüğüyle {sum(tls):+,.0f} TL" if all(v is not None for v in tls) else "") + "\n")
+    opn = [r for r in ongoing if r.get("gerc_disi_%") is not None]
+    if opn:
+        md += "\nGerçekleşmemiş (açık işlemler, son kapanışla; çıkış maliyeti düşülmüş tahmini):\n\n" + _md_table(opn, [
+            ("No", lambda r: r["id"]), ("Tür", tur), ("Hisse", lambda r: r["ticker"]),
+            ("Açık kısım %", lambda r: _fmt(r["gerc_disi_%"], "{:+.2f}")),
+            ("TP1'de alınan %", lambda r: _fmt(r["gerc_%"], "{:+.2f}")),
+            ("Toplam net % (tahmini)", lambda r: _fmt(r["gerc_disi_%"] + r["gerc_%"] - cost, "{:+.2f}")),
+            ("TL (plan)", lambda r: _fmt(_tl(settings, r, r["gerc_disi_%"] + r["gerc_%"] - cost), "{:+,.0f}"))])
+    if tl_note:
+        md += "\n_TL karşılığı için Ayarlar'da sermaye ve risk yüzdesini girin._\n"
+    md += "\n"
+
+    md += "## 6. İşlem maliyetleri\n"
+    md += (f"Varsayım: komisyon %{float(settings.get('komisyon_pct', journal.DEFAULT_COMMISSION_PCT)):.2f} + kayma "
+           f"%{float(settings.get('kayma_pct', journal.DEFAULT_SLIPPAGE_PCT)):.2f} = alış+satış toplam %{cost:.2f} "
+           "(Ayarlar'dan değiştirilebilir; Midas'ın gerçek oranını girin).\n")
+    if closed:
+        diff = sum(r["res"]["brut_getiri_pct"] - r["res"]["net_getiri_pct"] for r in closed)
+        tls = [_tl(settings, r, r["res"]["brut_getiri_pct"] - r["res"]["net_getiri_pct"]) for r in closed]
+        md += (f"- Kapanan {len(closed)} işlemde maliyetin getiriye etkisi toplam %{diff:.2f} puan"
+               + (f" (plan büyüklüğüyle ≈ {sum(tls):,.0f} TL)" if all(v is not None for v in tls) else "") + "\n")
+    md += f"- Bugün kapanan {len(closed_today)} işlemin maliyeti net getiriye dahildir.\n\n"
+
+    # 7–8 — kaçırılan fırsatlar (W4)
+    missed = out.get("kacirilan")
+    md += "## 7. Kaçırılan fırsatlar\n"
+    md += (missed["md_liste"] if missed else
+           "_Hazırlanıyor (W4): önerilmeyip ciddi yükselen hisseler, o gün botun bildiği veriyle incelenecek._\n") + "\n"
+    md += "## 8. Kaçırılma nedenleri\n"
+    md += (missed["md_neden"] if missed else "_Hazırlanıyor (W4)._\n") + "\n"
+
+    # 9 — başarılı / başarısız analizler
+    md += "## 9. Botun başarılı ve başarısız analizleri\n"
+    recent = [r for r in closed if r["res"].get("cikis_gunu", "") >= (ctx.today - timedelta(days=30)).isoformat()]
+    for r in recent:
+        r["sinif"] = _closed_class(r["res"])
+    md += "Son 30 günde kapanan işlemler:\n\n" + _md_table(recent, [
+        ("No", lambda r: r["id"]), ("Tür", tur), ("Hisse", lambda r: r["ticker"]), ("Senaryo", lambda r: r["senaryo"]),
+        ("Risk", lambda r: r["risk_seviyesi"] or "—"), ("Haber skoru", lambda r: _fmt(r["haber_skoru"])),
+        ("Sonuç", lambda r: r["res"]["sonuc"]), ("Net %", lambda r: _fmt(r["res"]["net_getiri_pct"], "{:+.2f}")),
+        ("Değerlendirme", lambda r: r["sinif"])]) + "\n"
+    m = journal.metrics(conn, "otomatik")
+    if m.get("kapanan"):
+        md += (f"Sanal toplam: kazanma oranı %{m['kazanma_orani_%']}, ortalama {_fmt(m.get('ortalama_R'))} R, kâr faktörü "
+               f"{_fmt(m.get('kar_faktoru'))}" + ("" if m["yeterli_ornek"] else
+                                                f" — **örnek az ({m['kapanan']} < {journal.MIN_TRADES_FOR_STATS}): bu "
+                                                "oranlar henüz güvenilir değil**") + ".\n\n")
+
+    # 10 — iyileştirme önerileri (veriden gözlem; ayar DEĞİŞTİRİLMEZ)
+    md += "## 10. Sistem iyileştirme önerileri\n"
+    notes = observations(conn, out)
+    md += ("".join(f"- {n}\n" for n in notes) or "_Bugün veriden çıkan bir gözlem yok._\n")
+    md += ("\n_Öneriler bilgi amaçlıdır; hiçbir ayar kendiliğinden değiştirilmez. Geçmiş raporlarla karşılaştırmalı "
+           "eğilim ve onay listesi W5'te._\n\n")
+    md += data_status_md(out, _data_status(conn), "Ek")
     md += DISCLAIMER
-    return md, {"tur": "aksam", "zaman": out["zaman"], "onerilen": rec, "calistirma": out["calistirma"]}
+    strip = lambda xs: [{k: v for k, v in r.items() if k not in ("sonuc_json",)} for r in xs]
+    data = {"tur": "aksam", "gun": D, "zaman": out["zaman"], "piyasa": ms, "onerilen": rec, "sabah_onerilen": m_rec,
+            "girilen": [r["id"] for r in opened], "kapanan": strip(closed_today), "devam": strip(ongoing),
+            "iptal": [r["id"] for r in cancelled], "tp1_bugun": [r["id"] for r in tp1_today],
+            "metrikler": {k: journal.metrics(conn, k) for k in ("otomatik", "gercek")}, "maliyet_%": cost,
+            "gozlemler": notes, "kacirilan": missed, "calistirma": out["calistirma"]}
+    return md, data
+
+
+def observations(conn, out) -> list:
+    """Bölüm 10 için kodla çıkarılan gözlemler (yapay zekâ yok, eşik değiştirmez)."""
+    from . import journal
+    n = (out.get("calistirma") or {}).get("nedenler") or {}
+    total = sum(n.values()) or 1
+    obs = []
+    wait = n.get("HABER_ANALIZ_BEKLIYOR", 0)
+    if wait:
+        obs.append(f"{wait} hissenin haberi henüz analiz edilmedi (evrenin yüzde {100 * wait / total:.0f}): bu hisseler "
+                   "için karar verilemedi. Sabah analizinde yapay zekâ kutusunu açmak ya da analiz sınırını artırmak "
+                   "kapsamı artırır (maliyet artar; karar sizde).")
+    sc = n.get("SENARYO_UYGUN_DEGIL", 0)
+    if sc:
+        obs.append(f"{sc} hissede haber olumlu ama giriş senaryosu uygun değildi (koşul yok ya da risk/getiri zayıf). "
+                   "Bu filtre fırsat eliyor mu, kaçırılan fırsat analiziyle (W4) ölçülecek; tek günlük veriyle eşik "
+                   "değiştirilmemeli.")
+    lq = n.get("LIKIDITE", 0)
+    if lq:
+        obs.append(f"{lq} hisse düşük likidite nedeniyle elendi (bilinçli koruma: sığ hissede emir fiyatı oynatır).")
+    if (out.get("fiyat") or {}).get("basarisiz"):
+        obs.append(f"{out['fiyat']['basarisiz']} hissenin fiyatı indirilemedi: veri sağlayıcı (Yahoo) hatası; sonraki "
+                   "çalıştırmada yeniden denenir.")
+    m = journal.metrics(conn, "otomatik")
+    if m.get("kapanan") and not m["yeterli_ornek"]:
+        obs.append(f"Sanal işlem sayısı henüz {m['kapanan']}: strateji karşılaştırması için en az "
+                   f"{journal.MIN_TRADES_FOR_STATS} kapanmış işlem gerekir.")
+    return obs
