@@ -183,14 +183,18 @@ def bars_for(conn, ticker: str, after: str) -> List[Dict]:
 def update_all(conn, commission_pct: float = DEFAULT_COMMISSION_PCT, slippage_pct: float = DEFAULT_SLIPPAGE_PCT) -> Dict:
     """Açık/bekleyen kayıtları kayıtlı fiyatlarla baştan değerlendirir (her seferinde aynı sonucu verir)."""
     n = changed = 0
+    changes = []
     for r in conn.execute("SELECT * FROM trade_journal WHERE durum IN (?,?,?)", OPEN_STATES).fetchall():
         res = evaluate(dict(r), bars_for(conn, r["ticker"], r["signal_day"]), commission_pct, slippage_pct)
         conn.execute("UPDATE trade_journal SET durum=?, sonuc_json=?, guncellendi=? WHERE id=?",
                      (res["durum"], json.dumps(res, ensure_ascii=False), _now(), r["id"]))
         n += 1
-        changed += res["durum"] != r["durum"]
+        if res["durum"] != r["durum"]:
+            changed += 1
+            changes.append({"id": r["id"], "hisse": r["ticker"], "kaynak": r["kaynak"], "onceki": r["durum"],
+                            "yeni": res["durum"], "sonuc": res.get("sonuc"), "net_%": res.get("net_getiri_pct")})
     conn.commit()
-    return {"degerlendirilen": n, "durumu_degisen": changed}
+    return {"degerlendirilen": n, "durumu_degisen": changed, "degisenler": changes}
 
 
 def open_tickers(conn) -> List[str]:

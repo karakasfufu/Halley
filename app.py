@@ -12,7 +12,8 @@ import pandas as pd
 import streamlit as st
 
 from bist_haber import (analyzer, calendar_sync, config, corp_events, db, earnings, entries, journal, kap_history,
-                        kap_worker, macro_calendar, pipeline, report, signals, technical, timeline, tradeplan)
+                        kap_worker, macro_calendar, pipeline, report, signals, technical, timeline, tradeplan,
+                        watchdog)
 
 st.set_page_config(page_title="Halley", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
 
@@ -181,6 +182,61 @@ if last:
         st.caption(f"{an['waiting']} haber bir sonraki güncellemeyi bekliyor.")
     if last.get("rss", {}).get("failed_feeds"):
         st.caption("Bazı haber siteleri okunamadı. Ayrıntı: Gelişmiş sekmesi.")
+
+# ---------------- Piyasa bekçisi (W2): sabah / akşam analizi — kullanıcı elle başlatır ----------------
+def watch_box() -> None:
+    st.markdown("#### 🛡️ Piyasa bekçisi")
+    w1, w2, w3 = st.columns([1, 1, 2])
+    use_ai = w3.checkbox("Sabah analizinde yeni haberleri yapay zekâ ile de analiz et", value=False, key="watch_ai",
+                         help="Kapalıysa ücretsizdir: haberler toplanır, fiyatlar güncellenir, kayıtlı analizlerle "
+                              "rapor hazırlanır. Açıksa Ayarlar'daki sınır kadar haber analiz edilir.")
+    if use_ai:
+        if pipeline.has_api_key():
+            est = pipeline.estimate_next_run(conn, analysis_limit=analysis_limit, quality=quality)
+            w3.caption(f"Şu an sırada {est['waiting']} haber; bu çalıştırmada en fazla {analysis_limit} haber analiz "
+                       f"edilir. Sıradakiler için tahmini maliyet {est['low_usd']:.3f}–{est['high_usd']:.3f} $ "
+                       "(gece gelen yeni haberler toplanınca sıra değişebilir; üst sınır analiz adedidir).")
+        else:
+            w3.caption("API anahtarı yok: yapay zekâ analizi yapılamaz, rapor ücretsiz kısımla hazırlanır.")
+    for kind, col, label in (("sabah", w1, "🌅 Sabah analizi"), ("aksam", w2, "🌙 Akşam analizi")):
+        tm = watchdog.timing(kind)
+        if col.button(label, use_container_width=True, key=f"watch_{kind}",
+                      help=("Borsa açılmadan önce: gece gelen haberler, tüm hisselerin fiyatı, açık işlemler, günün "
+                            "fırsatları ve takvim." if kind == "sabah" else
+                            "Kapanıştan sonra: günün fiyatları, işlem günlüğü (TP/SL), botun kararları.")):
+            if tm["uyari"]:
+                st.warning(tm["uyari"] + " Analiz yine de çalıştırıldı; rapora bu uyarı yazıldı.")
+            bar = st.progress(0.0, text="Başlıyor...")
+            try:
+                out = watchdog.run_session(
+                    conn, uni, kind, {"gun": days, "analiz_siniri": analysis_limit, "analiz_kalitesi": quality,
+                                      "komisyon_pct": commission, "kayma_pct": slippage, "pencere": window},
+                    ai=bool(use_ai and pipeline.has_api_key()),
+                    progress=lambda m, p_: bar.progress(min(max(p_, 0.0), 1.0), text=m))
+                st.session_state["watch_last"] = out["rapor"]
+                if kind == "sabah":
+                    st.session_state["last_update"] = datetime.now(config.TR_TZ).strftime("%H:%M")
+                    res = out.get("guncelleme") or {}
+                    if not os.environ.get("HALLEY_OFFLINE"):
+                        kap_worker.start(force=bool(res.get("kap", {}).get("rate_limited")
+                                                    or res.get("takvim_boslugu", {}).get("eklenen")))
+            except Exception as e:
+                st.error(f"{label} tamamlanamadı: {e}")
+            conn.close()
+            st.rerun()
+        if tm["uyari"]:
+            col.caption("⚠️ " + tm["uyari"].split(":")[0])
+    name = st.session_state.get("watch_last")
+    if name:
+        path = watchdog.report_dir() / f"{name}.md"
+        if path.exists():
+            with st.expander(f"📄 Son bekçi raporu: {name} (arşivde saklandı, değiştirilmez)", expanded=True):
+                st.markdown(path.read_text(encoding="utf-8"))
+                st.download_button("Raporu indir (.md)", path.read_bytes(), file_name=f"{name}.md",
+                                   key="watch_dl")
+
+
+watch_box()
 
 # ---------------- Özet ----------------
 rows = report.build(conn, uni, days=window)

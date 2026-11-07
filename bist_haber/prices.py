@@ -71,3 +71,59 @@ def company_stats(conn, tickers: Iterable[str]) -> Dict[str, dict]:
             f"SELECT * FROM company_stats WHERE date=? AND ticker IN ({','.join('?' * len(tickers))})",
             [today, *tickers])}
     return {t: {"market_cap": r["market_cap"], "last_price": r["last_price"]} for t, r in have.items()}
+
+
+NO_DATA_RETRY_DAYS = 7
+
+
+def update_universe(conn, tickers: Iterable[str], progress=None, batch: int = 100) -> Dict[str, int]:
+    """Tüm evrenin günlük OHLCV fiyatı (bekçi: tarama ve kaçırılan fırsatlar). Yapay zekâ yok, ücretsiz.
+    Son 40 günde fiyatı olan hisse için yalnız son 1 ay indirilir (artımlı), olmayan için 1 yıl."""
+    import json
+    from datetime import timedelta
+    tickers = sorted(set(t for t in tickers if t))
+    today = datetime.now(config.TR_TZ).date()
+    recent = (today - timedelta(days=40)).isoformat()
+    have = {r[0] for r in conn.execute("SELECT ticker FROM prices GROUP BY ticker HAVING MAX(date)>=?", (recent,))}
+    # Yahoo'da hiç fiyatı olmayanlar (çoğu borsada işlem görmeyen KAP şirketi: faktoring, varlık kiralama...)
+    # her sabah boşuna 1 yıllık indirme denenmesin: NO_DATA_RETRY_DAYS günde bir yeniden denenir.
+    nd_file = config.DATA / "fiyat_yok.json"
+    try:
+        no_data = json.loads(nd_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        no_data = {}
+    cutoff = (today - timedelta(days=NO_DATA_RETRY_DAYS)).isoformat()
+    skipped = sorted(t for t in tickers if t not in have and no_data.get(t, "") > cutoff)
+    groups = [("1mo", [t for t in tickers if t in have]),
+              ("1y", [t for t in tickers if t not in have and t not in skipped])]
+    total = sum(len(g) for _, g in groups)
+    done, rows, failed = 0, 0, 0
+    for period, group in groups:
+        for i in range(0, len(group), batch):
+            part = group[i:i + batch]
+            try:
+                rows += update(conn, part, period=period)
+            except Exception:  # bir parti başarısızsa diğerleri sürsün
+                failed += len(part)
+            done += len(part)
+            if progress:
+                progress(done, total)
+    last = dict(conn.execute("SELECT ticker, MAX(date) FROM prices WHERE ticker IN (%s) GROUP BY ticker"
+                             % ",".join("?" * len(tickers)), tickers).fetchall()) if tickers else {}
+    newest = max(last.values()) if last else None
+    missing = sorted(t for t in tickers if t not in last)            # hiç fiyatı yok
+    behind = sorted(t for t in tickers if t in last and last[t] != newest)   # fiyatı var ama son günü içermiyor
+    tried = set(groups[1][1])
+    for t in missing:
+        if t in tried:
+            no_data[t] = today.isoformat()
+    for t in list(no_data):
+        if t in last:
+            no_data.pop(t)
+    try:
+        config.DATA.mkdir(parents=True, exist_ok=True)
+        nd_file.write_text(json.dumps(no_data, ensure_ascii=False, indent=0, sort_keys=True), encoding="utf-8")
+    except OSError:
+        pass
+    return {"hisse": total, "satir": rows, "basarisiz": failed, "artimli": len(groups[0][1]), "tam": len(groups[1][1]),
+            "son_gun": newest, "geride": behind, "fiyati_yok": missing, "atlanan": len(skipped)}

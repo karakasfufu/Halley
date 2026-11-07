@@ -814,3 +814,31 @@ HABER_ANALIZ_BEKLIYOR, HABER_ONEMSIZ, HABER_OLUMSUZ, SKOR_ESIK_ALTI, TEKNIK_VERI
 SENARYO_UYGUN_DEGIL, ONERILDI) + seviyeler + riskler + "fiyatlanmış" işareti. `watch_runs` ve `signal_log` YALNIZ
 EKLENİR (tetikleyiciler UPDATE/DELETE'i reddeder). Canlı kopya: 761 hisse 9,7 sn; önerilen SOKM, FROTO (panelle aynı).
 **317 test geçti.**
+
+## 2026-11-07 — W2: sabah / akşam analizi düğmeleri (kullanıcı elle başlatır)
+**Panel:** üstte "🛡️ Piyasa bekçisi" kutusu: **🌅 Sabah analizi** ve **🌙 Akşam analizi**. Zamanlama otomatik değil
+(kullanıcı isteği); Windows görev zamanlayıcısı vb. kurulmadı.
+- **BIST takvim/saat kontrolü** (`watchdog.timing`): hafta sonu/tatil, sabah 09:40 sonrası, akşam kapanış + 10 dk
+  öncesi (yarım günde 12:40) → uyarı verir ama ENGELLEMEZ; uyarı rapora da yazılır.
+- **Sabah:** haber/KAP toplama (`pipeline.update_all`; yapay zekâ kutusu varsayılan KAPALI = ücretsiz, açılırsa
+  Ayarlar'daki adet sınırı ve tahmini maliyet gösterilir) → tüm evrenin fiyatı (`prices.update_universe`, ücretsiz)
+  → işlem günlüğü → karar izi (`log_run`) → önerilenler sanal günlüğe → rapor. **Akşam:** haber toplamadan aynı akış.
+- **Sabah raporu (7 bölüm):** gece haberleri (önceki kapanış 18:00'den beri; önemsiz/analiz edilen/bekleyen ayrımı),
+  günün fırsatları, takip listesi (skor ≥ 1 ama önerilmeyen + neden), açık sanal/gerçek işlemler (stopa / girişe
+  uzaklık), riskli (stopa %2'den yakın — görsel uyarı, karar kuralı değil) ve süresi dolan senaryolar, 5 işlem günü
+  takvimi, veri durumu. Akşam raporu şimdilik temel; 10 bölümlü hâli W3.
+- **Arşiv:** `data/raporlar/YYYY-MM-DD_{sabah|aksam}[_n].md + .json`; aynı gün yeniden çalıştırma yeni dosya açar,
+  eski rapor değiştirilmez. GitHub'a yüklenmez (.gitignore).
+- **Fiyatı olmayan şirketler:** KAP evrenindeki 761 şirketin 130'unun Yahoo'da fiyatı yok (çoğu borsada işlem görmeyen
+  faktoring/varlık kiralama vb.). Her sabah boşuna 1 yıllık indirme denenmesin diye `data/fiyat_yok.json` ile 7 günde
+  bir yeniden denenir; raporda ayrıca listelenir.
+- **Geri alınan kural:** "giriş gerçekleşmeden kapanış SL altı → geçersiz" kuralı eklenip GERİ ALINDI: limit emirli
+  senaryolarda hiç tetiklenemiyor (o fiyata inen limit zaten dolar), kırılımda ise SL kırılım seviyesine göre olduğundan
+  kırılım öncesi fiyat SL altında durabilir → geçerli senaryoyu haksız iptal ederdi. Regresyon testi eklendi.
+- **Gerçek veri denemesi (canlı veritabanı kopyası, KAP'a istek atılmadan):** 762 hisse fiyatı, ilk çalıştırma ~250 sn
+  (753 hisse 1 yıl), sonraki ~100 sn (artımlı). Karar izi: 2 önerilen (SOKM destek, FROTO kırılım — paneldekiyle aynı),
+  2 takip (TOASO, ISCTR: senaryo uygun değil), 432 analiz bekliyor, 173 önemsiz, 152 haber yok. Gece haberleri: KAP 393
+  + site 121 (Cuma kapanış sonrası bilanço yoğunluğu; ham kayıtla doğrulandı). Aynı gün 3 çalıştırma → 3 ayrı dosya.
+- Testler: `tests/test_watchdog_w2.py` (saat/tatil/yarım gün, akışlar, arşiv değişmezliği, artımlı/eksik fiyat, panel
+  düğmesi AppTest). Toplam 332 test, ağ bağlantısı engelliyken 0 bağlantı denemesi.
+- **Sırada:** W3 akşam raporu 10 bölüm + "📋 Raporlar" sekmesi; W4 kaçırılan fırsatlar; W5 eğilim/öneri listesi.

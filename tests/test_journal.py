@@ -49,6 +49,15 @@ class EvaluateTests(unittest.TestCase):
         r = J.evaluate(REC, bars((101, 101.5, 99.5, 100.5), (90, 91, 89, 90)))
         self.assertAlmostEqual(r["brut_getiri_pct"], -10.0)
 
+    def test_breakout_waiting_below_stop_is_not_cancelled(self):
+        # Kırılımda SL giriş seviyesine göredir; kırılım olmadan fiyatın SL altında durması senaryoyu bozmaz
+        # (kartta "kapanış SL altına inerse kırılım başarısız" kırılımdan SONRASI içindir). Erken iptal hatası önlenir.
+        rec = dict(REC, senaryo="kirilim", alarm=103.0, giris=103.4, sl=101.0, tp1=108.0, tp2=115.0)
+        r = J.evaluate(rec, bars((102, 102.5, 100, 100.5)))
+        self.assertEqual(r["durum"], "bekliyor")
+        r2 = J.evaluate(REC, bars((101, 101.5, 94.0, 94.5)))         # limit doldu ve aynı gün SL → SL
+        self.assertEqual(r2["sonuc"], "SL")
+
     def test_not_filled(self):
         self.assertEqual(J.evaluate(REC, bars(*[(103, 104, 101, 103)] * 5))["durum"], "iptal")
         self.assertEqual(J.evaluate(REC, bars(*[(103, 104, 101, 103)] * 2))["durum"], "bekliyor")
