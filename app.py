@@ -11,7 +11,7 @@ import pandas as pd
 import streamlit as st
 
 from bist_haber import (analyzer, calendar_sync, config, corp_events, db, earnings, entries, kap_history,
-                        kap_worker, macro_calendar, pipeline, report, technical, tradeplan)
+                        kap_worker, macro_calendar, pipeline, report, technical, timeline, tradeplan)
 
 st.set_page_config(page_title="Halley", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
 
@@ -310,6 +310,37 @@ def financial_block(ticker: str) -> None:
 _PLAN_CACHE = {}
 _EARN_CACHE = {}
 _EVENT_CACHE = {}
+_TL_CACHE = {}
+
+
+def macro_risk_line():
+    """Parça B4: vade (15 işlem günü) içindeki piyasa geneli olaylar — tüm hisseler için aynı, bir kez hesaplanır."""
+    if "macro" not in _TL_CACHE:
+        _TL_CACHE["macro"] = timeline.macro_risk(datetime.now(config.TR_TZ).date(), 15)
+    return _TL_CACHE["macro"]
+
+
+def ticker_timeline(ticker: str) -> dict:
+    if ticker not in _TL_CACHE:
+        _TL_CACHE[ticker] = timeline.for_ticker(conn, ticker, datetime.now(config.TR_TZ).date(), 15)
+    return _TL_CACHE[ticker]
+
+
+def timeline_block(ticker: str) -> None:
+    tl = ticker_timeline(ticker)
+    st.markdown("**📅 Önümüzdeki 15 işlem günü — bu hisse için** <span class='news-meta'>(piyasa geneli + bilanço + "
+                "şirket olayları; tarihler resmi takvim ve KAP bildirimlerinden)</span>", unsafe_allow_html=True)
+    if not tl["olaylar"]:
+        st.caption("Bu dönemde kayıtlı olay yok.")
+    else:
+        st.dataframe(pd.DataFrame([{"Tarih": f"{x['tarih'][8:10]}.{x['tarih'][5:7]}.{x['tarih'][:4]}",
+                                    "Kaç işlem günü sonra": x["is_gunu_sonra"] if x["is_gunu_sonra"] else "—",
+                                    "Kapsam": x["kapsam"], "Olay": x["olay"], "Ayrıntı": x["ayrinti"]}
+                                   for x in tl["olaylar"]]), hide_index=True, use_container_width=True)
+    notes = [n for n in ([("Takvimi henüz bilinmeyen: " + ", ".join(tl["bilinmeyen"])) if tl["bilinmeyen"] else None,
+                          tl.get("tatil_notu")]) if n]
+    if notes:
+        st.caption(" · ".join(notes))
 
 
 def corp_event(ticker: str) -> dict:
@@ -338,7 +369,8 @@ def scenario(r: dict) -> dict:
                      "persistence": imp["persistence"] if imp else "orta",
                      "reason": imp["reason"] if imp else "", "summary": r["last_news"], "hareket": move,
                      "bilanco_riski": earnings.window_risk(earning(r["ticker"]), datetime.now(config.TR_TZ).date(), 15),
-                     "olay_riskleri": corp_events.risk_lines(corp_event(r["ticker"]), (t_ or {}).get("son_fiyat"))}
+                     "olay_riskleri": corp_events.risk_lines(corp_event(r["ticker"]), (t_ or {}).get("son_fiyat")),
+                     "makro_riski": macro_risk_line()}
         _PLAN_CACHE[r["ticker"]] = tradeplan.plan(tech(r["ticker"]), news_info)
     return _PLAN_CACHE[r["ticker"]]
 
@@ -430,7 +462,7 @@ def stock_details(r: dict) -> None:
     news_move_block(r["ticker"])
     st.caption("📑 Bilanço takvimi: " + earnings.describe(earning(r["ticker"])) +
                " (Yasal süreler: SPK II-14.1 Md. 10–11; garanti değil, SPK ek süre verebilir.)")
-    st.caption("🗓️ Şirket olayları (15 işlem günü): " + corp_events.describe(corp_event(r["ticker"])))
+    timeline_block(r["ticker"])
     financial_block(r["ticker"])
     st.markdown("**📰 Haberler ve analiz**")
     for i in conn.execute("SELECT i.*, n.title, n.url, n.source, n.note FROM impacts i JOIN news n ON n.id=i.news_id "
@@ -561,6 +593,7 @@ with tab_list:
                     **best_entry_columns(scenario(r)),
                     "Bilanço durumu": earnings.describe(earning(r["ticker"])),
                     "Şirket olayları": corp_events.describe(corp_event(r["ticker"])),
+                    "15 işlem günü takvimi": timeline.compact(ticker_timeline(r["ticker"])),
                     "Risk faktörleri": " | ".join(scenario(r).get("riskler", [])),
                     "Açıklama": scenario(r).get("aciklama", scenario(r).get("neden_yok", "")),
                     "Son haber özeti": r["last_news"],

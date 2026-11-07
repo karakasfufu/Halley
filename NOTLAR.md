@@ -708,3 +708,16 @@ geçici sınır uyguluyor (iki turda 100 ve 99 sayfa; hemen tekrar deneme yine s
   KAP 429 verince ortaya çıktı) → test verisine şirket eklendi; tüm takım ağ yasaklanarak çalıştırıldı, ağ denemesi yok.
   Gerçek sorun: ilk kurulumda şirket listesi indirilirken KAP sınırı gelirse panel çöküyordu → anlaşılır mesaj.
   **264 test geçti.**
+
+## 2026-11-07 — Parça B4: birleşik takvim ve makro olay riski (`bist_haber/timeline.py`)
+
+- Hisse ayrıntısında "📅 Önümüzdeki 15 işlem günü — bu hisse için" tablosu: piyasa geneli (PPK, TÜFE, Enflasyon
+  Raporu, FİR, PPK özeti, Fed, kredi notu, VİOP vade sonu, Borsa tatili/yarım gün) + bilanço yasal son günü
+  (açıklanmadıysa/bilinmiyorsa) + şirket olayları; tarih sırası, kaç işlem günü sonra, ayrıntı (GK türü, brüt temettü).
+  Yeni tarih üretmez; mevcut doğrulanmış modülleri birleştirir. Takvimi bilinmeyen dönem ve 2027 dini bayram notu
+  tablonun altında. CSV'de "15 işlem günü takvimi" sütunu.
+- Risk: vade içinde PPK / TÜFE / Fed / Enflasyon Raporu / kredi notu varsa tek madde "Vade içinde piyasa geneli olay:
+  …" (1 puan; tüm hisseleri aynı etkilediği için düşük ağırlık). FİR, PPK özeti, VİOP yalnız takvimde.
+- Canlı veride (7 Kasım): FROTO → 12.11 Enflasyon Raporu, 23–24.11 olağanüstü GK, 26.11 temettü hak kullanımı (brüt
+  3,07 TL), 27.11 FİR. ETILR → 9.11 bilanço son günü, 13.11 temettü hak kullanımı.
+- Testler: `tests/test_timeline.py`. **270 test geçti.** B (olay takvimi) bölümü tamamlandı.
