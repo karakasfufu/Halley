@@ -137,6 +137,25 @@ class StartTests(unittest.TestCase):
         self.assertTrue(K.start(self.path))
         self.wait()
 
+    def test_running_in_another_process_is_not_duplicated(self):
+        from datetime import datetime, timedelta
+        self.add(150)
+        K._save({"durum": "çalışıyor", "okunan": 10, "kalan": 140})          # taze canlılık zamanı
+        self.assertFalse(K.start(self.path, force=True))
+        old = (datetime.now(config.TR_TZ) - timedelta(minutes=30)).isoformat(timespec="seconds")
+        st = K.load(); st["nabiz"] = old; st["sonraki"] = old
+        K.state_file().write_text(__import__("json").dumps(st), encoding="utf-8")   # çökmüş okuyucu: bayat
+        self.assertTrue(K.start(self.path))                                 # yarım iş kendiliğinden sürer
+        self.wait()
+
+    def test_waiting_worker_counts_as_alive_until_resume_time(self):
+        from datetime import datetime, timedelta
+        now = datetime.now(config.TR_TZ)
+        st = {"durum": "çalışıyor", "nabiz": (now - timedelta(minutes=8)).isoformat(),
+              "sonraki": (now + timedelta(minutes=2)).isoformat()}
+        self.assertTrue(K.alive_elsewhere(st, now))
+        self.assertFalse(K.alive_elsewhere(dict(st, durum="tamamlandı"), now))
+
     def test_nothing_pending(self):
         db.connect(self.path).close()
         self.assertFalse(K.start(self.path, force=True))
@@ -149,7 +168,10 @@ class PanelStatusTests(unittest.TestCase):
         from datetime import datetime
         from streamlit.testing.v1 import AppTest
         with tempfile.TemporaryDirectory() as t, patch.object(config, "DATA", Path(t)),                 patch.object(config, "DB_PATH", Path(t) / "live.db"),                 patch.dict(os.environ, {"OPENAI_API_KEY": "", "HALLEY_OFFLINE": "1"}):
-            db.connect().close()
+            c_ = db.connect()
+            c_.execute("INSERT INTO companies VALUES('TEST','Deneme',NULL)")  # aksi hâlde liste KAP'tan indirilir
+            c_.commit()
+            c_.close()
             if state:
                 K._save(state)
             at = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "app.py"))
@@ -171,6 +193,35 @@ class PanelStatusTests(unittest.TestCase):
         texts = self.render({"durum": "durdu", "mesaj": "2 sayfa bu sefer okunamadı"})
         self.assertTrue(any("KAP okuyucu durdu" in x for x in texts), texts)
         self.assertFalse(any("KAP" in x for x in self.render(None)))
+
+
+
+class FirstRunTests(unittest.TestCase):
+    def test_company_list_download_failure_shows_message_not_crash(self):
+        import os
+        from streamlit.testing.v1 import AppTest
+        from bist_haber import pipeline
+        with tempfile.TemporaryDirectory() as t, patch.object(config, "DATA", Path(t)),                 patch.object(config, "DB_PATH", Path(t) / "live.db"),                 patch.dict(os.environ, {"OPENAI_API_KEY": "", "HALLEY_OFFLINE": "1"}),                 patch("bist_haber.pipeline.refresh_companies", side_effect=RuntimeError("429 Request Limit Exceeded")):
+            at = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "app.py"))
+            at.run(timeout=30)
+            self.assertEqual(len(at.exception), 0, str(at.exception))
+            self.assertTrue(any("Şirket listesi KAP'tan alınamadı" in e.value for e in at.error))
+
+    def test_summary_puts_price_events_first(self):
+        with tempfile.TemporaryDirectory() as t:
+            conn = db.connect(Path(t) / "t.db")
+            conn.execute("INSERT INTO companies VALUES('AAA','A',NULL)")
+            conn.execute("INSERT INTO companies VALUES('ZZZ','Z',NULL)")
+            from test_corp_events import BEDELSIZ, GK_NEW
+            for nid, tk, subj, body in (("a", "AAA", "Genel Kurul İşlemlerine İlişkin Bildirim", GK_NEW.replace("02.09.2026", "10.11.2026")),
+                                        ("z", "ZZZ", "Sermaye Artırımı - Azaltımı İşlemlerine İlişkin Bildirim", BEDELSIZ.replace("14.09.2026", "20.11.2026"))):
+                conn.execute("INSERT INTO news(id,source,published_at,effective_date,title,subject,body,candidates,status,fetched_at) "
+                             "VALUES(?,?,?,?,?,?,?,?,'context','n')", (nid, "kap", "2026-11-01T10:00:00+03:00", "2026-11-02", "t", subj, body, tk))
+            conn.commit()
+            from datetime import date
+            oz = K.event_summary(conn, date(2026, 11, 7))
+            self.assertTrue(oz["onemli"][0].startswith("ZZZ 20.11 bedelsiz"), oz["onemli"])
+            conn.close()
 
 
 if __name__ == "__main__":

@@ -700,3 +700,11 @@ geçici sınır uyguluyor (iki turda 100 ve 99 sayfa; hemen tekrar deneme yine s
 - SQLite bağlantı beklemesi 5 → 30 sn (panel ve okuyucu aynı anda yazabilir).
 - Testler: `tests/test_kap_worker.py` (sahte KAP her turda 100 sayfadan sonra sınır; bekleme dizisi 3/5/10, tamamlanma,
   özet, ilerlemesiz durma, süre sınırı, kendiliğinden başlama koşulları, panel kutusu). **260 test geçti.**
+- Ek (aynı gün): okuyucu durum dosyasına canlılık zamanı yazar; başka bir işlem/pencere çalışan okuyucuyu görürse
+  ikincisini başlatmaz (son kayıt < 5 dk ya da planlanan devam + 5 dk geçmediyse). Özetteki "öne çıkanlar" önce fiyatı
+  etkileyenler (bedelsiz/bedelli, temettü hak kullanımı), sonra genel kurul. **Canlı deneme:** kalan 14 sayfa 28 sn'de
+  okundu → 213 olay sayfasının tamamı okundu; özet: 23 şirkette 48 olay.
+- Yakalanan iki test hatası: iki panel testi boş veritabanında şirket listesini KAP'tan indiriyordu (ağa çıkıyordu;
+  KAP 429 verince ortaya çıktı) → test verisine şirket eklendi; tüm takım ağ yasaklanarak çalıştırıldı, ağ denemesi yok.
+  Gerçek sorun: ilk kurulumda şirket listesi indirilirken KAP sınırı gelirse panel çöküyordu → anlaşılır mesaj.
+  **264 test geçti.**

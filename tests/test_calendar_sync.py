@@ -181,7 +181,10 @@ class PanelTests(Isolated):
         env = {k: v for k, v in os.environ.items() if k != "HALLEY_OFFLINE"}
         env["OPENAI_API_KEY"] = ""
         with patch.object(config, "DB_PATH", root / "live.db"), patch.object(config, "UNIVERSE_FILE", root / "u.txt"),                 patch.dict(os.environ, env, clear=True), patch.object(S, "check", fake_check):
-            db.connect().close()
+            c_ = db.connect()
+            c_.execute("INSERT INTO companies VALUES('TEST','Deneme',NULL)")  # liste KAP'tan indirilmesin
+            c_.commit()
+            c_.close()
             at = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "app.py"))
             at.run(timeout=30)
             self.assertEqual(len(at.exception), 0, str(at.exception))

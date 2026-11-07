@@ -29,7 +29,13 @@ div[data-testid="stMetric"] {background: #fff; border: 1px solid #E5E7EB; border
 """, unsafe_allow_html=True)
 
 conn = db.connect()
-uni = pipeline.universe(conn)
+try:
+    uni = pipeline.universe(conn)
+except Exception as e:  # ilk kurulumda şirket listesi KAP'tan indirilir; KAP geçici sınır uygularsa çökme
+    st.error("Şirket listesi KAP'tan alınamadı (KAP geçici olarak istek sınırı uyguluyor olabilir). Birkaç dakika "
+             f"sonra sayfayı yenileyin. Ayrıntı: {e}")
+    conn.close()
+    st.stop()
 
 WARN_FLAGS = ("çelişkili", "etki belirsiz", "tek görüş", "yorumsuz")
 FLAG_TR = {"teyitli": "✅ İki analiz aynı sonuca vardı", "çelişkili": "⚠️ Analizler çelişti, haberi okuyun",

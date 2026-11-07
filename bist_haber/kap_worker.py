@@ -36,7 +36,11 @@ def load() -> Dict:
         return {}
 
 
+STALE_MIN = 5   # canlılık zamanı bundan eskiyse (ve bekleme süresi geçtiyse) çalışan okuyucu yok sayılır
+
+
 def _save(st: Dict) -> None:
+    st["nabiz"] = datetime.now(config.TR_TZ).isoformat(timespec="seconds")  # başka işlemler için canlılık işareti
     path = state_file()
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
@@ -56,6 +60,9 @@ def event_summary(conn, today: Optional[date] = None, days: int = 15) -> Dict:
     today = today or datetime.now(config.TR_TZ).date()
     tickers = [r[0] for r in conn.execute("SELECT DISTINCT ticker FROM companies")]
     evs = [(t, e) for t in tickers for e in corp_events.upcoming(conn, t, today, days)["yaklasan"]]
+    # Fiyatı doğrudan etkileyenler (bedelsiz/bedelli düzeltme, temettü hak kullanımı) önce, sonra genel kurul; tarihe göre.
+    prio = lambda e: 0 if e["fiyat_duzeltir"] else (1 if e["tur"] == "temettu_hak" else 2)
+    evs = sorted(evs, key=lambda te: (prio(te[1]), te[1]["tarih"], te[0]))
     important = [f"{t} {e['tarih'][8:10]}.{e['tarih'][5:7]} " + (
         "bedelsiz/bedelli fiyat düzeltmesi" if e["fiyat_duzeltir"] else
         "temettü hak kullanımı" + (f" (brüt {e['brut_tl']:.2f} TL)" if e.get("brut_tl") else "") if e["tur"] == "temettu_hak"
@@ -140,6 +147,23 @@ def running() -> bool:
     return _thread is not None and _thread.is_alive()
 
 
+def alive_elsewhere(st: Optional[Dict] = None, now: Optional[datetime] = None) -> bool:
+    """Başka bir işlemde (ör. ikinci panel penceresi) okuyucu çalışıyor mu? Durum dosyasındaki canlılık zamanına bakar:
+    son kayıt 5 dk içindeyse ya da planlanan devam zamanı + 5 dk henüz geçmediyse çalışıyor sayılır."""
+    st = load() if st is None else st
+    if st.get("durum") != "çalışıyor":
+        return False
+    now = now or datetime.now(config.TR_TZ)
+    try:
+        beat = datetime.fromisoformat(st.get("nabiz", ""))
+        if (now - beat).total_seconds() < STALE_MIN * 60:
+            return True
+        nxt = st.get("sonraki")
+        return bool(nxt) and (now - datetime.fromisoformat(nxt)).total_seconds() < STALE_MIN * 60
+    except ValueError:
+        return False
+
+
 def start(db_path=None, force: bool = False) -> bool:
     """Arka planda başlatır (zaten çalışıyorsa False). force=False iken yalnız gerekiyorsa başlar."""
     global _thread
@@ -154,6 +178,8 @@ def start(db_path=None, force: bool = False) -> bool:
         if pend == 0:
             return False
         prev = load()
+        if alive_elsewhere(prev):
+            return False   # başka bir pencerede/işlemde zaten okuyor: KAP'a ikinci kez gitme
         # Kendiliğinden başlama: çok sayfa var, ya da önceki iş yarım kaldı (KAP sınırı / süre / panel kapandı).
         if not force and not (pend > AUTO_START_MIN_PAGES or prev.get("devam_gerek") or prev.get("durum") == "çalışıyor"):
             return False
