@@ -9,7 +9,7 @@ from html import escape as esc
 import pandas as pd
 import streamlit as st
 
-from bist_haber import analyzer, config, db, pipeline, report, technical, tradeplan
+from bist_haber import analyzer, config, db, pipeline, report, technical, tradeplan, entries
 
 st.set_page_config(page_title="Halley", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
 
@@ -271,9 +271,48 @@ def scenario(r: dict) -> dict:
     return _PLAN_CACHE[r["ticker"]]
 
 
-def scenario_block(p: dict) -> None:
-    st.markdown("**🎯 İşlem senaryosu** <span class='news-meta'>(tahmini, geçmiş veriyle henüz test edilmedi; "
+def md(text: str) -> str:
+    """Koddan üretilen metni markdown'da güvenli göster: ~ (üstü çizili) ve * _ ` biçimlendirme işaretlerini kaçır."""
+    return "".join("\\" + ch if ch in "~*_`" else ch for ch in str(text))
+
+
+def entry_block(g: dict) -> None:
+    """Parça A2: kırılım / geri çekilme / destekten tepki senaryoları (kodla, kredi harcamaz)."""
+    st.markdown("**🧭 Giriş senaryoları** <span class='news-meta'>(her zaman mevcut fiyattan alım gerekmez; "
                 "yatırım tavsiyesi değildir)</span>", unsafe_allow_html=True)
+    items = g.get("senaryolar", [])
+    best = next((s for s in items if s["tur"] == g.get("en_uygun")), None)
+    if best is None:
+        st.caption("Uygun giriş senaryosu yok. " + g.get("neden_yok", ""))
+    else:
+        st.markdown(f"**En uygun görünen: {md(best['ad'])}** · {md(best['emir'])}")
+        c1, c2, c3, c4, c5 = st.columns(5)
+        c1.metric("Giriş", f"{best['giris']:.2f} TL", f"{best['uzaklik_%']:+.1f}% fiyattan", delta_color="off")
+        c2.metric("Zarar durdur (SL)", f"{best['sl']:.2f} TL", f"{best['sl_%']:+.1f}%")
+        c3.metric("TP1", f"{best['tp1']:.2f} TL", f"{best['tp1_%']:+.1f}%")
+        c4.metric("TP2", f"{best['tp2']:.2f} TL", f"{best['tp2_%']:+.1f}%")
+        c5.metric("Risk / getiri", f"1 : {best['rr1']:.1f}", f"TP2'de 1 : {best['rr2']:.1f}", delta_color="off")
+        st.caption(f"Kaba vade tahmini: TP1 yaklaşık {best['tp1_gun']}, TP2 yaklaşık {best['tp2_gun']} işlem günü (garanti değil) · "
+                   f"senaryo {best['gecerlilik_gun']} işlem günü geçerli · SL dayanağı: {best['sl_dayanak']} · "
+                   f"TP1: {best['tp1_dayanak']} · TP2: {best['tp2_dayanak']}")
+        st.markdown(f"- **Teyit:** {md(best['teyit'])}\n- **Geçersiz olur:** {md(best['gecersiz'])}\n"
+                    f"- **Olumlu senaryo:** {md(best['olumlu'])}\n- **Olumsuz senaryo:** {md(best['olumsuz'])}\n"
+                    f"- **Gerçekleşmezse:** {md(best['iptal'])}"
+                    + "".join(f"\n- ⚠️ {md(n)}" for n in best["notlar"]))
+    if items:
+        table = [{"Senaryo": s["ad"],
+                  "Durum": s.get("uygulanamaz") or s["kalite"],
+                  "Emir": s.get("emir", ""), "Giriş": s.get("giris"), "SL": s.get("sl"), "TP1": s.get("tp1"),
+                  "TP2": s.get("tp2"), "Risk/getiri (TP1)": s.get("rr1")} for s in items]
+        st.dataframe(pd.DataFrame(table).round(2), hide_index=True, use_container_width=True)
+    st.caption("📏 " + entries.BACKTEST_NOTE)
+
+
+def scenario_block(p: dict) -> None:
+    if p.get("girisler"):
+        entry_block(p["girisler"])
+    st.markdown("**🎯 Mevcut fiyattan girilirse (referans)** <span class='news-meta'>(tahmini; yatırım tavsiyesi "
+                "değildir)</span>", unsafe_allow_html=True)
     if p["durum"] != "senaryo":
         st.caption(p["neden_yok"])
         if p["riskler"]:
@@ -293,6 +332,16 @@ def scenario_block(p: dict) -> None:
     st.info(p["aciklama"])
     if p["riskler"] or p["notlar"]:
         st.markdown("**Risk faktörleri**\n" + "\n".join(f"- {esc(x)}" for x in p["riskler"] + p["notlar"]))
+
+
+def best_entry_columns(p: dict) -> dict:
+    g = p.get("girisler") or {}
+    s = next((x for x in g.get("senaryolar", []) if x["tur"] == g.get("en_uygun")), None)
+    if not s:
+        return {"En uygun giriş senaryosu": "yok" if p.get("durum") == "senaryo" else ""}
+    return {"En uygun giriş senaryosu": s["ad"], "Giriş emri": s["emir"], "Giriş fiyatı": s["giris"],
+            "Giriş SL": s["sl"], "Giriş TP1": s["tp1"], "Giriş TP2": s["tp2"], "Giriş r/g (TP1)": s["rr1"],
+            "Teyit": s["teyit"], "Geçersizlik": s["gecersiz"]}
 
 
 def stock_details(r: dict) -> None:
@@ -385,6 +434,7 @@ with tab_list:
                     "Kâr al (TP)": scenario(r).get("tp"), "Risk/getiri (1:x)": scenario(r).get("rr"),
                     "Tahmini vade (işlem günü)": "{}–{}".format(*scenario(r)["vade"]) if scenario(r).get("vade") else "",
                     "Risk seviyesi": scenario(r).get("risk_seviyesi", ""),
+                    **best_entry_columns(scenario(r)),
                     "Risk faktörleri": " | ".join(scenario(r).get("riskler", [])),
                     "Açıklama": scenario(r).get("aciklama", scenario(r).get("neden_yok", "")),
                     "Son haber özeti": r["last_news"],

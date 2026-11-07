@@ -504,3 +504,36 @@ boş; tahmin edilmez), 20 günlük ortalama işlem hacmi (TL), salınım dibi, h
 Bollinger, OBV yönü, endekse göre güç farkı 0; ADX en çok 5e-6 puan (TA-Lib iç yuvarlaması; etkisiz). TA-Lib
 değerleri sabit bir seri üzerinde dondurulup `tests/test_indicators_v2.py`'ye kondu (17 test). Canlı veri kopyasında
 4 hisse için panel hatasız çizildi. Python 3.9.13 ile **137 test geçti**.
+
+## 2026-11-07 — Parça A2: üç giriş senaryosu (`bist_haber/entries.py`)
+
+Midas'ta koşullu emir yok → kırılım "fiyat alarmı kur, teyit gelince elle al"; geri çekilme ve destekten tepki
+limit emir. Mevcut fiyattan giriş planı "referans" olarak kaldı (pilot senaryo testi onu ölçüyor).
+
+**Kurallar (sabitler dosyada; geçmiş sonuca bakılarak ayarlanmadı):**
+- Kırılım: en yakın direnç (20g/60g/52h) fiyata ≤2 ATR ise. Alarm = direnç; tahmini alış = direnç + 0,2 ATR; teyit =
+  günlük kapanış direnç üstünde (+ hacim); SL = direnç − 1 ATR. Fiyat tüm seviyelerin üstündeyse uygulanamaz.
+- Geri çekilme: 20 EMA > 50 EMA (> 200 EMA) ve fiyat 50 EMA üstü. Limit = 20 EMA (fiyat 0,3 ATR içindeyse mevcut
+  fiyat); SL = salınım dibi − 0,2 ATR (dip 0,5–3 ATR aşağıdaysa) yoksa giriş − 1,5 ATR; geçersizlik: 50 EMA altı kapanış.
+- Destekten tepki: 20g (yoksa 60g) destek fiyata ≤2 ATR. Limit = destek + 0,25 ATR (fiyatın üstüne çıkmaz);
+  SL = destek − 0,75 ATR; düşüş trendinde "düşen bıçak" notu.
+- Hedefler: TP1 = girişin 0,5 ATR'den fazla üstündeki ilk direnç (yoksa 1:2), TP2 = sonraki (yoksa 1:3). Girişe
+  10 ATR'den uzak seviye hedef sayılmaz (≈20 işlem günü; kullanıcının swing vadesi) — FROTO'da 9 ay önceki +%72'lik
+  52h zirve TP2 olarak çıkınca eklendi (veri doğruydu, sorun kuraldaydı). Zarar mesafesi >%15 → elverişsiz.
+- Kalite: TP1 r/g <1 elverişsiz, 1–2 zayıf, ≥2 iyi. En uygun = en yüksek TP1 r/g (eşitlikte fiyata en yakın).
+  Hiçbiri uygun değilse "Uygun giriş senaryosu yok". Her senaryoda teyit, geçersizlik, olumlu/olumsuz senaryo,
+  geçerlilik (kırılım/geri çekilme 10, destek 5 işlem günü), kaba TP1/TP2 süresi.
+
+**Gerçek veri testi (44 BIST hissesi, ~2 yıl, 5 günde bir kesim = 4.400 durum, HABER YOK):** tutarlılık ihlali 0
+(SL < giriş < TP1 < TP2; limit fiyatın üstünde değil). Emir gerçekleşme oranı %55–63. Gerçekleşenlerde TP1 önce
+%33–37, SL önce %57–65; ortalama getiri −0,25…+0,26% (maliyet hariç). Mevcut fiyattan referans: TP1 %30, SL %51,
+ort. +0,38%. Sonuç: teknik kurallar tek başına avantaj sağlamıyor (rastgele yürüyüşte 1:2 hedef için beklenen ~%33
+ile uyumlu → ölçüm de taraflı değil). Kurallar buna göre değiştirilmedi; panelde bu not aynen gösteriliyor.
+Haber sinyalinin katkısı pilotta (Faz C: koşullu giriş testi) ölçülmeli. Test ölçüm kuralları: kırılım = kapanış
+seviyenin üstünde → ertesi gün açılış; limit = en düşük ≤ limit; aynı gün SL+TP → SL; limit dolduğu gün TP sayılmaz.
+
+**Panel:** "🧭 Giriş senaryoları" kartı (en uygun senaryo + üçünün tablosu), altında "Mevcut fiyattan girilirse
+(referans)". Detaylı CSV'ye en uygun giriş sütunları eklendi. Markdown'da "~" üstü çizili yaptığı için metinlerde
+"yaklaşık" kullanıldı; kod metinleri `md()` ile kaçırılıyor. Testler: `tests/test_entries.py` (20). **157 test geçti.**
+Not: Yahoo gün içinde son barı yalnız kapanışla (açılış/en yüksek/en düşük boş) verebiliyor; ATR bunu kapanışla
+dolduruyor, etkisi küçük.

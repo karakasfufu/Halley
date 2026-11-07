@@ -7,6 +7,8 @@ HENÜZ TEST EDİLMEDİ; ekranda "tahmini" olarak gösterilir. Yalnızca olumlu h
 import math
 from typing import Dict, List, Optional
 
+from . import entries
+
 MIN_RR = 2.0              # hedef/risk oranı en az 1:2
 ATR_STOP_MULT = 2.0       # destek uygun değilse SL = fiyat − 2 × ATR
 MAX_STOP_PCT = 15.0       # SL fiyatın %15'inden daha aşağıda olamaz
@@ -125,4 +127,6 @@ def plan(t: Optional[Dict], news: Dict) -> Dict:
     )
     return {"durum": "senaryo", "elverissiz": unfavorable, "giris": entry, "sl": sl, "sl_dayanak": sl_basis, "tp": tp, "tp_dayanak": tp_basis,
             "sl_%": pct(sl), "tp_%": pct(tp), "rr": rr, "vade": (lo, hi), "risk_seviyesi": level,
-            "riskler": risks, "notlar": notes, "aciklama": explanation}
+            "riskler": risks, "notlar": notes, "aciklama": explanation,
+            # Parça A2: mevcut fiyattan girişin yanında üç koşullu giriş senaryosu (kırılım/geri çekilme/destek).
+            "girisler": entries.scenarios(t)}
