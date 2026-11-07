@@ -314,9 +314,12 @@ EVENT_SUBJECTS = ("Sermaye Artırımı", "Kar Payı", "Bölünme")
 
 
 def for_ticker(conn, ticker: str, today: Optional[date] = None) -> Optional[Dict]:
-    q = "SELECT date, open, high, low, close, volume FROM prices WHERE ticker=? ORDER BY date"
-    bars = [dict(r) for r in conn.execute(q, (ticker,))]
-    t = analyze(bars, today, bench=[dict(r) for r in conn.execute(q, (BENCHMARK,))])
+    # W4 (2026-11-07): "today" verildiğinde o günden SONRAKİ fiyatlar kullanılmaz (geçmiş bir gün için hesapta
+    # geleceği görme hatası vardı; bugünkü kullanımda gelecek fiyat olmadığından davranış değişmez).
+    cut = (today or date.max).isoformat()
+    q = "SELECT date, open, high, low, close, volume FROM prices WHERE ticker=? AND date<=? ORDER BY date"
+    bars = [dict(r) for r in conn.execute(q, (ticker, cut))]
+    t = analyze(bars, today, bench=[dict(r) for r in conn.execute(q, (BENCHMARK, cut))])
     if t is None:
         return None
     since = (date.fromisoformat(t["tarih"]) - timedelta(days=60)).isoformat()

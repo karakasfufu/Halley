@@ -239,7 +239,7 @@ class EveningReportTests(unittest.TestCase):
         # kapanan B: adet floor(1000/5,3)=188; 188 × 100 × %7,2 = 1.354 TL
         self.assertIn("| 2 | Sanal | B | TP2 | +7.50 | +7.20 | 2.40 | +1,354 |", md)
         self.assertIn("maliyetin getiriye etkisi toplam %0.30 puan", md)
-        self.assertIn("Hazırlanıyor (W4)", md)
+        self.assertIn("Değerlendirilecek karar günü yok", md)        # önceki gün bekçi kaydı yok
         self.assertIn("örnek az (1 < 30)", md)
 
     def test_without_capital_no_tl_and_note(self):

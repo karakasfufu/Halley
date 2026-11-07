@@ -214,6 +214,11 @@ def run_session(conn, universe: Dict[str, str], kind: str, settings: Dict, ai: b
     out["fiyat"] = pr()
     say("İşlem günlüğü güncelleniyor...", 0.82)
     out["gunluk"] = journal.update_all(conn, commission, slippage)
+    if kind == "aksam":
+        say("Kaçırılan fırsatlar inceleniyor (o günkü karar kaydına göre)...", 0.85)
+        from . import missed
+        res = missed.scan(conn, now.date())
+        out["kacirilan"] = dict(missed.report_md(res), ham=res)
     say("Karar izi kaydediliyor...", 0.88)
     ctx = signals.Context(conn, now.date())
     out["calistirma"] = log_run(conn, universe, kind, window=int(settings.get("pencere", 7)), ctx=ctx)
@@ -582,7 +587,7 @@ def observations(conn, out) -> list:
     sc = n.get("SENARYO_UYGUN_DEGIL", 0)
     if sc:
         obs.append(f"{sc} hissede haber olumlu ama giriş senaryosu uygun değildi (koşul yok ya da risk/getiri zayıf). "
-                   "Bu filtre fırsat eliyor mu, kaçırılan fırsat analiziyle (W4) ölçülecek; tek günlük veriyle eşik "
+                   "Bu filtre fırsat eliyor mu, kaçırılan fırsat bölümünde (7–8) izlenir; tek günlük veriyle eşik "
                    "değiştirilmemeli.")
     lq = n.get("LIKIDITE", 0)
     if lq:

@@ -118,6 +118,24 @@ CREATE TRIGGER IF NOT EXISTS watch_runs_no_update BEFORE UPDATE ON watch_runs
 BEGIN SELECT RAISE(ABORT, 'çalıştırma kaydı değiştirilemez'); END;
 CREATE TRIGGER IF NOT EXISTS watch_runs_no_delete BEFORE DELETE ON watch_runs
 BEGIN SELECT RAISE(ABORT, 'çalıştırma kaydı silinemez'); END;
+-- W4 (2026-11-07): penceresi tamamlanmış kaçırılan fırsatlar (eğilim takibi için). YALNIZ EKLENİR.
+CREATE TABLE IF NOT EXISTS missed_log (
+    baz_gun          TEXT NOT NULL,
+    ticker           TEXT NOT NULL,
+    run_id           INTEGER NOT NULL REFERENCES watch_runs(run_id),
+    neden_kodu       TEXT NOT NULL,
+    modul            TEXT,
+    kazanc_pct       REAL,
+    endekse_gore_atr REAL,
+    zirve_gunu       TEXT,
+    etiketler        TEXT,
+    kayit_ani        TEXT NOT NULL,
+    UNIQUE (baz_gun, ticker)
+);
+CREATE TRIGGER IF NOT EXISTS missed_log_no_update BEFORE UPDATE ON missed_log
+BEGIN SELECT RAISE(ABORT, 'kaçırılan fırsat kaydı değiştirilemez'); END;
+CREATE TRIGGER IF NOT EXISTS missed_log_no_delete BEFORE DELETE ON missed_log
+BEGIN SELECT RAISE(ABORT, 'kaçırılan fırsat kaydı silinemez'); END;
 CREATE TABLE IF NOT EXISTS prices (
     ticker TEXT NOT NULL,
     date   TEXT NOT NULL,

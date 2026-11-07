@@ -867,3 +867,28 @@ Yalnız okunur.
 testte bağımsız hesaplandı (ör. 172 adet × 100 × %8,7 = 1.496 TL). Canlı kopya (06.11 verisi): XU100 +%1,32 ham
 fiyattan ayrıca hesaplandı, aynı; 630 hissede 424 yükselen / 177 düşen; 580 likit hisse. 335 test, ağsız 0 bağlantı.
 **Sırada:** W4 kaçırılan fırsatlar (eşik gerçek dağılımdan, o günkü karar izine göre neden), W5 eğilim + onay listesi.
+
+## 2026-11-07 — W4: kaçırılan fırsat analizi (`bist_haber/missed.py`) — akşam raporu bölüm 7–8
+**Tanım:** baz günden sonraki en fazla 5 işlem gününde kapanış, XU100 getirisi düşüldükten sonra baz gün ATR'sinin
+en az **4 katı** yükseldiyse "ciddi yükseliş". Eşik gerçek dağılımdan (canlı veri, ~1 yıl, likit hisseler, 133.287
+hisse-gün): medyan 0,33 · %90 2,12 · %95 3,01 · **%97,5 3,98** · %99 5,48 ATR → 4 ATR ≈ en güçlü %2,5, gün başına
+medyan 14 hisse (3 ATR: 29/gün, fazla gürültülü). Pencerede ±%10,5'ten büyük günlük hareket → "veri şüphesi", dışarıda.
+**Geriye dönük bilgi yok:** karar = o gün bekçinin kaydettiği karar (signal_log); kaydı olmayan gün yeniden kurulmaz,
+raporda "bekçi kaydı olmayan günler" olarak yazılır. Baz gün = çalıştırma anında kapanışı kesinleşmiş son işlem günü
+(sabah → önceki gün; kapanış + 10 dk). ATR/likidite baz gün dahil önceki barlarla; yükseliş yalnız sonraki kapanışlarla.
+**Nedenler** (kullanıcının soruları): haber yok / analiz bekliyordu / önemsiz bulundu / olumsuz yorumlandı / skor eşik
+altı / teknik filtre (senaryo uygun değil) / likidite / veri eksik-kritik / önerildi ama giriş oluşmadı. Ek etiketler:
+*haber karardan SONRA geldi* (o an bilinemezdi; botun hatası sayılmaz), *başlıkta kod geçiyor ama eşleşmemiş* (şirket
+eşleştirme), *fiyatlanmış/aşırı yükselmiş uyarısı vardı*. Önerildi ve giriş olduysa kaçırılan sayılmaz (bölüm 9).
+Her neden için iyileştirme önerisi; hiçbir ayar değişmez. Son 10 işlem gününün kararları taranır; penceresi tamamlanan
+kaçırılanlar `missed_log` tablosuna (yalnız eklenir, değiştirilemez/silinemez) W5 eğilimi için yazılır.
+**Düzeltilen sızıntı:** `technical.for_ticker(today=geçmiş gün)` o günden sonraki fiyatları da kullanıyordu (geçmiş gün
+hesabında geleceği görme). Artık `date<=today` ile kesiliyor; bugünkü kullanımda davranış değişmez. Test eski kodda
+başarısız, yenide başarılı.
+**Gerçek veri denemesi (yalnız test kopyası):** 27.10 kararı o günün fiyat/haberiyle yeniden kuruldu (kopya A'da 27.10
+19:00 sonrası fiyat ve haber silindi), tam fiyatlı kopya B'de tarandı: 584 likit hisse değerlendirildi, 4 kaçırılan
+(QNBTR +%43,8 / 11,5 ATR, KONTR +%59,9, KIMMR +%28,4 — haber karardan sonra, DOAS endeks −%3,5 iken +%11,1). İlk 3'ü ham
+fiyattan bağımsız hesapla birebir aynı. Hepsi "haber yok": canlı veritabanında 27.10 öncesi analiz edilmiş haber yok
+(beklenen). Not: yeniden kurulumda sonradan yapılmış analizler kalabilirdi; canlıda kararlar kayıttan okunduğu için bu
+sorun yok. 343 test, ağsız 0 bağlantı.
+**Sırada:** W5 — geçmiş raporlarla eğilim (kaynak, strateji, filtre, tekrar eden nedenler) ve onay bekleyen öneri listesi.
