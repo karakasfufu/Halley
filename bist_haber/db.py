@@ -85,6 +85,39 @@ CREATE TABLE IF NOT EXISTS trade_journal (
     guncellendi  TEXT,
     UNIQUE (ticker, signal_day, senaryo, kaynak)
 );
+-- W1 (2026-11-07): bekçi çalıştırmaları ve her hisse için karar izi. YALNIZ EKLENİR; değiştirilemez, silinemez.
+CREATE TABLE IF NOT EXISTS watch_runs (
+    run_id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind        TEXT NOT NULL,            -- sabah | aksam | guncelleme
+    day         TEXT NOT NULL,            -- çalıştırma günü (TR)
+    started_at  TEXT NOT NULL,
+    summary_json TEXT
+);
+CREATE TABLE IF NOT EXISTS signal_log (
+    run_id       INTEGER NOT NULL REFERENCES watch_runs(run_id),
+    ticker       TEXT NOT NULL,
+    karar        TEXT NOT NULL,           -- onerildi | onerilmedi
+    neden_kodu   TEXT NOT NULL,
+    modul        TEXT,
+    neden        TEXT,
+    haber_skoru  REAL,
+    haber_sayisi INTEGER,
+    son_fiyat    REAL,
+    fiyat_gunu   TEXT,
+    senaryo      TEXT,
+    giris REAL, sl REAL, tp1 REAL, tp2 REAL,
+    risk_seviyesi TEXT,
+    detay_json   TEXT,
+    PRIMARY KEY (run_id, ticker)
+);
+CREATE TRIGGER IF NOT EXISTS signal_log_no_update BEFORE UPDATE ON signal_log
+BEGIN SELECT RAISE(ABORT, 'sinyal geçmişi değiştirilemez'); END;
+CREATE TRIGGER IF NOT EXISTS signal_log_no_delete BEFORE DELETE ON signal_log
+BEGIN SELECT RAISE(ABORT, 'sinyal geçmişi silinemez'); END;
+CREATE TRIGGER IF NOT EXISTS watch_runs_no_update BEFORE UPDATE ON watch_runs
+BEGIN SELECT RAISE(ABORT, 'çalıştırma kaydı değiştirilemez'); END;
+CREATE TRIGGER IF NOT EXISTS watch_runs_no_delete BEFORE DELETE ON watch_runs
+BEGIN SELECT RAISE(ABORT, 'çalıştırma kaydı silinemez'); END;
 CREATE TABLE IF NOT EXISTS prices (
     ticker TEXT NOT NULL,
     date   TEXT NOT NULL,

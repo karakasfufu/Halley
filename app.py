@@ -12,7 +12,7 @@ import pandas as pd
 import streamlit as st
 
 from bist_haber import (analyzer, calendar_sync, config, corp_events, db, earnings, entries, journal, kap_history,
-                        kap_worker, macro_calendar, pipeline, report, technical, timeline, tradeplan)
+                        kap_worker, macro_calendar, pipeline, report, signals, technical, timeline, tradeplan)
 
 st.set_page_config(page_title="Halley", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
 
@@ -239,14 +239,13 @@ tab_list, tab_journal, tab_news, tab_adv = st.tabs(["📈 Bugünün listesi", "�
                                                      "🔧 Gelişmiş"])
 
 
-_TECH_CACHE = {}
+# W1: panel ve bekçi aynı hesabı kullanır (bist_haber/signals.py)
+CTX = signals.Context(conn)
 
 
 def tech(ticker: str):
     """Teknik göstergeler (kodla hesaplanır, kredi harcamaz). Sayfa çiziminde bir kez hesaplanır."""
-    if ticker not in _TECH_CACHE:
-        _TECH_CACHE[ticker] = technical.for_ticker(conn, ticker)
-    return _TECH_CACHE[ticker]
+    return CTX.tech(ticker)
 
 
 def _n(v, fmt="{:.2f}"):
@@ -329,17 +328,12 @@ def financial_block(ticker: str) -> None:
     st.markdown("\n".join(f"- {esc(ln)}" for ln in lines))
 
 
-_PLAN_CACHE = {}
-_EARN_CACHE = {}
-_EVENT_CACHE = {}
 _TL_CACHE = {}
 
 
 def macro_risk_line():
-    """Parça B4: vade (15 işlem günü) içindeki piyasa geneli olaylar — tüm hisseler için aynı, bir kez hesaplanır."""
-    if "macro" not in _TL_CACHE:
-        _TL_CACHE["macro"] = timeline.macro_risk(datetime.now(config.TR_TZ).date(), 15)
-    return _TL_CACHE["macro"]
+    """Parça B4: vade (15 işlem günü) içindeki piyasa geneli olaylar — tüm hisseler için aynı."""
+    return CTX.macro_risk()
 
 
 def ticker_timeline(ticker: str) -> dict:
@@ -369,36 +363,17 @@ def timeline_block(ticker: str) -> None:
 
 def corp_event(ticker: str) -> dict:
     """Parça B3: kayıtlı KAP bildirimlerinden genel kurul / kâr payı / sermaye artırımı tarihleri."""
-    if ticker not in _EVENT_CACHE:
-        _EVENT_CACHE[ticker] = corp_events.upcoming(conn, ticker)
-    return _EVENT_CACHE[ticker]
+    return CTX.corp(ticker)
 
 
 def earning(ticker: str) -> dict:
     """Parça B2: bilanço yasal son tarihi ve açıklanıp açıklanmadığı (eldeki kayıtlardan)."""
-    if ticker not in _EARN_CACHE:
-        _EARN_CACHE[ticker] = earnings.status(conn, ticker)
-    return _EARN_CACHE[ticker]
+    return CTX.earning(ticker)
 
 
 def scenario(r: dict) -> dict:
-    """Haber + teknik + risk → SL/TP/vade senaryosu (kodla, kredi harcamaz)."""
-    if r["ticker"] not in _PLAN_CACHE:
-        imp = conn.execute("SELECT confidence, persistence, reason, published_at, effective_date FROM impacts WHERE ticker=? AND direction!=0 "
-                           "ORDER BY published_at DESC LIMIT 1", (r["ticker"],)).fetchone()
-        t_ = tech(r["ticker"])
-        move = technical.news_moves_for(conn, r["ticker"], imp["effective_date"], t_.get("atr")) if imp and t_ else {}
-        news_info = {"score": r["score"], "direction": 1 if r["score"] > 0 else (-1 if r["score"] < 0 else 0),
-                     "confidence": imp["confidence"] if imp else None, "flags": r.get("flags", ""),
-                     "persistence": imp["persistence"] if imp else "orta",
-                     "reason": imp["reason"] if imp else "", "summary": r["last_news"], "hareket": move,
-                     "bilanco_riski": earnings.window_risk(earning(r["ticker"]), datetime.now(config.TR_TZ).date(), 15),
-                     "olay_riskleri": corp_events.risk_lines(corp_event(r["ticker"]), (t_ or {}).get("son_fiyat")),
-                     "makro_riski": macro_risk_line(),
-                     "temettu": [(e["tarih"], e["brut_tl"] / t_["son_fiyat"] * 100) for e in corp_event(r["ticker"])["yaklasan"]
-                                 if e["tur"] == "temettu_hak" and e.get("brut_tl") and t_ and t_.get("son_fiyat")]}
-        _PLAN_CACHE[r["ticker"]] = tradeplan.plan(tech(r["ticker"]), news_info)
-    return _PLAN_CACHE[r["ticker"]]
+    """Haber + teknik + risk → SL/TP/vade senaryosu (kodla, kredi harcamaz). Bekçiyle aynı hesap (signals)."""
+    return CTX.plan(r)
 
 
 def md(text: str) -> str:
@@ -513,7 +488,7 @@ def stock_details(r: dict) -> None:
             f"<div class='news-meta' style='margin-top:6px'>Neden: {esc(i['reason'] or '-')}</div>"
             f"<div class='news-meta'>{esc(EVENT_TR.get(i['event_type'], i['event_type']))} · güven %{i['confidence'] * 100:.0f}"
             f" · etkisi {PERSIST_TR.get(i['persistence'], i['persistence'])} sürebilir · "
-            f"<a href='{esc(i['url'])}' target='_blank'>haberin kaynağını aç</a></div></div>",
+            f"<a href='{esc(i['url'] or '')}' target='_blank'>haberin kaynağını aç</a></div></div>",
             unsafe_allow_html=True)
 
 
@@ -726,7 +701,7 @@ with tab_news:
         st.markdown(
             f"<div class='news-card'><div class='news-meta'>{n['published_at'][:16].replace('T', ' ')} · {source}</div>"
             f"{chips}<div style='margin-top:6px'><b>{esc(n['title'])}</b></div><div>{esc(n['note'] or '')}</div>"
-            f"<div class='news-meta' style='margin-top:6px'><a href='{esc(n['url'])}' target='_blank'>haberin kaynağını aç</a>"
+            f"<div class='news-meta' style='margin-top:6px'><a href='{esc(n['url'] or '')}' target='_blank'>haberin kaynağını aç</a>"
             f"</div></div>", unsafe_allow_html=True)
 
 # ---------------- Gelişmiş ----------------

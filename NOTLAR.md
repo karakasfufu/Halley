@@ -797,3 +797,20 @@ kuralı: TP1'de yarısı satılır, stop girişe çekilir, kalan TP2'ye; olaylar
   hesabıyla tutuyor (100.000 TL, %1 → SOKM 496 adet, azami ≈ 999 TL). **311 test geçti** (ağ yasaklı da).
 - Henüz yok: birleşik "fırsat puanı" (günlük ≥ 30 kapanan işlem topladıktan sonra test edilecek), portföy riski
   (sektör/korelasyon), geçmiş benzer hareketlere dayalı vade.
+
+## 2026-11-07 — W: Akıllı Piyasa Bekçisi (kullanıcı isteği) — W1: sinyal geçmişi ve karar izi
+
+İstek: sabah (açılış öncesi) ve akşam (kapanış sonrası) analiz — kullanıcı ELLE başlatır (zamanlayıcı yok); kaçırılan
+fırsatlar ve nedenleri; 10 bölümlü akşam raporu; geçmişle karşılaştırma; ayarlar kendiliğinden değişmez (öneri →
+onay); rutin işte yapay zekâ yok; otomatik emir yok. Plan: W1 karar izi → W2 sabah/akşam düğmeleri → W3 rapor + arşiv
+→ W4 kaçırılan fırsatlar → W5 gelişim takibi ve onay bekleyen öneriler → (W6 isteğe bağlı YZ yorumu, maliyet onaylı).
+
+**W1:** `bist_haber/signals.py` — panelin senaryo hesabı ortak modüle taşındı (panel = bekçi; iki yer ayrışmasın).
+Eski ve yeni panel canlı kopyada birebir karşılaştırıldı (121 metin, 14 tablo aynı). Karşılaştırma, taşıma sırasında
+silinen bir yardımcı işlevi yakaladı (boş veritabanlı panel testleri hisse ayrıntısını çizmediği için görünmüyordu) →
+hisseli panel testi eklendi; bu test de URL'si boş haberde panelin çöktüğünü buldu → düzeltildi.
+Karar izi: her çalıştırmada evrendeki her hisse için önerildi/önerilmedi + neden kodu + modül (HABER_YOK,
+HABER_ANALIZ_BEKLIYOR, HABER_ONEMSIZ, HABER_OLUMSUZ, SKOR_ESIK_ALTI, TEKNIK_VERI_YOK, VERI_KRITIK, LIKIDITE,
+SENARYO_UYGUN_DEGIL, ONERILDI) + seviyeler + riskler + "fiyatlanmış" işareti. `watch_runs` ve `signal_log` YALNIZ
+EKLENİR (tetikleyiciler UPDATE/DELETE'i reddeder). Canlı kopya: 761 hisse 9,7 sn; önerilen SOKM, FROTO (panelle aynı).
+**317 test geçti.**
