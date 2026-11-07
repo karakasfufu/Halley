@@ -63,11 +63,13 @@ def _consolidated(conn, ticker: str) -> Optional[bool]:
     rows = conn.execute("SELECT subject FROM news WHERE source='kap' AND (','||candidates||',') LIKE ? AND "
                         "(subject LIKE 'Sorumluluk Beyanı (%' OR subject LIKE 'Faaliyet Raporu (%') "
                         "ORDER BY published_at DESC", (like,)).fetchall()
-    for r in rows:
-        if "Konsolide Olmayan" in r["subject"]:
-            return False
-        if "(Konsolide)" in r["subject"]:
-            return True
+    # Hem konsolide hem bireysel tablo veren şirket (gerçek örnek: QYATB) konsolide sayılır: yükümlülük varsa süre
+    # konsolide süresidir (II-14.1 Md. 10/5, 11/5). Yalnız "Konsolide Olmayan" bildirimi varsa bireysel.
+    subjects = [r["subject"] for r in rows]
+    if any("(Konsolide)" in s for s in subjects):
+        return True
+    if any("Konsolide Olmayan" in s for s in subjects):
+        return False
     return None
 
 

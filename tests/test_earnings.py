@@ -108,6 +108,13 @@ class StatusTests(unittest.TestCase):
         self.assertEqual(s["ek_sure"], "2026-10-13")
         self.assertIn("SPK ek süre talebini değerlendirdi (13 Ekim 2026", E.describe(s, date(2026, 11, 7)))
 
+    def test_company_with_both_consolidated_and_solo_is_consolidated(self):  # gerçek örnek: QYATB
+        self.cover()
+        self.news("AAA", "Sorumluluk Beyanı (Konsolide)", "2026-08-14T10:00:00+03:00")
+        self.news("AAA", "Sorumluluk Beyanı (Konsolide Olmayan)", "2026-08-14T10:05:00+03:00")   # en son bu
+        s = E.status(self.conn, "AAA", date(2026, 11, 7))
+        self.assertEqual((s["konsolide"], s["son_tarih"], s["durum"]), (True, "2026-11-09", "açıklanmadı"))
+
     def test_half_year_assumption_is_stated(self):
         s = E.status(self.conn, "AAA", date(2026, 7, 15))
         self.assertIn("sınırlı bağımsız denetim için +10 gün", E.describe(s, date(2026, 7, 15)))

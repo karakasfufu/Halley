@@ -201,6 +201,8 @@ def kap_reader_box() -> None:
 
 @st.fragment(run_every=15)
 def kap_reader_live() -> None:
+    if not os.environ.get("HALLEY_OFFLINE"):
+        kap_worker.start()   # panel yeniden başlatıldıysa yarım iş birkaç dakika içinde kendiliğinden sürer
     kap_reader_box()
 
 

@@ -760,3 +760,8 @@ gün) 90 sn'de listelendi, +4.112 takvim kaydı; kapsam 180 gün (12.05–07.11)
 851 günlük haber metni (kullanıcının 15:02 güncellemesinde KAP sınırı nedeniyle yarım kalanlar; analiz yine
 "Haberleri güncelle" ve haber sınırıyla). Sayfaları panel içindeki okuyucu KAP sınırına göre bekleyerek okuyor; 4 saati
 aşarsa bir sonraki açılışta sürer. Yeni ilk kurulumda ilk güncelleme 180 günü kendiliğinden listeler (~2 dk).
+- 180 gün sonrası kontrol: "süresi geçti" 2 → 96 oldu; 95'i yalnız "Konsolide Olmayan" beyanı olan (çoğu borçlanma aracı
+  ihraççısı) ve 30 Ekim'e kadar 9 aylık raporu KAP listesinde olmayan şirketler (doğru; metin "KAP'tan kontrol edin,
+  gecikme/ek süre olabilir"). 1'i hata: hem konsolide hem bireysel beyan veren QYATB son bildirimine göre bireysel
+  sayılıyordu → herhangi bir konsolide beyan varsa konsolide (II-14.1 Md. 10/5, 11/5). Bütünleşik test sorun 0.
+- Okuyucu panel yeniden başlatılınca 15 sn'lik durum kutusundan da kendiliğinden sürdürülür. **283 test geçti.**
