@@ -306,6 +306,34 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         self.assertEqual(K.load()["gunluk_fiyat_gunu"], calls[0])
 
+    def test_new_watcher_waits_for_stale_lock_then_takes_over(self):
+        # gerçek hata (2026-11-08): panel yeniden başlatılınca kapatılan eski bekçinin kilidi tazeydi, yeni bekçi
+        # hemen çıkıyordu → okuyucu bir sonraki başlatmaya kadar çalışmıyordu
+        import json
+        import os
+        from datetime import datetime, timedelta
+        lock = K._serve_lock()
+        lock.write_text(json.dumps({"nabiz": datetime.now(config.TR_TZ).isoformat(timespec="seconds"),
+                                    "sahip": "eski"}), encoding="utf-8")
+        sleeps = []
+
+        class Stop(Exception):
+            pass
+
+        def fake_sleep(s):
+            sleeps.append(s)
+            if len(sleeps) == 1:      # eski bekçi gerçekten yok: kilidi bayatlat
+                old = (datetime.now(config.TR_TZ) - timedelta(minutes=30)).isoformat(timespec="seconds")
+                lock.write_text(json.dumps({"nabiz": old, "sahip": "eski"}), encoding="utf-8")
+            else:
+                raise Stop()
+
+        with self.assertRaises(Stop):
+            K.serve(self.path, sleep=fake_sleep, run_fn=lambda db_path=None: self.calls.append(db_path))
+        self.assertEqual(self.calls, [self.path])                                # bekledi, sonra devraldı
+        self.assertEqual(json.loads(lock.read_text(encoding="utf-8"))["sahip"], str(os.getpid()))
+        self.assertEqual(sleeps[0], K.SERVE_CHECK_SEC)
+
     def test_errors_never_crash_the_watcher(self):
         def boom(db_path=None):
             raise RuntimeError("KAP kapalı")

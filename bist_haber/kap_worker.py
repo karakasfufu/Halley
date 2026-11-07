@@ -220,19 +220,28 @@ def serve(db_path=None, sleep: Callable[[float], None] = time.sleep, once: bool 
           run_fn: Optional[Callable] = None) -> None:
     """baslat.bat ile panelin yanında çalışan bekçi (2026-11-07): tarayıcıda panel açık olmasa da bekleyen sayfaları
     kendiliğinden tamamlar. 2 dk'da bir bakar; başka bir işlemde okuyucu çalışıyorsa (canlılık zamanı) karışmaz.
-    Aynı anda tek bekçi: başka bekçinin kilidi tazeyse çıkar. Pencere kapanınca biter."""
+    Aynı anda tek bekçi: başka bekçinin kilidi tazeyse BEKLER (2026-11-08 düzeltmesi: önceden hemen çıkıyordu;
+    panel yeniden başlatılınca kapatılan eski bekçinin taze kilidi yüzünden yeni bekçi çıkıyor ve bir daha
+    denemiyordu). Kilit bayatlayınca (eski bekçi gerçekten yoksa) görevi devralır. Pencere kapanınca biter."""
+    import os
     lock = _serve_lock()
-    try:
-        other = json.loads(lock.read_text(encoding="utf-8"))
-        beat = datetime.fromisoformat(other["nabiz"])
-        if (datetime.now(config.TR_TZ) - beat).total_seconds() < SERVE_CHECK_SEC * 3 and not once:
-            return  # başka bir bekçi çalışıyor
-    except (OSError, ValueError, KeyError):
-        pass
+    me = str(os.getpid())
+    while not once:
+        try:
+            other = json.loads(lock.read_text(encoding="utf-8"))
+            beat = datetime.fromisoformat(other["nabiz"])
+            fresh = (datetime.now(config.TR_TZ) - beat).total_seconds() < SERVE_CHECK_SEC * 3
+            if fresh and other.get("sahip") != me:
+                sleep(SERVE_CHECK_SEC)      # başka bir bekçi çalışıyor (ya da az önce kapatıldı): bekle, sonra bak
+                continue
+        except (OSError, ValueError, KeyError):
+            pass
+        break
     run_fn = run_fn or run
     while True:
         lock.parent.mkdir(parents=True, exist_ok=True)
-        lock.write_text(json.dumps({"nabiz": datetime.now(config.TR_TZ).isoformat(timespec="seconds")}), encoding="utf-8")
+        lock.write_text(json.dumps({"nabiz": datetime.now(config.TR_TZ).isoformat(timespec="seconds"), "sahip": me}),
+                        encoding="utf-8")
         try:
             conn = db.connect(db_path)
             try:

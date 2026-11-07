@@ -968,3 +968,10 @@ eden halka açık olmayan işletmeler "ihraç ettikleri araçların itfa tarihin
 olmadığı verimizde yok → "süre geçti" kesin değil. **Değişiklik (yalnız açıklama metni):** `earnings.status` →
 `fiyat_var`; fiyatı hiç olmayan şirkette açıklamaya bu mevzuat uyarısı eklenir. Risk hesabı/öneri etkilenmez (bu
 şirketler için zaten senaryo yok). 370 test, ağsız 0 bağlantı.
+**Bekçi yeniden başlatma hatası (2026-11-08, bulundu ve düzeltildi):** panel yeniden başlatılınca kapatılan eski
+bekçinin kilit dosyası (nabız) birkaç dakika taze kalıyordu; yeni bekçi "başka bekçi çalışıyor" deyip HEMEN çıkıyor ve
+bir daha denemiyordu → bir sonraki başlatmaya kadar arka plan okuma ve günlük işlem günlüğü güncellemesi yoktu
+(01:53 yeniden başlatmasında görüldü; o an okunacak sayfa kalmadığı için kayıp yok). Artık kilitte sahip (süreç no)
+var; yeni bekçi taze yabancı kilitte 2 dk'da bir bakarak bekler, kilit bayatlayınca devralır. Test eski kodda
+başarısız, yenide başarılı. Okuma sonucu: 95 sayfanın 90'ı okundu; 5 sayfa KAP'tan boş/hatalı geldi, bir sonraki
+güncellemede yeniden denenir. 371 test, ağsız 0 bağlantı.
