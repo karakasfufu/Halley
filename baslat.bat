@@ -9,4 +9,6 @@ if not exist "%VENV%\Scripts\python.exe" (
     "%VENV%\Scripts\pip" install -r requirements.txt || (echo Kurulum basarisiz. & pause & exit /b 1)
 )
 echo BIST Haber Radari aciliyor... Kapatmak icin bu pencereyi kapatin.
+rem Eksik KAP sayfalarini tarayici acik olmasa da tamamlayan bekci (ayni pencerede, pencere kapaninca biter)
+start "" /b "%VENV%\Scripts\python" -m bist_haber okuyucu
 "%VENV%\Scripts\python" -m streamlit run app.py

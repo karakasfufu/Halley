@@ -188,6 +188,49 @@ def start(db_path=None, force: bool = False) -> bool:
         return True
 
 
+SERVE_CHECK_SEC = 120
+
+
+def _serve_lock():
+    return config.DATA / "kap_okuyucu_servis.json"
+
+
+def serve(db_path=None, sleep: Callable[[float], None] = time.sleep, once: bool = False,
+          run_fn: Optional[Callable] = None) -> None:
+    """baslat.bat ile panelin yanında çalışan bekçi (2026-11-07): tarayıcıda panel açık olmasa da bekleyen sayfaları
+    kendiliğinden tamamlar. 2 dk'da bir bakar; başka bir işlemde okuyucu çalışıyorsa (canlılık zamanı) karışmaz.
+    Aynı anda tek bekçi: başka bekçinin kilidi tazeyse çıkar. Pencere kapanınca biter."""
+    lock = _serve_lock()
+    try:
+        other = json.loads(lock.read_text(encoding="utf-8"))
+        beat = datetime.fromisoformat(other["nabiz"])
+        if (datetime.now(config.TR_TZ) - beat).total_seconds() < SERVE_CHECK_SEC * 3 and not once:
+            return  # başka bir bekçi çalışıyor
+    except (OSError, ValueError, KeyError):
+        pass
+    run_fn = run_fn or run
+    while True:
+        lock.parent.mkdir(parents=True, exist_ok=True)
+        lock.write_text(json.dumps({"nabiz": datetime.now(config.TR_TZ).isoformat(timespec="seconds")}), encoding="utf-8")
+        try:
+            conn = db.connect(db_path)
+            try:
+                pend = pending_counts(conn)["toplam"]
+            finally:
+                conn.close()
+            prev = load()
+            need = pend > 0 and (pend > AUTO_START_MIN_PAGES or prev.get("devam_gerek") or prev.get("durum") == "çalışıyor")
+            if need and not alive_elsewhere(prev) and not running():
+                run_fn(db_path=db_path)
+        except Exception as e:  # bekçi asla çökmemeli; bir sonraki turda yeniden dener
+            st = load()
+            st["bekci_hata"] = str(e)[:200]
+            _save(st)
+        if once:
+            return
+        sleep(SERVE_CHECK_SEC)
+
+
 def note_rate_limited() -> None:
     """Günlük güncelleme KAP sınırına takıldıysa işaretle: panel okuyucuyu kendiliğinden başlatsın."""
     st = load()

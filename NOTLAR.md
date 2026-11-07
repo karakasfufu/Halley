@@ -765,3 +765,8 @@ aşarsa bir sonraki açılışta sürer. Yeni ilk kurulumda ilk güncelleme 180 
   gecikme/ek süre olabilir"). 1'i hata: hem konsolide hem bireysel beyan veren QYATB son bildirimine göre bireysel
   sayılıyordu → herhangi bir konsolide beyan varsa konsolide (II-14.1 Md. 10/5, 11/5). Bütünleşik test sorun 0.
 - Okuyucu panel yeniden başlatılınca 15 sn'lik durum kutusundan da kendiliğinden sürdürülür. **283 test geçti.**
+- **Yakalanan tasarım açığı:** okuyucu yalnız tarayıcıda panel açıkken çalışıyordu; panel yeniden başlatılıp sekme
+  bağlanmayınca 2.506 sayfa bekledi. `baslat.bat` artık panelin yanında `python -m bist_haber okuyucu` bekçisini aynı
+  pencerede başlatır (pencere kapanınca biter): 2 dk'da bir bakar, bekleyen > 100 sayfa ya da yarım iş varsa okuyucuyu
+  çalıştırır; başka işlemde canlı okuyucu varsa karışmaz; tek bekçi (kilit dosyası); hata bekçiyi çökertmez.
+  **287 test geçti.**

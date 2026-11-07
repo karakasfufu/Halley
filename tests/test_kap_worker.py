@@ -226,3 +226,47 @@ class FirstRunTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ServeTests(unittest.TestCase):
+    """baslat.bat ile çalışan bekçi: tarayıcı açık olmasa da okuyucuyu çalıştırır."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.path = Path(self.tmp.name) / "t.db"
+        p = patch.object(config, "DATA", Path(self.tmp.name))
+        p.start()
+        self.addCleanup(p.stop)
+        conn = db.connect(self.path)
+        for i in range(150):
+            conn.execute("INSERT INTO news(id,source,published_at,effective_date,title,subject,body,candidates,status,"
+                         "fetched_at) VALUES(?,?,?,?,?,?,NULL,'AAA','context','n')",
+                         (f"kap:{i}", "kap", "2026-10-01T10:00:00+03:00", "2026-10-01", "t",
+                          "Genel Kurul İşlemlerine İlişkin Bildirim"))
+        conn.commit()
+        conn.close()
+        self.calls = []
+
+    def test_runs_when_pending_and_nobody_else(self):
+        K.serve(self.path, once=True, run_fn=lambda db_path=None: self.calls.append(db_path))
+        self.assertEqual(self.calls, [self.path])
+
+    def test_does_not_disturb_live_reader_elsewhere(self):
+        K._save({"durum": "çalışıyor"})                                # taze canlılık zamanı
+        K.serve(self.path, once=True, run_fn=lambda db_path=None: self.calls.append(db_path))
+        self.assertEqual(self.calls, [])
+
+    def test_resumes_stale_half_done_job(self):
+        import json
+        from datetime import datetime, timedelta
+        old = (datetime.now(config.TR_TZ) - timedelta(minutes=30)).isoformat(timespec="seconds")
+        K.state_file().write_text(json.dumps({"durum": "çalışıyor", "nabiz": old, "sonraki": old}), encoding="utf-8")
+        K.serve(self.path, once=True, run_fn=lambda db_path=None: self.calls.append(db_path))
+        self.assertEqual(self.calls, [self.path])
+
+    def test_errors_never_crash_the_watcher(self):
+        def boom(db_path=None):
+            raise RuntimeError("KAP kapalı")
+        K.serve(self.path, once=True, run_fn=boom)
+        self.assertIn("KAP kapalı", K.load()["bekci_hata"])

@@ -91,6 +91,7 @@ def main(argv=None):
     sub.add_parser("init")
     sub.add_parser("status")
     sub.add_parser("prices")
+    sub.add_parser("okuyucu", help="Eksik KAP sayfalarını arka planda tamamlayan bekçi (baslat.bat başlatır)")
     for name in ("collect", "analyze", "report", "run"):
         sp = sub.add_parser(name)
         if name in ("collect", "run"):
@@ -105,6 +106,10 @@ def main(argv=None):
         if name == "report":
             sp.add_argument("--days", type=int, default=7, help="Kaç günlük etki toplansın")
     args = p.parse_args(argv)
+    if args.cmd == "okuyucu":
+        from . import kap_worker
+        kap_worker.serve()
+        return
     if args.cmd == "run":
         args.report_days = 7
     conn = db.connect()
