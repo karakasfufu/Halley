@@ -48,8 +48,8 @@ def risk_factors(t: Dict, news: Dict) -> List[str]:
         out.append("Fiyat geçmişi 200 günden kısa: uzun vadeli trend hesaplanamadı")
     vol = t.get("islem_hacmi_tl")
     if vol is not None and LIQ_MIN_TL <= vol < LIQ_WARN_TL:
-        out.append(f"Düşük likidite: günlük ortalama işlem hacmi {vol / 1e6:.1f} milyon TL (BIST hisselerinin en düşük "
-                   "dörtte birinde); emir gerçekleşmesi zorlaşabilir, alış-satış farkı büyük olabilir")
+        out.append(f"Düşük likidite: günlük ortalama işlem hacmi {vol / 1e6:.1f} milyon TL (7 Kasım 2026 ölçümüne göre "
+                   "BIST hisselerinin en düşük dörtte birinde); emir gerçekleşmesi zorlaşabilir, alış-satış farkı büyük olabilir")
     move = news.get("hareket") or {}
     if news.get("direction", 1) > 0 and move.get("sonra_atr") is not None and move["sonra_atr"] >= PRICED_IN_ATR:
         out.append(f"Haberden bu yana fiyat %{move['sonra_%']:.1f} yükseldi ({move['sonra_atr']:.1f} günlük ortalama "
@@ -71,7 +71,8 @@ def risk_factors(t: Dict, news: Dict) -> List[str]:
 
 
 HEAVY = ("Haber olumlu ama teknik trend", "Risk/getiri zayıf", "Düşük likidite", "Haberden bu yana",
-         "Haber olumlu ama fiyat", "Vade içinde bilanço açıklanacak", "Vade içinde fiyat düzeltmesi")
+         "Haber olumlu ama fiyat", "Vade içinde bilanço açıklanacak", "Vade içinde fiyat düzeltmesi",
+         "Temettü düşüşü SL'yi tetikleyebilir")
 
 
 def _points(risks: List[str]) -> int:
@@ -109,7 +110,8 @@ def plan(t: Optional[Dict], news: Dict) -> Dict:
     vol = t.get("islem_hacmi_tl")
     if vol is not None and vol < LIQ_MIN_TL:
         return {"durum": "yok", "neden_yok": f"Likidite çok düşük: günlük ortalama işlem hacmi {vol / 1e6:.2f} milyon TL "
-                "(BIST'in en düşük %8'i). Emir gerçekleşmesi ve fiyatlar güvenilmez; senaryo üretilmedi.",
+                "(2 milyon TL altı; 7 Kasım 2026 ölçümünde BIST hisselerinin en düşük %8'i). Emir gerçekleşmesi ve "
+                "fiyatlar güvenilmez; senaryo üretilmedi.",
                 "riskler": risks}
     if news.get("direction", 0) <= 0 or news.get("score", 0) < 1.5:
         return {"durum": "yok", "neden_yok": "Olumlu bir haber sinyali olmadığı için alım senaryosu üretilmedi.",
@@ -172,6 +174,22 @@ def plan(t: Optional[Dict], news: Dict) -> Dict:
         + " Bu bir senaryodur, yatırım tavsiyesi değildir; seviyeler geçmiş veriyle henüz test edilmedi."
     )
     girisler = entries.scenarios(t)
+    # Temettü hak kullanım günü fiyat temettü kadar düşer: düşüş SL mesafesinin yarısı ya da fazlasıysa o gün SL
+    # yapay olarak tetiklenebilir (A ile B'nin uyumu, 2026-11-07).
+    divs = [(d, y) for d, y in (news.get("temettu") or []) if y and y > 0]
+    if divs:
+        d0, y0 = max(divs, key=lambda x: x[1])
+        for s in [*girisler["senaryolar"], {"sl_%": (sl / entry - 1) * 100, "_ref": True}]:
+            if "uygulanamaz" in s or s.get("sl_%") is None:
+                continue
+            if y0 >= 0.5 * abs(s["sl_%"]):
+                msg = (f"Temettü düşüşü SL'yi tetikleyebilir: {d0[8:10]}.{d0[5:7]} hak kullanım günü fiyat ~%{y0:.1f} "
+                       f"düşer, zarar durdur mesafesi %{abs(s['sl_%']):.1f}. O gün SL ve TP'yi temettü kadar aşağı "
+                       "kaydırmayı değerlendirin")
+                if s.get("_ref"):
+                    risks.append(msg)
+                else:
+                    s["notlar"] = s["notlar"] + [msg]
     # Her giriş senaryosunun risk seviyesi: ortak riskler (mevcut fiyattan planın risk/getirisi HARİÇ) + o senaryonun
     # kendi risk/getirisi. Böylece özetteki risk, gösterilen senaryoya aittir.
     common = _points([r for r in risks if not r.startswith("Risk/getiri")])

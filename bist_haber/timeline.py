@@ -4,7 +4,7 @@ Tek listede, tarih sırasıyla: piyasa geneli (PPK, TÜFE, Enflasyon Raporu, Fed
 tatili/yarım gün), hissenin bilanço yasal son günü (açıklanmadıysa/bilinmiyorsa) ve şirket olayları (genel kurul,
 kâr payı, sermaye artırımı). Yalnız mevcut modüllerin doğrulanmış verisini birleştirir; yeni tarih üretmez.
 """
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional
 
 from . import config, corp_events, earnings, macro_calendar, market_calendar
@@ -40,7 +40,12 @@ def for_ticker(conn, ticker: str, today: Optional[date] = None, days: int = 15) 
     items.sort(key=lambda x: (x["tarih"], x["kapsam"] != "Hisse"))
     for x in items:
         x["is_gunu_sonra"] = market_calendar.trading_days_between(today, date.fromisoformat(x["tarih"]))
-    return {"olaylar": items, "bitis": end, "bilinmeyen": up["bilinmeyen"], "tatil_notu": up.get("tatil_notu")}
+    from .kap import coverage_gaps
+    gaps = coverage_gaps(conn, today - timedelta(days=45), today, today)
+    gap_note = (f"KAP listesi {len(gaps)} gün için alınmamış: bu günlerde açıklanan şirket olayları eksik olabilir "
+                "(bir sonraki güncellemede kendiliğinden tamamlanır)." if gaps else None)
+    return {"olaylar": items, "bitis": end, "bilinmeyen": up["bilinmeyen"], "tatil_notu": up.get("tatil_notu"),
+            "kap_boslugu": gap_note}
 
 
 def macro_risk(today: Optional[date] = None, days: int = 15) -> Optional[str]:

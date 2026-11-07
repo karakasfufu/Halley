@@ -198,10 +198,17 @@ def events_for(conn, ticker: str) -> List[Dict]:
     latest: Dict = {}
     for r in rows:
         evs = parse_notice(r["subject"], r["body"], [ticker], r["published_at"], r["id"])
-        kinds = {e["tur"] for e in evs}
-        for k in kinds:  # yeni bildirim aynı türdeki eski tarihleri geçersiz kılar (güncelleme/düzeltme/erteleme)
-            latest[k] = [e for e in evs if e["tur"] == k]
+        # Yeni bildirim aynı türdeki eski tarihleri geçersiz kılar (güncelleme/düzeltme/erteleme). Genel kurulda tür
+        # (olağan / olağanüstü) ayrı tutulur: aynı şirketin iki ayrı genel kurulu birbirini silmesin.
+        key = lambda e: (e["tur"], _gk_type(e.get("tip")) if e["tur"] in ("genel_kurul", "gk_son_pay") else "")
+        for k in {key(e) for e in evs}:
+            latest[k] = [e for e in evs if key(e) == k]
     return sorted((e for v in latest.values() for e in v), key=lambda e: e["tarih"])
+
+
+def _gk_type(tip: Optional[str]) -> str:
+    t = (tip or "").lower()
+    return "olaganustu" if "olağanüstü" in t else ("olagan" if "olağan" in t else "")
 
 
 def upcoming(conn, ticker: str, today: Optional[date] = None, trading_days: int = 15) -> Dict:
@@ -216,7 +223,10 @@ def upcoming(conn, ticker: str, today: Optional[date] = None, trading_days: int 
 def risk_lines(up: Dict, price: Optional[float] = None) -> List[str]:
     """Vade içindeki olaylardan risk maddeleri."""
     out = []
+    has_ex = any(e["tur"] == "temettu_hak" for e in up["yaklasan"])
     for e in up["yaklasan"]:
+        if has_ex and e["tur"] in ("temettu_gk", "temettu_tarih"):
+            continue  # hak kullanım günü biliniyorsa aynı temettü ikinci/üçüncü kez sayılmaz
         d = f"{int(e['tarih'][8:10])}.{e['tarih'][5:7]}"
         if e["fiyat_duzeltir"]:
             out.append(f"Vade içinde fiyat düzeltmesi: {d} {e['ad']} — fiyat oranında aşağı düzeltilir; teknik seviyeler "

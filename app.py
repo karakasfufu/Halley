@@ -121,8 +121,8 @@ if h2.button("🔄 Haberleri güncelle", type="primary", use_container_width=Tru
                                   progress=lambda m, p: bar.progress(min(p, 1.0), text=m))
         st.session_state["last_update"] = datetime.now(config.TR_TZ).strftime("%H:%M")
         st.session_state["last_result"] = res
-        if res.get("kap", {}).get("rate_limited") and not os.environ.get("HALLEY_OFFLINE"):
-            kap_worker.start()   # yarım kalan metinleri arka planda, KAP sınırına göre bekleyerek tamamla
+        if not os.environ.get("HALLEY_OFFLINE"):  # yarım kalan / boşluk sayfalarını arka planda tamamla
+            kap_worker.start(force=bool(res.get("kap", {}).get("rate_limited") or res.get("takvim_boslugu", {}).get("eklenen")))
     except Exception as e:
         st.error(f"Güncelleme tamamlanamadı: {e}")
     conn.close()  # sayfa yenilenmeden önce bağlantıyı bırak (aksi hâlde açık kalıyordu)
@@ -136,6 +136,8 @@ if h2.button("🧪 Ücretsiz dene", use_container_width=True, key="free_check",
         res = pipeline.free_check(conn, days=days, analysis_limit=analysis_limit, quality=quality,
                                   progress=lambda m, p: bar.progress(min(p, 1.0), text=m))
         st.session_state["last_result"] = res
+        if not os.environ.get("HALLEY_OFFLINE"):
+            kap_worker.start(force=bool(res.get("kap", {}).get("rate_limited") or res.get("takvim_boslugu", {}).get("eklenen")))
     except Exception as e:
         st.error(f"Ücretsiz deneme tamamlanamadı: {e}")
     conn.close()  # sayfa yenilenmeden önce bağlantıyı bırak (aksi hâlde açık kalıyordu)
@@ -338,7 +340,7 @@ def timeline_block(ticker: str) -> None:
                                     "Kapsam": x["kapsam"], "Olay": x["olay"], "Ayrıntı": x["ayrinti"]}
                                    for x in tl["olaylar"]]), hide_index=True, use_container_width=True)
     notes = [n for n in ([("Takvimi henüz bilinmeyen: " + ", ".join(tl["bilinmeyen"])) if tl["bilinmeyen"] else None,
-                          tl.get("tatil_notu")]) if n]
+                          tl.get("tatil_notu"), tl.get("kap_boslugu")]) if n]
     if notes:
         st.caption(" · ".join(notes))
 
@@ -370,7 +372,9 @@ def scenario(r: dict) -> dict:
                      "reason": imp["reason"] if imp else "", "summary": r["last_news"], "hareket": move,
                      "bilanco_riski": earnings.window_risk(earning(r["ticker"]), datetime.now(config.TR_TZ).date(), 15),
                      "olay_riskleri": corp_events.risk_lines(corp_event(r["ticker"]), (t_ or {}).get("son_fiyat")),
-                     "makro_riski": macro_risk_line()}
+                     "makro_riski": macro_risk_line(),
+                     "temettu": [(e["tarih"], e["brut_tl"] / t_["son_fiyat"] * 100) for e in corp_event(r["ticker"])["yaklasan"]
+                                 if e["tur"] == "temettu_hak" and e.get("brut_tl") and t_ and t_.get("son_fiyat")]}
         _PLAN_CACHE[r["ticker"]] = tradeplan.plan(tech(r["ticker"]), news_info)
     return _PLAN_CACHE[r["ticker"]]
 

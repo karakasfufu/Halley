@@ -278,3 +278,62 @@ class PlanIntegrationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReviewBTests(unittest.TestCase):
+    """B son kontrolü (2026-11-07) düzeltmeleri."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.conn = db.connect(Path(self.tmp.name) / "t.db")
+        self.addCleanup(self.conn.close)
+
+    def add(self, nid, when, subject, body, ticker="FROTO"):
+        self.conn.execute("INSERT INTO news(id,source,published_at,effective_date,title,subject,body,candidates,fetched_at) "
+                          "VALUES(?,?,?,?,?,?,?,?,'n')", (nid, "kap", when, when[:10], subject, subject, body, ticker))
+        self.conn.commit()
+
+    def test_two_different_general_assemblies_both_kept(self):
+        olagan = GK_NEW.replace("Olağanüstü Genel Kurul", "Olağan Genel Kurul").replace("02.09.2026", "20.11.2026")
+        olaganustu = GK_NEW.replace("02.09.2026", "24.11.2026")
+        self.add("a", "2026-10-20T10:00:00+03:00", "Genel Kurul İşlemlerine İlişkin Bildirim", olagan)
+        self.add("b", "2026-10-27T10:00:00+03:00", "Genel Kurul İşlemlerine İlişkin Bildirim", olaganustu)
+        gk = [e["tarih"] for e in C.events_for(self.conn, "FROTO") if e["tur"] == "genel_kurul"]
+        self.assertEqual(gk, ["2026-11-20", "2026-11-24"])
+
+    def test_same_assembly_update_replaces_old_date(self):  # erteleme/düzeltme: eski tarih kalmaz
+        self.add("a", "2026-10-20T10:00:00+03:00", "Genel Kurul İşlemlerine İlişkin Bildirim", GK_NEW.replace("02.09.2026", "20.11.2026"))
+        self.add("b", "2026-10-27T10:00:00+03:00", "Genel Kurul İşlemlerine İlişkin Bildirim", GK_NEW.replace("02.09.2026", "27.11.2026"))
+        gk = [e["tarih"] for e in C.events_for(self.conn, "FROTO") if e["tur"] == "genel_kurul"]
+        self.assertEqual(gk, ["2026-11-27"])
+
+    def test_same_dividend_counted_once_in_risks(self):
+        self.add("k", "2026-10-27T18:20:00+03:00", "Kar Payı Dağıtım İşlemlerine İlişkin Bildirim", FROTO_KAR)
+        up = C.upcoming(self.conn, "FROTO", date(2026, 11, 7), 15)
+        r = [x for x in C.risk_lines(up, price=73.15) if "kâr payı" in x]
+        self.assertEqual(len(r), 1, r)
+        self.assertIn("26.11", r[0])
+
+
+class DividendVsStopTests(unittest.TestCase):
+    """A–B uyumu: temettü düşüşü zarar durdur mesafesinin yarısı ya da fazlasıysa uyarı."""
+
+    def test_warning_when_dividend_eats_stop_distance(self):
+        from bist_haber import tradeplan
+        from test_entries import base
+        news = {"score": 3, "direction": 1, "confidence": 0.8, "flags": "", "persistence": "orta",
+                "temettu": [("2026-11-26", 4.2)]}
+        p = tradeplan.plan(base(), news)
+        brk = next(s for s in p["girisler"]["senaryolar"] if s["tur"] == "kirilim")   # SL ~%2,3
+        self.assertTrue(any(n.startswith("Temettü düşüşü SL'yi tetikleyebilir: 26.11") for n in brk["notlar"]))
+        self.assertTrue(any(r.startswith("Temettü düşüşü SL'yi tetikleyebilir") for r in p["riskler"]))  # referans
+
+    def test_small_dividend_no_warning(self):
+        from bist_haber import tradeplan
+        from test_entries import base
+        news = {"score": 3, "direction": 1, "confidence": 0.8, "flags": "", "persistence": "orta",
+                "temettu": [("2026-11-13", 0.2)]}
+        p = tradeplan.plan(base(), news)
+        self.assertFalse(any("Temettü düşüşü" in n for s in p["girisler"]["senaryolar"] for n in s.get("notlar", [])))
+        self.assertFalse(any("Temettü düşüşü" in r for r in p["riskler"]))

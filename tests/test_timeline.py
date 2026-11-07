@@ -24,8 +24,8 @@ class TimelineTests(unittest.TestCase):
         self.addCleanup(self.conn.close)
         self.conn.execute("INSERT INTO companies VALUES('ETILR','ETİLER GIDA A.Ş.',NULL)")
         # Kapsam dönem başından (bilanço durumu kesin): 9 aylık rapor yok, konsolide bilinmiyor → son gün 9 Kasım
-        self.conn.execute("INSERT INTO news(id,source,published_at,effective_date,title,subject,candidates,fetched_at) "
-                          "VALUES('k0','kap','2026-09-25T10:00:00+03:00','2026-09-25','x','Özel Durum','XYZ','n')")
+        from bist_haber import kap
+        kap.record_coverage(self.conn, date(2026, 10, 1), date(2026, 11, 7), "2026-11-07T12:00:00+03:00")
         self.conn.execute("INSERT INTO news(id,source,published_at,effective_date,title,subject,body,candidates,status,"
                           "fetched_at) VALUES('k1','kap','2026-11-01T10:00:00+03:00','2026-11-02','t',"
                           "'Kar Payı Dağıtım İşlemlerine İlişkin Bildirim',?,'ETILR','context','n')",
@@ -46,8 +46,9 @@ class TimelineTests(unittest.TestCase):
         self.assertTrue(txt.startswith("9.11 2026 9 aylık bilanço yasal son günü; 12.11 TCMB Enflasyon Raporu"), txt)
 
     def test_published_report_not_listed(self):
-        self.conn.execute("INSERT INTO news(id,source,published_at,effective_date,title,subject,candidates,fetched_at) "
-                          "VALUES('k2','kap','2026-11-05T18:00:00+03:00','2026-11-06','x','Finansal Rapor','ETILR','n')")
+        self.conn.execute("INSERT INTO news(id,source,published_at,effective_date,title,subject,candidates,fetched_at,"
+                          "donem) VALUES('k2','kap','2026-11-05T18:00:00+03:00','2026-11-06','x','Finansal Rapor','ETILR',"
+                          "'n','2026/3')")
         self.conn.commit()
         tl = T.for_ticker(self.conn, "ETILR", date(2026, 11, 7), 15)
         self.assertNotIn("bilanco", [x["tur"] for x in tl["olaylar"]])

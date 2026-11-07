@@ -45,7 +45,7 @@ def periods_around(today: date) -> List[Dict]:
             else:
                 single, consol = _add_days(end, 30), _add_days(end, 40)
             out.append({"donem": f"{y} {label}", "donem_sonu": end.isoformat(), "son_bireysel": single.isoformat(),
-                        "son_konsolide": consol.isoformat(), "tur": kind})
+                        "son_konsolide": consol.isoformat(), "tur": kind, "kod": f"{y}/{m // 3}"})
     out.sort(key=lambda p: p["donem_sonu"])
     past = [p for p in out if p["donem_sonu"] < today.isoformat()]
     future = [p for p in out if p["donem_sonu"] >= today.isoformat()]
@@ -78,16 +78,20 @@ def status(conn, ticker: str, today: Optional[date] = None) -> Dict:
     consol = _consolidated(conn, ticker)
     special = _is_special(conn, ticker)
     like = f"%,{ticker},%"
+    # Raporun DÖNEMİ KAP listesinden (year/period) eşleştirilir: geç verilen eski dönem raporu (gerçek örnek: BRKO,
+    # BTCIM, BSOKE 6 aylık raporları Eylül sonu/Ekim başında) yeni dönem sanılmaz.
     pub = conn.execute("SELECT MIN(published_at) d FROM news WHERE source='kap' AND subject='Finansal Rapor' AND "
-                       "(','||candidates||',') LIKE ? AND published_at > ?", (like, last["donem_sonu"])).fetchone()["d"]
+                       "(','||candidates||',') LIKE ? AND donem=?", (like, last["kod"])).fetchone()["d"]
     # KAP kaydı yoksa: haber analizi bu dönem için "finansal sonuç" olayı bulduysa (ör. Bloomberg HT bilanço
     # haberi) rapor açıklanmış demektir; kaynağı ayrıca belirtilir.
     via_news = None
     if not pub:
         via_news = conn.execute("SELECT MIN(published_at) d FROM impacts WHERE ticker=? AND event_type='finansal_sonuc' "
                                 "AND published_at > ?", (ticker, last["donem_sonu"])).fetchone()["d"]
-    first_kap = conn.execute("SELECT MIN(published_at) d FROM news WHERE source='kap'").fetchone()["d"]
-    covered = bool(first_kap) and first_kap[:10] <= (date.fromisoformat(last["donem_sonu"]) + timedelta(days=1)).isoformat()
+    from .kap import coverage_gaps
+    gaps = coverage_gaps(conn, date.fromisoformat(last["donem_sonu"]) + timedelta(days=1), today, today)
+    covered = not gaps   # dönem sonundan bugüne her günün KAP listesi alınmış olmalı
+    first_kap = conn.execute("SELECT MIN(day) d FROM kap_coverage").fetchone()["d"]
     deadline = (last["son_konsolide"] if consol else last["son_bireysel"]) if consol is not None else last["son_konsolide"]
     if pub or via_news:
         state = "açıklandı"
@@ -98,8 +102,19 @@ def status(conn, ticker: str, today: Optional[date] = None) -> Dict:
     return {"ticker": ticker, "donem": last, "sonraki": nxt, "konsolide": consol, "ozel_mevzuat": special,
             "aciklama_tarihi": (pub or via_news)[:10] if (pub or via_news) else None,
             "kaynak": "KAP finansal rapor bildirimi" if pub else ("haber analizi (finansal sonuç)" if via_news else None),
-            "durum": state, "kapsam_basi": (first_kap or "")[:10],
+            "ek_sure": _extension(conn, ticker, last["donem_sonu"]),
+            "durum": state, "kapsam_basi": (first_kap or "")[:10], "bosluk": [d.isoformat() for d in gaps][:10],
+            "bosluk_sayisi": len(gaps),
             "son_tarih": deadline}
+
+
+def _extension(conn, ticker: str, since: str) -> Optional[str]:
+    """SPK'nın finansal rapor ek süre talebi değerlendirmesi bildirimi (gerçek örnek: TRKNT 13.10.2026). Bildirimin
+    tarihi döner; verilen yeni süre bildirim metnindedir (metin okunmaz, kullanıcıya KAP'ı açması söylenir)."""
+    row = conn.execute("SELECT MAX(published_at) d FROM news WHERE source='kap' AND subject LIKE 'Finansal Rapor Ek Süre%' "
+                       "AND (','||candidates||',') LIKE ? AND published_at > date(?, '-120 day')",
+                       (f"%,{ticker},%", since)).fetchone()
+    return row["d"][:10] if row and row["d"] else None
 
 
 def _fmt(d: str) -> str:
@@ -125,8 +140,15 @@ def describe(s: Dict, today: Optional[date] = None) -> str:
         text = (f"{p['donem']} raporunun yasal süresi doldu ({rule}) ama kayıtlarımızda raporu göremiyoruz; KAP'tan "
                 "kontrol edin (gecikme ya da ek süre olabilir).")
     else:
-        text = (f"{p['donem']} raporunun açıklanıp açıklanmadığını bilmiyoruz (KAP kayıtlarımız "
-                f"{_fmt(s['kapsam_basi']) if s['kapsam_basi'] else '—'} tarihinden başlıyor). Yasal son gün {rule}.")
+        why = (f"{s['bosluk_sayisi']} günün KAP listesi alınmamış (ilk: {_fmt(s['bosluk'][0])})" if s.get("bosluk")
+               else "KAP kayıtları yetersiz")
+        text = (f"{p['donem']} raporunun açıklanıp açıklanmadığını bilmiyoruz ({why}; bir sonraki güncellemede "
+                f"kendiliğinden tamamlanır). Yasal son gün {rule}.")
+    if p.get("tur") == "ara6":
+        text += " (6 aylık süreye sınırlı bağımsız denetim için +10 gün eklendi; borsada işlem gören şirketlerde olağan.)"
+    if s.get("ek_sure"):
+        text += (f" SPK ek süre talebini değerlendirdi ({_fmt(s['ek_sure'])} bildirimi): son tarih farklı olabilir, "
+                 "ayrıntı için KAP bildirimini açın.")
     if s["ozel_mevzuat"]:
         text += " Banka/sigorta/finansal kuruluş: kendi mevzuatındaki süre daha kısa olabilir."
     nb = {True: _fmt(n["son_konsolide"]), False: _fmt(n["son_bireysel"])}.get(

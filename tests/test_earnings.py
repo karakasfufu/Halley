@@ -36,21 +36,34 @@ class StatusTests(unittest.TestCase):
         self.conn.execute("INSERT INTO companies VALUES('BNK','ÖRNEK BANKASI A.Ş.',NULL)")
         self.n = 0
 
-    def news(self, ticker, subject, when, source="kap"):
+    def news(self, ticker, subject, when, source="kap", donem=None):
         self.n += 1
-        self.conn.execute("INSERT INTO news(id,source,published_at,effective_date,title,subject,candidates,fetched_at) "
-                          "VALUES(?,?,?,?,?,?,?,'n')", (f"x{self.n}", source, when, when[:10], subject, subject, ticker))
+        self.conn.execute("INSERT INTO news(id,source,published_at,effective_date,title,subject,candidates,fetched_at,"
+                          "donem) VALUES(?,?,?,?,?,?,?,'n',?)",
+                          (f"x{self.n}", source, when, when[:10], subject, subject, ticker, donem))
         self.conn.commit()
 
+    def cover(self, start="2026-10-01", end="2026-11-07", listed_at="2026-11-07T12:00:00+03:00"):
+        """KAP listesinin bu günler için eksiksiz alındığını işaretle (kap.record_coverage)."""
+        from bist_haber import kap
+        kap.record_coverage(self.conn, date.fromisoformat(start), date.fromisoformat(end), listed_at)
+
     def test_published_from_kap(self):
-        self.news("XYZ", "Özel Durum Açıklaması (Genel)", "2026-09-25T10:00:00+03:00")  # kapsam dönem başından
-        self.news("AAA", "Finansal Rapor", "2026-10-28T18:30:00+03:00")
+        self.cover()
+        self.news("AAA", "Finansal Rapor", "2026-10-28T18:30:00+03:00", donem="2026/3")
         s = E.status(self.conn, "AAA", date(2026, 11, 7))
         self.assertEqual((s["durum"], s["aciklama_tarihi"], s["kaynak"]), ("açıklandı", "2026-10-28", "KAP finansal rapor bildirimi"))
         self.assertIsNone(E.window_risk(s, date(2026, 11, 7), 15))
 
+    def test_late_previous_period_report_is_not_current(self):  # gerçek örnek: BRKO 6 aylık rapor 25.09, BTCIM 02.10
+        self.cover()
+        self.news("AAA", "Finansal Rapor", "2026-10-02T19:56:00+03:00", donem="2026/2")
+        s = E.status(self.conn, "AAA", date(2026, 11, 7))
+        self.assertEqual(s["durum"], "açıklanmadı")
+        self.assertIsNone(s["aciklama_tarihi"])
+
     def test_not_published_with_full_coverage_and_consolidated(self):
-        self.news("XYZ", "Özel Durum Açıklaması (Genel)", "2026-09-25T10:00:00+03:00")
+        self.cover()
         self.news("AAA", "Sorumluluk Beyanı (Konsolide)", "2026-08-15T10:00:00+03:00")
         s = E.status(self.conn, "AAA", date(2026, 11, 7))
         self.assertEqual((s["durum"], s["konsolide"], s["son_tarih"]), ("açıklanmadı", True, "2026-11-09"))
@@ -58,19 +71,46 @@ class StatusTests(unittest.TestCase):
         self.assertIn("9 Kasım 2026", E.describe(s, date(2026, 11, 7)))
 
     def test_non_consolidated_deadline_passed(self):
-        self.news("XYZ", "Özel Durum Açıklaması (Genel)", "2026-09-25T10:00:00+03:00")
+        self.cover()
         self.news("AAA", "Faaliyet Raporu (Konsolide Olmayan)", "2026-08-15T10:00:00+03:00")
         s = E.status(self.conn, "AAA", date(2026, 11, 7))
         self.assertEqual((s["durum"], s["konsolide"]), ("süresi geçti, kayıtlarda yok", False))
         self.assertIsNone(E.window_risk(s, date(2026, 11, 7), 15))
 
+    def test_gap_in_listing_makes_status_unknown(self):  # uygulama birkaç gün açılmadı → kesinlik uydurulmaz
+        self.cover("2026-10-01", "2026-10-20", "2026-10-21T09:00:00+03:00")
+        self.cover("2026-10-24", "2026-11-07")
+        s = E.status(self.conn, "AAA", date(2026, 11, 7))
+        self.assertEqual((s["durum"], s["bosluk_sayisi"]), ("bilinmiyor", 3))
+        self.assertIn("3 günün KAP listesi alınmamış", E.describe(s, date(2026, 11, 7)))
+
+    def test_day_listed_only_during_that_day_counts_as_gap(self):
+        self.cover("2026-10-01", "2026-11-07", "2026-11-07T08:00:00+03:00")
+        self.cover("2026-10-15", "2026-10-15", "2026-10-15T09:00:00+03:00")  # MAX: sonraki alım geçerli kalır
+        self.assertEqual(E.status(self.conn, "AAA", date(2026, 11, 7))["bosluk_sayisi"], 0)
+        from bist_haber import kap
+        self.conn.execute("UPDATE kap_coverage SET listed_at='2026-10-15T09:00:00+03:00' WHERE day='2026-10-15'")
+        self.assertEqual(kap.coverage_gaps(self.conn, date(2026, 10, 14), date(2026, 10, 16), date(2026, 11, 7)),
+                         [date(2026, 10, 15)])                         # o gün 09:00'da alınmış: akşam bildirimleri eksik
+
     def test_unknown_when_records_start_after_period_end(self):
-        self.news("XYZ", "Özel Durum Açıklaması (Genel)", "2026-11-06T10:00:00+03:00")
+        self.cover("2026-11-06", "2026-11-07")
         s = E.status(self.conn, "AAA", date(2026, 11, 7))
         self.assertEqual(s["durum"], "bilinmiyor")
         self.assertIn("bilmiyoruz", E.describe(s, date(2026, 11, 7)))
         self.assertIn("konsolide değilse 30 Ekim 2026, konsolide ise 9 Kasım 2026", E.describe(s, date(2026, 11, 7)))
         self.assertTrue(E.window_risk(s, date(2026, 11, 7), 15).startswith("Bilanço henüz açıklanmadıysa"))
+
+    def test_spk_extension_notice_is_reported(self):  # gerçek örnek: TRKNT 13.10.2026
+        self.cover()
+        self.news("AAA", "Finansal Rapor Ek Süre Taleplerine İlişkin SPK Değerlendirmesi", "2026-10-13T14:58:00+03:00")
+        s = E.status(self.conn, "AAA", date(2026, 11, 7))
+        self.assertEqual(s["ek_sure"], "2026-10-13")
+        self.assertIn("SPK ek süre talebini değerlendirdi (13 Ekim 2026", E.describe(s, date(2026, 11, 7)))
+
+    def test_half_year_assumption_is_stated(self):
+        s = E.status(self.conn, "AAA", date(2026, 7, 15))
+        self.assertIn("sınırlı bağımsız denetim için +10 gün", E.describe(s, date(2026, 7, 15)))
 
     def test_financial_result_news_counts_as_published(self):  # gerçek örnek: SOKM, Bloomberg HT 5 Kasım
         self.news("XYZ", "Özel Durum Açıklaması (Genel)", "2026-11-06T10:00:00+03:00")
@@ -84,8 +124,8 @@ class StatusTests(unittest.TestCase):
         self.assertEqual((s["durum"], s["kaynak"]), ("açıklandı", "haber analizi (finansal sonuç)"))
 
     def test_old_period_report_does_not_count(self):
-        self.news("XYZ", "Özel Durum Açıklaması (Genel)", "2026-07-01T10:00:00+03:00")
-        self.news("AAA", "Finansal Rapor", "2026-08-10T10:00:00+03:00")   # 6 aylık rapor, 9 aylık değil
+        self.cover("2026-07-01", "2026-11-07")
+        self.news("AAA", "Finansal Rapor", "2026-08-10T10:00:00+03:00", donem="2026/2")   # 6 aylık rapor
         s = E.status(self.conn, "AAA", date(2026, 11, 7))
         self.assertEqual(s["durum"], "açıklanmadı")      # konsolide bilinmiyor → temkinli geç tarih (9 Kasım)
         self.assertIsNone(s["aciklama_tarihi"])

@@ -96,6 +96,7 @@ class NewsSourceTests(unittest.TestCase):
     def test_live_update_passes_analysis_limit_without_real_api(self):
         with patch.object(pipeline, "universe", return_value={"TEST": "Deneme"}), \
                 patch.object(pipeline.kap, "collect", return_value={}), \
+                patch.object(pipeline.kap, "list_disclosures", return_value=[]), \
                 patch.object(pipeline.kap, "fetch_missing_bodies", return_value={}), \
                 patch.object(pipeline.rss, "collect", return_value={}), \
                 patch.object(pipeline, "has_api_key", return_value=True), \

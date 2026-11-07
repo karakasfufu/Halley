@@ -232,6 +232,43 @@ def _clean(text: str) -> str:
     return strip_translation("\n".join(out))
 
 
+def item_period(item: dict) -> Optional[str]:
+    """KAP listesindeki rapor dönemi: year + period (1=3 aylık, 2=6 aylık, 3=9 aylık, 4=yıllık) → "2026/3"."""
+    y, p = item.get("year"), item.get("period")
+    try:
+        return f"{int(y)}/{int(p)}" if y and p and 1 <= int(p) <= 4 else None
+    except (TypeError, ValueError):
+        return None
+
+
+def record_coverage(conn, d_from: date, d_to: date, listed_at: Optional[str] = None) -> None:
+    """[d_from, d_to] günlerinin KAP listesi eksiksiz alındı (liste 2000 sınırında bölünerek tamamlanıyor)."""
+    listed_at = listed_at or datetime.now(config.TR_TZ).isoformat(timespec="seconds")
+    d = d_from
+    while d <= d_to:
+        conn.execute("INSERT INTO kap_coverage(day, listed_at) VALUES(?,?) ON CONFLICT(day) DO UPDATE SET "
+                     "listed_at=MAX(listed_at, excluded.listed_at)", (d.isoformat(), listed_at))
+        d += timedelta(days=1)
+    conn.commit()
+
+
+def coverage_gaps(conn, d_from: date, d_to: date, today: Optional[date] = None) -> List[date]:
+    """[d_from, d_to] içinde listesi hiç alınmamış ya da gün bitmeden alınıp sonra yenilenmemiş günler (bugün hariç:
+    bugün için herhangi bir alım yeterli)."""
+    rows = dict(conn.execute("SELECT day, listed_at FROM kap_coverage WHERE day BETWEEN ? AND ?",
+                             (d_from.isoformat(), d_to.isoformat())).fetchall())
+    today = today or datetime.now(config.TR_TZ).date()
+    gaps, d = [], d_from
+    while d <= d_to:
+        k = d.isoformat()
+        if k not in rows:
+            gaps.append(d)
+        elif d < today and rows[k][:10] <= k:  # o gün içinde alınmış, gün sonundaki bildirimler eksik olabilir
+            gaps.append(d)
+        d += timedelta(days=1)
+    return gaps
+
+
 def _tickers(item: dict) -> List[str]:
     codes = []
     for field in ("stockCodes", "relatedStocks"):
@@ -243,9 +280,9 @@ def _tickers(item: dict) -> List[str]:
 def collect(conn, universe: Dict[str, str], days: int = 1, fetch_bodies: bool = True,
             progress: Optional[Callable[[int, int], None]] = None) -> Dict[str, int]:
     today = datetime.now(config.TR_TZ).date()
+    now = datetime.now(config.TR_TZ).isoformat(timespec="seconds")
     items = list_disclosures(today - timedelta(days=days - 1), today)
     stats = {"listed": len(items), "new": 0, "out_of_universe": 0, "skipped_subject": 0}
-    now = datetime.now(config.TR_TZ).isoformat(timespec="seconds")
     for it in items:
         news_id = f"kap:{it['disclosureIndex']}"
         existing = conn.execute("SELECT status FROM news WHERE id=?", (news_id,)).fetchone()
@@ -253,9 +290,9 @@ def collect(conn, universe: Dict[str, str], days: int = 1, fetch_bodies: bool = 
             if existing["status"] == "context":
                 # Takvim için (analiz edilmeden) saklanmış bildirim günlük pencereye girdi: normal sıraya al.
                 skip = any(s in (it.get("subject") or "") for s in config.KAP_SKIP_SUBJECTS)
-                conn.execute("UPDATE news SET status=?, note=?, body=? WHERE id=?",
+                conn.execute("UPDATE news SET status=?, note=?, body=?, donem=COALESCE(donem, ?) WHERE id=?",
                              ("skipped" if skip else "new", "konu listesi" if skip else None, "" if skip else None,
-                              news_id))
+                              item_period(it), news_id))
                 stats["new"] += 1
             continue
         tickers = [t for t in _tickers(it) if t in universe]
@@ -269,14 +306,15 @@ def collect(conn, universe: Dict[str, str], days: int = 1, fetch_bodies: bool = 
             status, note, body = "skipped", "konu listesi", ""
             stats["skipped_subject"] += 1
         conn.execute(
-            "INSERT INTO news(id,source,published_at,effective_date,title,subject,body,url,candidates,status,note,fetched_at)"
-            " VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO news(id,source,published_at,effective_date,title,subject,body,url,candidates,status,note,"
+            "fetched_at,donem) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (news_id, "kap", published.isoformat(), effective_date(published),
              f"{it.get('kapTitle', '')}: {it.get('summary') or subject}", subject, body,
-             DETAIL_URL.format(index=it["disclosureIndex"]), ",".join(tickers), status, note, now),
+             DETAIL_URL.format(index=it["disclosureIndex"]), ",".join(tickers), status, note, now, item_period(it)),
         )
         stats["new"] += 1
     conn.commit()
+    record_coverage(conn, today - timedelta(days=days - 1), today, now)
     stats["skipped_subject"] += apply_skip_rules(conn)
     if fetch_bodies:
         stats.update(fetch_missing_bodies(conn, progress))

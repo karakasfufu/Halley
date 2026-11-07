@@ -721,3 +721,32 @@ geçici sınır uyguluyor (iki turda 100 ve 99 sayfa; hemen tekrar deneme yine s
 - Canlı veride (7 Kasım): FROTO → 12.11 Enflasyon Raporu, 23–24.11 olağanüstü GK, 26.11 temettü hak kullanımı (brüt
   3,07 TL), 27.11 FİR. ETILR → 9.11 bilanço son günü, 13.11 temettü hak kullanımı.
 - Testler: `tests/test_timeline.py`. **270 test geçti.** B (olay takvimi) bölümü tamamlandı.
+
+## 2026-11-07 — B son kontrol + A+B bütünleşik test
+
+**Bulunan ve düzeltilenler:**
+1. **Geç verilen eski dönem raporu yeni dönem sanılıyordu** (gerçek: BRKO, BTCIM, BSOKE 6 aylık raporları 25.09–02.10;
+   MERKO 3 aylık raporu 30.10; TRKNT 6 aylık 06.11). KAP listesindeki year/period artık `news.donem` ("2026/3") olarak
+   saklanıyor; bilanço durumu dönemle eşleşiyor. Canlı Finansal Raporlar: 417 × 2026/3, 17 eski dönem.
+2. **KAP kayıt boşluğu kesinlik uyduruyordu:** uygulama birkaç gün açılmazsa aradaki günler hiç listelenmiyor, bilanço
+   "açıklanmadı" diyebiliyordu. `kap_coverage` tablosu her listelenen günü ve alınma anını tutuyor (gün içinde alınıp
+   sonra yenilenmeyen gün eksik sayılır). Boşluk varsa "bilinmiyor (X günün listesi alınmamış)"; güncellemede
+   `kap_history.fill_gaps` son 45 günün boşluklarını yalnız takvim için doldurur (yapay zekâ yok), sayfaları okuyucu
+   okur. Birleşik takvimde boşluk notu. Canlı veriye gerçek kapsam yazıldı: 24.09–07.11, liste anı 14:37:05.
+3. SPK "Finansal Rapor Ek Süre" bildirimleri takvime alındı (5 adet; TRKNT 13.10) → "SPK ek süre talebini
+   değerlendirdi; son tarih farklı olabilir".
+4. Aynı şirketin olağan ve olağanüstü genel kurulu birbirini siliyordu → tür ayrı tutuluyor (aynı türün güncellemesi
+   eskiyi geçersiz kılar). Aynı temettü (GK + hak kullanım) risklerde iki kez sayılıyordu → hak günü varsa tek.
+5. **A–B uyumu:** temettü düşüşü SL mesafesinin ≥ yarısıysa senaryo notu + referans plan riski (2 puan) — o gün SL
+   yapay tetiklenebilir. 6 aylık süredeki sınırlı denetim varsayımı ekranda. "Ücretsiz dene" de okuyucuyu başlatır.
+   Likidite oranlarında ölçüm tarihi (7 Kasım 2026) yazıyor.
+6. Testlerde ağ: boşluk doldurma iki pipeline testinde KAP'a çıkıyordu → sahte listeye bağlandı; tüm takım ağ
+   yasaklanarak çalıştırıldı (deneme 0).
+
+**Bütünleşik test (gerçek veri):** 761 şirketin bilanço durumu ham KAP listesiyle karşılaştırıldı (çelişki 0;
+385 açıklandı, 374 açıklanmadı, 2 süresi geçti = MERKO, TRKNT, ikisi de doğru); 220 şirket olayının hepsi kaynaklı ve
+işlem gününde; 79 makro olay hafta içi; 44 hisse × 6 kesim = 264 plan: seviye sırası, risk puanı↔seviye, senaryo riski,
+tekrar eden risk satırı, takvim sırası/penceresi/kaynağı → sorun 0. A sınır durum testi 5.714 deneme hata 0. Panel canlı
+kopyayla hatasız; "None/nan" metni yok. Takvim modülleri dışında kodda elle yazılmış tarih yok. **282 test geçti.**
+**Bilinen sınır:** takvim geçmişi 45 gün; daha önce duyurulmuş uzun süreçler (ör. 2. taksit, uzun sermaye artırımı)
+kaçabilir — daha uzun pencere KAP isteği gerektirir, onay alınmadı.

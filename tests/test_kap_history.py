@@ -15,7 +15,7 @@ def item(idx, subject, code, when="05.11.2026 18:30:00"):
             "summary": subject}
 
 
-ITEMS = [item(1, "Finansal Rapor", "AAA", "28.10.2026 18:30:00"),
+ITEMS = [dict(item(1, "Finansal Rapor", "AAA", "28.10.2026 18:30:00"), year=2026, period=3),  # KAP: 9 aylık
          item(2, "Sorumluluk Beyanı (Konsolide)", "AAA", "28.10.2026 18:31:00"),
          item(3, "Sermaye Artırımı - Azaltımı İşlemlerine İlişkin Bildirim", "AAA", "01.11.2026 10:00:00"),
          item(4, "Özel Durum Açıklaması (Genel)", "AAA"),          # takvim konusu değil → alınmaz
@@ -37,8 +37,11 @@ class BackfillTests(unittest.TestCase):
         return BEDELSIZ.replace("14.09.2026", "12.11.2026") if index == 3 else ""
 
     def run_backfill(self):
+        def listing(a, b):
+            return ITEMS
+        listing.records_coverage = True   # gerçek KAP listesi gibi: alınan günler "tarandı" sayılır
         return kap_history.backfill(self.conn, self.uni, days=45, today=date(2026, 11, 7),
-                                    list_fn=lambda a, b: ITEMS, page_fn=self.page, sleep=lambda s: None)
+                                    list_fn=listing, page_fn=self.page, sleep=lambda s: None)
 
     def test_only_calendar_subjects_stored_and_never_queued_for_ai(self):
         st = self.run_backfill()
@@ -80,6 +83,26 @@ class BackfillTests(unittest.TestCase):
                                   page_fn=limited, sleep=lambda s: None)
         self.assertTrue(st["kap_siniri"])
         self.assertEqual(st["metin_bekleyen"], 2)
+
+
+    def test_period_and_coverage_recorded(self):
+        self.run_backfill()
+        self.assertEqual(self.conn.execute("SELECT donem FROM news WHERE id='kap:1'").fetchone()[0], "2026/3")
+        self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM kap_coverage").fetchone()[0], 45)
+
+    def test_fill_gaps_lists_only_missing_days(self):
+        from bist_haber import kap
+        kap.record_coverage(self.conn, date(2026, 9, 24), date(2026, 10, 31), "2026-11-01T09:00:00+03:00")
+        asked = []
+        def listing(a, b):
+            asked.append((a.isoformat(), b.isoformat()))
+            return []
+        listing.records_coverage = True
+        res = kap_history.fill_gaps(self.conn, self.uni, lookback_days=45, today=date(2026, 11, 7), list_fn=listing)
+        self.assertEqual(asked, [("2026-11-01", "2026-11-07")])
+        self.assertEqual(res["bosluk_gun"], 7)
+        self.assertEqual(kap.coverage_gaps(self.conn, date(2026, 9, 24), date(2026, 11, 7), date(2026, 11, 7)), [])
+        self.assertEqual(kap_history.fill_gaps(self.conn, self.uni, today=date(2026, 11, 7), list_fn=listing)["bosluk_gun"], 0)
 
 
 class DailyCollectPromotionTests(unittest.TestCase):

@@ -37,6 +37,12 @@ def update_all(conn, days: int = 1, progress: Optional[Progress] = None, analyze
     out = {}
     say("KAP bildirim listesi alınıyor...", 0.02)
     out["kap"] = kap.collect(conn, uni, days=days, fetch_bodies=False)
+    try:  # uygulama birkaç gün açılmadıysa aradaki günleri takvim için doldur (yalnız liste, yapay zekâ yok)
+        from . import kap_history
+        say("Takvim için eksik günler kontrol ediliyor...", 0.04)
+        out["takvim_boslugu"] = kap_history.fill_gaps(conn, uni)
+    except Exception as e:  # KAP sınırı vb.: güncelleme yine sürsün
+        out["takvim_boslugu"] = {"hata": str(e)[:200]}
     say("Ekonomi haberleri (RSS) alınıyor...", 0.05)
     out["rss"] = rss.collect(conn, Matcher(uni))
     out["kap"].update(kap.fetch_missing_bodies(

@@ -22,9 +22,15 @@ CREATE TABLE IF NOT EXISTS news (
     candidates     TEXT,                  -- virgülle ayrılmış aday hisse kodları
     status         TEXT NOT NULL DEFAULT 'new', -- new|skipped|filtered_out|analyzed|error
     note           TEXT,
-    fetched_at     TEXT NOT NULL
+    fetched_at     TEXT NOT NULL,
+    donem          TEXT                   -- finansal rapor dönemi (KAP listesi year/period): "2026/3"
 );
 CREATE INDEX IF NOT EXISTS ix_news_status ON news(status);
+-- 2026-11-07: hangi günlerin KAP listesi eksiksiz alındı (boşluk varsa bilanço durumu "bilinmiyor" denir)
+CREATE TABLE IF NOT EXISTS kap_coverage (
+    day       TEXT PRIMARY KEY,           -- YYYY-AA-GG
+    listed_at TEXT NOT NULL               -- o günün listesinin en son alındığı an (ISO, TR)
+);
 CREATE INDEX IF NOT EXISTS ix_news_title_key ON news(title_key);
 CREATE TABLE IF NOT EXISTS analyses (
     news_id       TEXT PRIMARY KEY REFERENCES news(id),
@@ -78,6 +84,9 @@ def connect(path=None) -> sqlite3.Connection:
     cols = {r[1] for r in conn.execute("PRAGMA table_info(impacts)")}
     if "flag" not in cols:
         conn.execute("ALTER TABLE impacts ADD COLUMN flag TEXT")  # ör. "çelişkili", "ikinci görüş"
+    news_cols = {r[1] for r in conn.execute("PRAGMA table_info(news)")}
+    if "donem" not in news_cols:  # finansal raporun ait olduğu dönem, KAP listesinden: "2026/3" (3 = 9 aylık)
+        conn.execute("ALTER TABLE news ADD COLUMN donem TEXT")
     price_cols = {r[1] for r in conn.execute("PRAGMA table_info(prices)")}
     for col in ("open", "high", "low"):  # teknik analiz için (2026-11-07)
         if col not in price_cols:

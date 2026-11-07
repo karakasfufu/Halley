@@ -289,6 +289,7 @@ class FreeCheckTests(unittest.TestCase):
         add_news(conn, nid="kap:2", body="Yeni yatırım kararı alındı. " * 20)
         with patch.object(pipeline, "universe", return_value={"TEST": "Deneme"}), \
                 patch.object(kap, "collect", return_value={"new": 2}), \
+                patch.object(kap, "list_disclosures", return_value=[]), \
                 patch.object(kap, "fetch_missing_bodies", return_value={}), \
                 patch("bist_haber.rss.collect", return_value={"new": 0}), \
                 patch("bist_haber.prices.update", return_value=0), \
