@@ -85,3 +85,38 @@ class OpportunitySummaryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReviewFixTests(unittest.TestCase):
+    """Son kontrol (2026-11-07) düzeltmeleri."""
+
+    def test_scenario_risk_does_not_use_reference_plans_reward_risk(self):
+        p = tradeplan.plan(base(), NEWS)
+        self.assertTrue(p["elverissiz"])                       # mevcut fiyattan: TP 103, SL ~96 → 1:0,75
+        self.assertEqual(p["risk_seviyesi"], "yüksek")
+        brk = next(s for s in p["girisler"]["senaryolar"] if s["tur"] == "kirilim")
+        self.assertEqual(brk["kalite"], "zayıf")
+        self.assertEqual(brk["risk_seviyesi"], "orta")          # ortak risk 0 + zayıf r/g 2
+        self.assertEqual(tradeplan.opportunity_summary({"AAA": p})["uygun"][0][2], "orta")
+
+    def test_common_risks_raise_every_scenario(self):
+        p = tradeplan.plan(base(islem_hacmi_tl=5e6), NEWS)     # düşük likidite: 2 puan
+        brk = next(s for s in p["girisler"]["senaryolar"] if s["tur"] == "kirilim")
+        self.assertEqual(brk["risk_seviyesi"], "yüksek")        # 2 + 2
+
+    def test_partial_last_bar_is_warned(self):
+        from bist_haber import technical as T
+        from test_indicators_v2 import series
+        bars = series(60)
+        bars[-1] = dict(bars[-1], open=None, high=None, low=None)
+        from datetime import date
+        today = date.fromisoformat(bars[-1]["date"])           # deneme serisi eski tarihli: "bugün" = son gün
+        t = T.analyze(bars, today=today)
+        self.assertTrue(any("yarım veri" in w for w in t["veri_uyarilari"]))
+        self.assertFalse(t["veri_kritik"])                      # uyarı; senaryoyu engellemez
+        self.assertFalse(any("yarım veri" in w for w in T.analyze(series(60), today=today)["veri_uyarilari"]))
+
+    def test_partial_bar_warning_does_not_add_risk_points(self):
+        w = "Son günün (2026-11-06) açılış/en yüksek/en düşük fiyatı eksik (gün içi yarım veri): ..."
+        self.assertEqual(tradeplan._points([w]), 0)
+        self.assertEqual(tradeplan._points([w, "MACD ivmesi zayıf"]), 1)

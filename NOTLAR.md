@@ -560,3 +560,20 @@ Her gün işlem yapmak gerekmez." + neden sayıları (haber zayıf / likidite / 
 
 Canlı veri kopyasında: 3 hissede uygun senaryo (SOKM destekten tepki risk orta — çelişki notuyla; FROTO ve ISCTR
 kırılım risk orta). Testler: `tests/test_a3_rules.py` (+ etki günü testi). Python 3.9.13 ile **170 test geçti**.
+
+## 2026-11-07 — A1–A3 son kontrol
+
+**Bulunan ve düzeltilenler:**
+1. Özette ve senaryo kartında gösterilen risk seviyesi, gösterilen giriş senaryosuna değil "mevcut fiyattan" referans
+   planın risk/getirisine dayanıyordu (ör. referans elverişsiz → kırılım iyi olsa da "yüksek"). Artık her giriş
+   senaryosunun kendi risk seviyesi var: ortak riskler (referansın r/g maddeleri hariç) + senaryonun r/g'si
+   (elverişsiz 4, zayıf 2). Panelde ve CSV'de gösteriliyor.
+2. Yahoo gün içinde son günü yalnız kapanışla verebiliyor (canlı veride 4 hissede 2026-11-06 açılış/en yüksek/en
+   düşük boştu; sonradan tam geldi: FROTO en yüksek 74,20). Artık veri uyarısı çıkıyor ("seans bitince yeniden
+   güncelleyin"); bu uyarı piyasa riski olmadığı için risk puanına katılmıyor. INSERT OR REPLACE bir sonraki
+   güncellemede satırı düzeltiyor.
+3. Senaryo testi: girişte açılış eksikse "ölçülemedi"; en yüksek/en düşük eksikse kapanış kullanılır (çökme yok).
+
+**Doğrulama:** 5.714 bozulmuş gerçek veri denemesi (eksik OHLC, hacimsiz, 30–252 gün, düz fiyat, boşluk, endeks
+yok/eksik) → hata 0, tutarlılık ihlali 0. 4.400 durumluk senaryo testi değişmedi (ihlal 0). Panel canlı veri
+kopyasıyla hatasız; CSV hazırlanıyor; pilot senaryo testi aynı. **175 test geçti.**

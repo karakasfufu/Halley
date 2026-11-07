@@ -200,6 +200,10 @@ def data_checks(bars: List[dict], today: Optional[date] = None):
             warnings.append(f"{cur['date']} tarihinde %{change * 100:+.0f} sıçrama (günlük sınır ±%10): düzeltilmemiş "
                             "bölünme/bedelsiz ya da veri hatası olabilir" + ("; son 60 günde, seviyeler güvenilmez" if recent else ""))
             critical = critical or recent
+    last = bars[-1]
+    if last.get("high") is None or last.get("low") is None or last.get("open") is None:
+        warnings.append(f"Son günün ({last['date']}) açılış/en yüksek/en düşük fiyatı eksik (gün içi yarım veri): o günün "
+                        "aralığı destek/direnç ve oynaklığa girmedi; seans bitince yeniden güncelleyin")
     last20 = bars[-20:]
     # Hacim bilgisi olmayan seriler (ör. pilot fiyatları) bu kontrole girmez.
     zero_vol = sum(1 for b in last20 if b.get("volume") is not None and not b["volume"])

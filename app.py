@@ -294,7 +294,9 @@ def entry_block(g: dict) -> None:
         c3.metric("TP1", f"{best['tp1']:.2f} TL", f"{best['tp1_%']:+.1f}%")
         c4.metric("TP2", f"{best['tp2']:.2f} TL", f"{best['tp2_%']:+.1f}%")
         c5.metric("Risk / getiri", f"1 : {best['rr1']:.1f}", f"TP2'de 1 : {best['rr2']:.1f}", delta_color="off")
-        st.caption(f"Kaba vade tahmini: TP1 yaklaşık {best['tp1_gun']}, TP2 yaklaşık {best['tp2_gun']} işlem günü (garanti değil) · "
+        st.caption(f"Bu senaryonun risk seviyesi: **{best.get('risk_seviyesi', '—')}** (ortak risk faktörleri + "
+                   "bu senaryonun risk/getirisi) · "
+                   f"Kaba vade tahmini: TP1 yaklaşık {best['tp1_gun']}, TP2 yaklaşık {best['tp2_gun']} işlem günü (garanti değil) · "
                    f"senaryo {best['gecerlilik_gun']} işlem günü geçerli · SL dayanağı: {best['sl_dayanak']} · "
                    f"TP1: {best['tp1_dayanak']} · TP2: {best['tp2_dayanak']}")
         st.markdown(f"- **Teyit:** {md(best['teyit'])}\n- **Geçersiz olur:** {md(best['gecersiz'])}\n"
@@ -305,7 +307,8 @@ def entry_block(g: dict) -> None:
         table = [{"Senaryo": s["ad"],
                   "Durum": s.get("uygulanamaz") or s["kalite"],
                   "Emir": s.get("emir", ""), "Giriş": s.get("giris"), "SL": s.get("sl"), "TP1": s.get("tp1"),
-                  "TP2": s.get("tp2"), "Risk/getiri (TP1)": s.get("rr1")} for s in items]
+                  "TP2": s.get("tp2"), "Risk/getiri (TP1)": s.get("rr1"), "Risk": s.get("risk_seviyesi", "")}
+                 for s in items]
         st.dataframe(pd.DataFrame(table).round(2), hide_index=True, use_container_width=True)
     st.caption("📏 " + entries.BACKTEST_NOTE)
 
@@ -343,6 +346,7 @@ def best_entry_columns(p: dict) -> dict:
         return {"En uygun giriş senaryosu": "yok" if p.get("durum") == "senaryo" else ""}
     return {"En uygun giriş senaryosu": s["ad"], "Giriş emri": s["emir"], "Giriş fiyatı": s["giris"],
             "Giriş SL": s["sl"], "Giriş TP1": s["tp1"], "Giriş TP2": s["tp2"], "Giriş r/g (TP1)": s["rr1"],
+            "Giriş risk seviyesi": s.get("risk_seviyesi", ""),
             "Teyit": s["teyit"], "Geçersizlik": s["gecersiz"]}
 
 

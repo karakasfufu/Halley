@@ -65,6 +65,21 @@ def risk_factors(t: Dict, news: Dict) -> List[str]:
     return out
 
 
+HEAVY = ("Haber olumlu ama teknik trend", "Risk/getiri zayıf", "Düşük likidite", "Haberden bu yana",
+         "Haber olumlu ama fiyat")
+
+
+def _points(risks: List[str]) -> int:
+    """Ağırlıklı risk puanı: elverişsiz r/g 4 (en az "yüksek"), ağır maddeler 2, diğerleri 1.
+    Gün içi yarım veri uyarısı piyasa riski değil, geçici veri durumudur: gösterilir ama puana katılmaz."""
+    return sum(0 if "yarım veri" in r else 4 if r.startswith("Risk/getiri elverişsiz") else
+               2 if r.startswith(HEAVY) else 1 for r in risks)
+
+
+def _level(points: int) -> str:
+    return "düşük" if points <= 1 else ("orta" if points <= 3 else "yüksek")
+
+
 def _horizon(persistence: str, entry: float, tp: float, atr: Optional[float]):
     """Haberin kalıcılığına göre temel aralık; hedefe uzaklık (ATR cinsinden) bunu uzatabilir."""
     base_lo, base_hi = HORIZON.get(persistence, HORIZON["orta"])
@@ -136,10 +151,7 @@ def plan(t: Optional[Dict], news: Dict) -> Dict:
         risks.append(f"Risk/getiri zayıf (1:{rr:.1f})")
     lo, hi = _horizon(news.get("persistence", "orta"), entry, tp, atr)
     # Ağırlıklı risk puanı: elverişsiz risk/getiri ve haber–trend çelişkisi daha ağır sayılır.
-    points = sum(4 if r.startswith("Risk/getiri elverişsiz") else  # elverişsiz → en az "yüksek"
-                 2 if r.startswith(("Haber olumlu ama teknik trend", "Risk/getiri zayıf", "Düşük likidite",
-                                    "Haberden bu yana", "Haber olumlu ama fiyat")) else 1 for r in risks)
-    level = "düşük" if points <= 1 else ("orta" if points <= 3 else "yüksek")
+    level = _level(_points(risks))
     pct = lambda x: (x / entry - 1) * 100
     tech_line = (f"Teknik trend {t['trend'].lower()}, RSI {t['rsi14']:.0f}" if t.get("rsi14") is not None
                  else f"Teknik trend {t['trend'].lower()}")
@@ -154,11 +166,19 @@ def plan(t: Optional[Dict], news: Dict) -> Dict:
         + (" Mevcut seviyelerde senaryo elverişsiz görünüyor." if unfavorable else "")
         + " Bu bir senaryodur, yatırım tavsiyesi değildir; seviyeler geçmiş veriyle henüz test edilmedi."
     )
+    girisler = entries.scenarios(t)
+    # Her giriş senaryosunun risk seviyesi: ortak riskler (mevcut fiyattan planın risk/getirisi HARİÇ) + o senaryonun
+    # kendi risk/getirisi. Böylece özetteki risk, gösterilen senaryoya aittir.
+    common = _points([r for r in risks if not r.startswith("Risk/getiri")])
+    for s in girisler["senaryolar"]:
+        if "uygulanamaz" not in s:
+            own = {"elverişsiz": 4, "zayıf": 2}.get(s["kalite"], 0)
+            s["risk_seviyesi"] = _level(common + own)
     return {"durum": "senaryo", "elverissiz": unfavorable, "giris": entry, "sl": sl, "sl_dayanak": sl_basis, "tp": tp, "tp_dayanak": tp_basis,
             "sl_%": pct(sl), "tp_%": pct(tp), "rr": rr, "vade": (lo, hi), "risk_seviyesi": level,
             "riskler": risks, "notlar": notes, "aciklama": explanation,
             # Parça A2: mevcut fiyattan girişin yanında üç koşullu giriş senaryosu (kırılım/geri çekilme/destek).
-            "girisler": entries.scenarios(t)}
+            "girisler": girisler}
 
 
 def opportunity_summary(plans: Dict[str, Dict]) -> Dict:
@@ -169,7 +189,7 @@ def opportunity_summary(plans: Dict[str, Dict]) -> Dict:
         g = p.get("girisler") or {}
         best = next((s for s in g.get("senaryolar", []) if s["tur"] == g.get("en_uygun")), None)
         if p.get("durum") == "senaryo" and best:
-            ok.append((ticker, best["ad"], p.get("risk_seviyesi", "")))
+            ok.append((ticker, best["ad"], best.get("risk_seviyesi", "")))
             continue
         if p.get("durum") != "senaryo":
             text = p.get("neden_yok", "")

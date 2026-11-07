@@ -101,6 +101,12 @@ class ScenarioTestTests(unittest.TestCase):
         self.assertEqual((s["tp"], s["sl"], s["test_edilen"]), (1, 0, 1))
         self.assertIn("geleceği görmeden", scenario_test.as_text(scenario_test.run(self.conn)))
 
+    def test_missing_entry_open_is_not_measured(self):
+        self.forward([(100, 101, 99, 100)] * 31)
+        self.conn.execute("UPDATE pilot_bars SET open=NULL WHERE ticker='TEST' AND date=?", (self.days[self.event_idx + 1],))
+        self.conn.commit()
+        self.assertEqual(self.run_one()["sonuç"], "ölçülemedi")
+
 
 if __name__ == "__main__":
     unittest.main()

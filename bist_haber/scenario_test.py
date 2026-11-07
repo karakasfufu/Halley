@@ -61,7 +61,7 @@ def run(conn, max_days: int = MAX_DAYS) -> List[dict]:
             out.append(rec)
             continue
         forward = [b for b in series if b["date"] >= entry_day][:max_days]
-        if not forward or forward[0]["date"] != entry_day:
+        if not forward or forward[0]["date"] != entry_day or forward[0].get("open") is None:
             rec.update(sonuç="ölçülemedi", **{"not": "giriş günü hisse fiyatı eksik"})
             out.append(rec)
             continue
@@ -72,6 +72,7 @@ def run(conn, max_days: int = MAX_DAYS) -> List[dict]:
                    tahmini_vade="{}–{}".format(*p["vade"]), risk_seviyesi=p["risk_seviyesi"])
         locked, result = 0, None
         for n, b in enumerate(forward, start=1):
+            b = dict(b, high=b.get("high") or b["close"], low=b.get("low") or b["close"])  # eksikse kapanış
             if b["high"] == b["low"] == b["close"]:
                 locked += 1
             if n == 1 and entry <= sl:
