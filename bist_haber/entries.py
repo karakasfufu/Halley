@@ -121,11 +121,13 @@ def breakout(t: Dict) -> Dict:
         notes.append("Bollinger sıkışması var: sert hareket olasılığı yüksek (yönü belli değil)")
     if t.get("obv_egilim") == "azalıyor":
         notes.append("OBV azalıyor: kırılım hacimle desteklenmeyebilir")
-    return _finish("kirilim", t, entry, sl, f"kırılan seviyenin ({level:.2f} TL) {BREAKOUT_STOP_ATR:g} ATR altı",
+    out = _finish("kirilim", t, entry, sl, f"kırılan seviyenin ({level:.2f} TL) {BREAKOUT_STOP_ATR:g} ATR altı",
                    [x for x in _levels(t) if x[0] > level], f"Fiyat alarmı: {level:.2f} TL üstü → teyit gelince elle al",
                    f"Günlük kapanış {level:.2f} TL ({name}) üstünde olmalı; hacim 20 günlük ortalamanın üstündeyse "
                    "teyit daha güçlü. Alarm gün içinde çalıp fiyat geri düşerse alım yapılmaz.",
                    f"Kapanış {sl:.2f} TL altına inerse kırılım başarısız sayılır.", notes)
+    out["alarm"] = level   # işlem günlüğü: alarm seviyesi (kapanış bunun üstündeyse ertesi gün alınır)
+    return out
 
 
 def pullback(t: Dict) -> Dict:

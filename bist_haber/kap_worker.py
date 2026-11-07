@@ -40,8 +40,11 @@ def load() -> Dict:
 STALE_MIN = 5   # canlılık zamanı bundan eskiyse (ve bekleme süresi geçtiyse) çalışan okuyucu yok sayılır
 
 
-def _save(st: Dict) -> None:
-    st["nabiz"] = datetime.now(config.TR_TZ).isoformat(timespec="seconds")  # başka işlemler için canlılık işareti
+def _save(st: Dict, beat: bool = True) -> None:
+    """beat=True yalnız okuyucunun kendisi yazarken: canlılık zamanı tazelenir. Bekçinin yan bilgileri (günlük fiyat,
+    hata) beat=False ile yazılır; aksi hâlde çökmüş bir okuyucu canlı sanılır (testte yakalanan hata)."""
+    if beat:
+        st["nabiz"] = datetime.now(config.TR_TZ).isoformat(timespec="seconds")  # başka işlemler için canlılık işareti
     path = state_file()
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
@@ -236,6 +239,7 @@ def serve(db_path=None, sleep: Callable[[float], None] = time.sleep, once: bool 
                 pend = pending_counts(conn)["toplam"]
             finally:
                 conn.close()
+            _daily_journal(db_path)
             prev = load()
             need = pend > 0 and (pend > AUTO_START_MIN_PAGES or prev.get("devam_gerek") or prev.get("durum") == "çalışıyor")
             if need and not alive_elsewhere(prev) and not running():
@@ -243,14 +247,31 @@ def serve(db_path=None, sleep: Callable[[float], None] = time.sleep, once: bool 
         except Exception as e:  # bekçi asla çökmemeli; bir sonraki turda yeniden dener
             st = load()
             st["bekci_hata"] = str(e)[:200]
-            _save(st)
+            _save(st, beat=False)
         if once:
             return
         sleep(SERVE_CHECK_SEC)
+
+
+def _daily_journal(db_path=None) -> None:
+    """Günde bir kez işlem günlüğünün fiyatlarını indir ve sonuçlarını güncelle (Parça C3)."""
+    from . import journal
+    st = load()
+    today = datetime.now(config.TR_TZ).date().isoformat()
+    if st.get("gunluk_fiyat_gunu") == today:
+        return
+    conn = db.connect(db_path)
+    try:
+        res = journal.daily_refresh(conn, today)
+    finally:
+        conn.close()
+    st = load()
+    st.update(gunluk_fiyat_gunu=today, gunluk_sonuc=res)
+    _save(st, beat=False)
 
 
 def note_rate_limited() -> None:
     """Günlük güncelleme KAP sınırına takıldıysa işaretle: panel okuyucuyu kendiliğinden başlatsın."""
     st = load()
     st["devam_gerek"] = True
-    _save(st)
+    _save(st, beat=False)

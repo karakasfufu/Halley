@@ -3,6 +3,7 @@
 Sade düzen (2026-11-06): tek "Haberleri güncelle" düğmesi, 3 özet kutusu, olumlu/olumsuz hisse listeleri.
 Ayarlar katlanır bölümde; durum ve geçmiş veri pilotu "Gelişmiş" sekmesinde.
 """
+import json
 import os
 from datetime import date, datetime
 from html import escape as esc
@@ -10,7 +11,7 @@ from html import escape as esc
 import pandas as pd
 import streamlit as st
 
-from bist_haber import (analyzer, calendar_sync, config, corp_events, db, earnings, entries, kap_history,
+from bist_haber import (analyzer, calendar_sync, config, corp_events, db, earnings, entries, journal, kap_history,
                         kap_worker, macro_calendar, pipeline, report, technical, timeline, tradeplan)
 
 st.set_page_config(page_title="Halley", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
@@ -109,6 +110,22 @@ with st.expander("⚙️ Ayarlar"):
         key="analysis_quality")
     if quality != saved_q:
         pipeline.save_settings(analiz_kalitesi=quality)
+    # Parça C2: işlem günlüğü maliyetleri ve pozisyon hesabı (bu bilgisayarda saklanır; kişiye özel karar kullanıcıda)
+    saved = pipeline.load_settings()
+    c1, c2, c3, c4 = st.columns(4)
+    commission = c1.number_input("Komisyon, alış+satış (%)", 0.0, 2.0, float(saved.get("komisyon_pct", journal.DEFAULT_COMMISSION_PCT)),
+                                 0.01, format="%.2f", key="commission_pct",
+                                 help="İşlem günlüğünde net getiri bu maliyet düşülerek hesaplanır. Midas'ın kendi oranını girin.")
+    slippage = c2.number_input("Kayma, alış+satış (%)", 0.0, 2.0, float(saved.get("kayma_pct", journal.DEFAULT_SLIPPAGE_PCT)),
+                               0.01, format="%.2f", key="slippage_pct",
+                               help="Emrin beklenen fiyattan biraz kötü gerçekleşmesi (alış-satış farkı vb.).")
+    capital = c3.number_input("Sermaye (TL) — pozisyon hesabı için", 0.0, 1e9, float(saved.get("sermaye", 0.0)), 1000.0,
+                              format="%.0f", key="capital", help="0 bırakılırsa pozisyon hesabı gösterilmez.")
+    risk_pct = c4.number_input("İşlem başına göze alınan risk (%)", 0.0, 100.0, float(saved.get("risk_pct", 0.0)), 0.25,
+                               format="%.2f", key="risk_pct", help="SL'ye gelinirse sermayenin en fazla yüzde kaçı kaybedilsin?")
+    if (commission, slippage, capital, risk_pct) != (saved.get("komisyon_pct"), saved.get("kayma_pct"),
+                                                      saved.get("sermaye"), saved.get("risk_pct")):
+        pipeline.save_settings(komisyon_pct=commission, kayma_pct=slippage, sermaye=capital, risk_pct=risk_pct)
     if quality != config.DEFAULT_QUALITY:
         st.caption("⚠️ Bu ayarda maliyet düşer ama analizler daha az ayrıntılı ve hata payı daha yüksek olabilir.")
     st.caption("Kaynaklar: KAP + " + ", ".join(config.RSS_SOURCE_LABELS.get(n, n) for n in config.RSS_FEEDS)
@@ -218,7 +235,8 @@ if calendar_sync.due() and not os.environ.get("HALLEY_OFFLINE"):
     with st.spinner("Takvim resmi kaynaklardan kontrol ediliyor (günde bir kez, birkaç saniye)..."):
         calendar_sync.auto_check()
 
-tab_list, tab_news, tab_adv = st.tabs(["📈 Bugünün listesi", "📰 Haberler", "🔧 Gelişmiş"])
+tab_list, tab_journal, tab_news, tab_adv = st.tabs(["📈 Bugünün listesi", "📒 İşlem günlüğü", "📰 Haberler",
+                                                     "🔧 Gelişmiş"])
 
 
 _TECH_CACHE = {}
@@ -404,6 +422,14 @@ def entry_block(g: dict) -> None:
         c3.metric("TP1", f"{best['tp1']:.2f} TL", f"{best['tp1_%']:+.1f}%")
         c4.metric("TP2", f"{best['tp2']:.2f} TL", f"{best['tp2_%']:+.1f}%")
         c5.metric("Risk / getiri", f"1 : {best['rr1']:.1f}", f"TP2'de 1 : {best['rr2']:.1f}", delta_color="off")
+        if capital > 0 and risk_pct > 0:
+            try:
+                ps = journal.position_size(capital, risk_pct, best["giris"], best["sl"], commission + slippage)
+                st.caption(f"🧮 Pozisyon hesabı (sizin girdiğiniz sermaye {capital:,.0f} TL ve risk %{risk_pct:g}): "
+                           f"**{ps['adet']} adet** ≈ {ps['tutar']:,.0f} TL; SL'ye gelinirse en fazla ≈ {ps['azami_kayip']:,.0f} TL "
+                           f"(%{ps['azami_kayip_%']:.2f}, maliyet dahil). Sınırlayan: {ps['sinirlayan']}. Yalnız hesaplamadır.")
+            except ValueError as e:
+                st.caption(f"🧮 Pozisyon hesaplanamadı: {e}")
         st.caption(f"Bu senaryonun risk seviyesi: **{best.get('risk_seviyesi', '—')}** (ortak risk faktörleri + "
                    "bu senaryonun risk/getirisi) · "
                    f"Kaba vade tahmini: TP1 yaklaşık {best['tp1_gun']}, TP2 yaklaşık {best['tp2_gun']} işlem günü (garanti değil) · "
@@ -546,6 +572,12 @@ with tab_list:
         st.info("Henüz liste yok. Yukarıdaki **Haberleri güncelle** düğmesine basın.")
     else:
         summary_ = tradeplan.opportunity_summary({r["ticker"]: scenario(r) for r in positives})
+        # Parça C1: uygun senaryoları sanal işlem olarak günlüğe yaz (hisse başına tek açık kayıt), sonuçları güncelle
+        for r in positives:
+            t_rec = tech(r["ticker"])
+            if t_rec:
+                journal.record_auto(conn, r["ticker"], scenario(r), t_rec["tarih"], r["score"])
+        journal.update_all(conn, commission, slippage)
         if summary_["uygun"]:
             st.success(f"Bugün {len(summary_['uygun'])} hissede uygun görünen giriş senaryosu var: "
                        + ", ".join(f"{tk} ({name.split(' (')[0].lower()}, risk {risk})" for tk, name, risk in summary_["uygun"])
@@ -616,6 +648,65 @@ with tab_list:
             st.session_state["signals_export_ready"] = True
             conn.close()  # sayfa yenilenmeden önce bağlantıyı bırak (aksi hâlde açık kalıyordu)
             st.rerun()
+
+# ---------------- İşlem günlüğü ----------------
+def metrics_block(title: str, m: dict) -> None:
+    st.markdown(f"**{title}** — kayıt {m['kayit']} · kapanan {m['kapanan']} · açık/bekleyen {m['acik_bekleyen']} · "
+                f"gerçekleşmeyen {m['iptal']}")
+    if not m["kapanan"]:
+        st.caption("Henüz kapanan işlem yok.")
+        return
+    a, b, c, d, e, f = st.columns(6)
+    a.metric("Kazanma oranı", f"%{m['kazanma_orani_%']:.0f}")
+    b.metric("Ortalama net", f"%{m['ortalama_net_%']:+.2f}")
+    c.metric("Ortalama R", "—" if m["ortalama_R"] is None else f"{m['ortalama_R']:+.2f}")
+    d.metric("Kâr faktörü", "—" if m["kar_faktoru"] is None else f"{m['kar_faktoru']:.2f}")
+    e.metric("Maks. düşüş", f"{m['maks_dusus_R']:.2f} R")
+    f.metric("Sharpe (işlem başına)", "—" if m["sharpe_islem_basina"] is None else f"{m['sharpe_islem_basina']:.2f}")
+    if not m["yeterli_ornek"]:
+        st.warning(f"Yalnız {m['kapanan']} kapanan işlem var: {journal.MIN_TRADES_FOR_STATS}'dan az örnekte bu oranlar "
+                   "rastlantıdan ayırt edilemez; karar için kullanmayın.")
+
+
+with tab_journal:
+    st.markdown("#### 📒 İşlem günlüğü")
+    st.caption("Panelde 'uygun' görünen her hissenin en uygun giriş senaryosu kendiliğinden SANAL işlem olarak kaydedilir "
+               "ve sonraki günlerin fiyatlarıyla izlenir: giriş gerçekleşti mi, önce TP mi SL mi? Kural: TP1'de yarısı "
+               "satılır, stop girişe çekilir, kalan TP2'ye izlenir; en fazla 30 işlem günü. Net getiri komisyon ve "
+               "kayma düşülerek (⚙️ Ayarlar). Amaç haber sinyalinin işe yarayıp yaramadığını ölçmek. Geçmiş sonuç "
+               "geleceği garanti etmez; yatırım tavsiyesi değildir.")
+    metrics_block("Sanal (otomatik) işlemler", journal.metrics(conn, "otomatik"))
+    metrics_block("Gerçek işlemleriniz", journal.metrics(conn, "gercek"))
+    rows_j = conn.execute("SELECT * FROM trade_journal ORDER BY id DESC LIMIT 200").fetchall()
+    if rows_j:
+        tbl = []
+        for jr in rows_j:
+            res = json.loads(jr["sonuc_json"]) if jr["sonuc_json"] else {}
+            tbl.append({"No": jr["id"], "Tür": "Gerçek" if jr["kaynak"] == "gercek" else "Sanal", "Hisse": jr["ticker"],
+                        "Sinyal günü": jr["signal_day"], "Senaryo": entries.NAMES.get(jr["senaryo"], jr["senaryo"]),
+                        "Giriş": jr["giris"], "SL": jr["sl"], "TP1": jr["tp1"], "TP2": jr["tp2"],
+                        "Durum": jr["durum"], "Sonuç": res.get("sonuc", ""), "Alış günü": res.get("giris_gunu", ""),
+                        "Net %": res.get("net_getiri_pct", res.get("acik_getiri_%")), "R": res.get("r")})
+        st.dataframe(pd.DataFrame(tbl).round(2), hide_index=True, use_container_width=True)
+        open_auto = [jr for jr in rows_j if jr["kaynak"] == "otomatik" and jr["durum"] in journal.OPEN_STATES]
+        if open_auto:
+            with st.expander("✍️ Bu işleme girdim (gerçek işleminizi kaydedin)"):
+                choice = st.selectbox("Hangi sanal kayıt?", [jr["id"] for jr in open_auto], key="real_pick",
+                                      format_func=lambda i: next(f"#{jr['id']} {jr['ticker']} · {entries.NAMES.get(jr['senaryo'], '')}"
+                                                                 f" · giriş {jr['giris']:.2f}" for jr in open_auto if jr["id"] == i))
+                g1, g2 = st.columns(2)
+                fill_day = g1.date_input("Alış günü", datetime.now(config.TR_TZ).date(), key="real_day")
+                fill_px = g2.number_input("Alış fiyatı (TL)", 0.0, 1e7, 0.0, 0.01, format="%.2f", key="real_px")
+                if st.button("Kaydet", key="real_save"):
+                    try:
+                        journal.record_real(conn, int(choice), fill_day.isoformat(), float(fill_px))
+                        journal.update_all(conn, commission, slippage)
+                        st.success("Gerçek işleminiz kaydedildi; aynı seviyelerle ayrıca izlenecek.")
+                    except ValueError as e:
+                        st.error(f"Kaydedilemedi: {e}")
+    else:
+        st.info("Henüz kayıt yok. Panelde uygun giriş senaryosu çıktığında kendiliğinden eklenir.")
+
 
 # ---------------- Haberler ----------------
 with tab_news:

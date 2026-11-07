@@ -60,6 +60,31 @@ CREATE TABLE IF NOT EXISTS company_stats (
     market_cap REAL,               -- TL
     last_price REAL
 );
+-- Parça C1 (2026-11-07): işlem günlüğü. otomatik = panelin "uygun" senaryosu (sanal), gercek = kullanıcının girdiği.
+CREATE TABLE IF NOT EXISTS trade_journal (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at   TEXT NOT NULL,
+    signal_day   TEXT NOT NULL,            -- senaryonun hesaplandığı son fiyat günü (sonraki günler değerlendirilir)
+    ticker       TEXT NOT NULL,
+    kaynak       TEXT NOT NULL,            -- otomatik | gercek
+    haber_skoru  REAL,
+    risk_seviyesi TEXT,
+    senaryo      TEXT NOT NULL,            -- kirilim | geri_cekilme | destek
+    emir         TEXT,
+    alarm        REAL,
+    giris        REAL NOT NULL,
+    sl           REAL NOT NULL,
+    tp1          REAL NOT NULL,
+    tp2          REAL NOT NULL,
+    gecerlilik   INTEGER NOT NULL,
+    gercek_giris_gunu TEXT,                -- gercek kayıtta kullanıcının alış günü/fiyatı
+    gercek_giris_fiyati REAL,
+    ana_id       INTEGER,                  -- gercek kaydın türetildiği otomatik kayıt
+    durum        TEXT NOT NULL DEFAULT 'bekliyor',
+    sonuc_json   TEXT,
+    guncellendi  TEXT,
+    UNIQUE (ticker, signal_day, senaryo, kaynak)
+);
 CREATE TABLE IF NOT EXISTS prices (
     ticker TEXT NOT NULL,
     date   TEXT NOT NULL,

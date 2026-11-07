@@ -772,3 +772,28 @@ aşarsa bir sonraki açılışta sürer. Yeni ilk kurulumda ilk güncelleme 180 
   **287 test geçti.**
 - Kullanıcı gözlemi: kutu dakikalarca "0/2506" gösterdi (okuma aslında sürüyordu: ~11 sayfa/20 sn). Okuyucu ilerlemeyi
   yalnız tur sonunda yazıyordu → artık tur içinde her 10 sayfada bir yazar. **288 test geçti.**
+
+## 2026-11-07 — Parça C: işlem günlüğü, performans, pozisyon hesabı (`bist_haber/journal.py`)
+
+Kullanıcı onaylı varsayımlar: (1) panelde "uygun" görünen hissenin en uygun giriş senaryosu kendiliğinden SANAL işlem
+olarak kaydedilir (hisse başına tek açık kayıt) + "Bu işleme girdim" ile gerçek işlem ayrıca izlenir; (2) maliyet
+alış+satış komisyon %0,20 + kayma %0,10 (Ayarlar'dan değişir; Midas oranı doğrulanmadı); (3) pozisyon hesabı: sermaye
+ve işlem başına risk % kullanıcı girer (varsayılan yok) → adet, tutar, SL'de azami kayıp (maliyet dahil); (4) stop
+kuralı: TP1'de yarısı satılır, stop girişe çekilir, kalan TP2'ye; olaylar kayda yazılır.
+- Değerlendirme kuralları 4.400 durumluk geçmiş testle aynı (kırılım: kapanış alarm üstü → ertesi açılış; limit:
+  en düşük ≤ limit; aynı gün SL+TP → SL; limit dolduğu gün TP sayılmaz; en fazla 30 işlem günü; signal_day ve öncesi
+  yok sayılır). R planlanan risk mesafesine göre (kırılımda açılış SL altına düşebiliyor — gerçek veride yakalandı).
+- Metrikler: kazanma oranı, ortalama/medyan net %, ortalama R, kâr faktörü, maksimum düşüş (R, çıkış sırasıyla),
+  işlem başına Sharpe, gerçekleşme oranı; 30 kapanan işlemden azsa "karar için kullanmayın" uyarısı.
+- **Gerçek veri çapraz kontrolü:** günlük motoru 44 hisse × 4.400 kesimde önceki simülasyonla aynı gerçekleşme
+  (%55/63/57) ve önce-TP1 (%37/33/33) oranlarını verdi; yarı satış + başabaş ile net ortalama −%0,01…−%0,32 (haber
+  olmadan avantaj yok — önceki sonuçla tutarlı).
+- Panel: "📒 İşlem günlüğü" sekmesi (metrikler sanal/gerçek ayrı, son 200 kayıt, "Bu işleme girdim" formu); senaryo
+  kartında pozisyon hesabı (sermaye ve risk girilmişse); Ayarlar'da komisyon, kayma, sermaye, risk %.
+- Bekçi günde bir kez açık kayıtların hisseleri + XU100 fiyatını indirip günlüğü günceller (tarayıcı açık olmasa da).
+  Yakalanan hata: bekçinin yan bilgi yazması okuyucunun canlılık zamanını tazeliyordu (çökmüş okuyucu canlı
+  sanılıyordu) → yalnız okuyucu tazeler.
+- Canlı kopya: SOKM (destekten tepki) ve FROTO (kırılım) 6 Kasım sinyaliyle "bekliyor" kaydedildi; pozisyon hesabı el
+  hesabıyla tutuyor (100.000 TL, %1 → SOKM 496 adet, azami ≈ 999 TL). **311 test geçti** (ağ yasaklı da).
+- Henüz yok: birleşik "fırsat puanı" (günlük ≥ 30 kapanan işlem topladıktan sonra test edilecek), portföy riski
+  (sektör/korelasyon), geçmiş benzer hareketlere dayalı vade.

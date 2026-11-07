@@ -298,6 +298,14 @@ class ServeTests(unittest.TestCase):
         K.serve(self.path, once=True, run_fn=lambda db_path=None: self.calls.append(db_path))
         self.assertEqual(self.calls, [self.path])
 
+    def test_daily_journal_refresh_once_per_day(self):
+        calls = []
+        with patch("bist_haber.journal.daily_refresh", lambda conn, today: calls.append(today) or {"hisse": 0}):
+            K.serve(self.path, once=True, run_fn=lambda db_path=None: None)
+            K.serve(self.path, once=True, run_fn=lambda db_path=None: None)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(K.load()["gunluk_fiyat_gunu"], calls[0])
+
     def test_errors_never_crash_the_watcher(self):
         def boom(db_path=None):
             raise RuntimeError("KAP kapalı")

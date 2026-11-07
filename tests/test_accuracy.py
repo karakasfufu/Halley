@@ -439,8 +439,9 @@ class PanelTests(unittest.TestCase):
                 at = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "app.py"))
                 at.run(timeout=30)
                 self.assertEqual(len(at.exception), 0, str(at.exception))
-                # Sade düzen: 3 sekme; durum ve geçmiş veri pilotu "Gelişmiş" sekmesinde.
-                self.assertEqual(len(at.tabs), 3)
+                # Sade düzen: 4 sekme; durum ve geçmiş veri pilotu "Gelişmiş" sekmesinde.
+                self.assertEqual(len(at.tabs), 4)   # + İşlem günlüğü (Parça C2)
+                self.assertTrue(any("İşlem günlüğü" in tab.label for tab in at.tabs))
                 self.assertTrue(any("Gelişmiş" in tab.label for tab in at.tabs))
                 self.assertTrue(any("Geçmiş veri pilotu" in m.value for m in at.markdown))
                 self.assertTrue(any(b.label == "🔄 Haberleri güncelle" for b in at.button))
