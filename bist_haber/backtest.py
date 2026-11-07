@@ -26,8 +26,8 @@ LIMITATIONS = (
     "Güncel piyasa değeri ve son fiyat kullanılmaz. Tarihli şirket büyüklüğü verisi henüz yoktur.",
     "Resim PDF, Excel ekleri, okunmayan veya kesilen metinler ayrıntı kaybına yol açabilir. "
     "Pilot belge kontrolü bunları işaretler; tam doğruluk garantisi vermez.",
-    "İşlem günleri endeks fiyat tarihlerinden türetilir; resmi tatil/yarım gün takvimiyle "
-    "henüz doğrulanmadı. Fiyat servisi eksikleri tatille karışabilir.",
+    "İşlem günleri endeks fiyat tarihlerinden türetilir. 2026 tarihleri Borsa İstanbul tatil takvimiyle birebir "
+    "tutuyor (2026-11-07 kontrolü); 2025 ve öncesi doğrulanmadı, fiyat servisi eksikleri tatille karışabilir.",
     "Modelin geçmiş olayları bilmesi yalnızca talimatla tamamen engellenemez. "
     "Eşik değiştirmeden önce ayrı dönem ve ileriye dönük takip gerekir.",
     "Örnekleme, aynı hisseye ait yakın olaylar ve örtüşen vadeler bağımsız gözlem sayılmaz. "

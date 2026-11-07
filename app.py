@@ -397,8 +397,10 @@ def macro_block() -> None:
     u = macro_calendar.upcoming(today, 15)
     tr_date = lambda d: f"{int(d[8:10])} {AYLAR[int(d[5:7]) - 1]}"
     if u["olaylar"]:
-        items = "; ".join(f"**{tr_date(e['tarih'])}** {e['ad']} saat {e['saat']}"
-                          + (" (bugün)" if e["bugun"] else f" ({e['is_gunu_sonra']} işlem günü sonra)")
+        items = "; ".join(f"**{tr_date(e['tarih'])}** {e['ad']}"
+                          + ("" if e["tur"] == "tatil" else f" saat {e['saat']}" if e["tur"] != "yarim" else f", {e['saat']}")
+                          + (" (bugün)" if e["bugun"] else "" if e["is_gunu_sonra"] is None
+                             else f" ({e['is_gunu_sonra']} işlem günü sonra)")
                           + (" — tek kaynak" if e["dogrulama"] == "tek kaynak" else "") for e in u["olaylar"])
         text = f"📅 **Önümüzdeki 15 işlem günü** ({tr_date(u['bitis'])} dahil): {items}."
     else:
@@ -410,8 +412,10 @@ def macro_block() -> None:
              if e["tarih"] else f"{e['ad']} — takvimde yok (henüz yayımlanmadı)") for e in later) + "."
     if u["bilinmeyen"]:
         text += " Bu pencerede takvimi henüz bilinmeyen: " + ", ".join(u["bilinmeyen"]) + "."
+    if u.get("tatil_notu"):
+        text += " " + u["tatil_notu"]
     st.markdown(text + " <span class='news-meta'>Faiz ve enflasyon açıklamaları tüm piyasayı oynatabilir; "
-                "resmi tatiller hesaba katılmadı.</span>", unsafe_allow_html=True)
+                "işlem günleri Borsa İstanbul tatilleri düşülerek sayıldı.</span>", unsafe_allow_html=True)
     warn = macro_calendar.stale(today)
     if warn:
         st.caption("🛠️ " + warn)

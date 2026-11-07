@@ -10,10 +10,12 @@ Kaynaklar:
 - TÜFE 2026: TÜİK Ulusal Veri Yayımlama Takvimi (2 Ocak 2026), Foreks aktarımı; Mayıs (5 Haziran) ve Eylül (5 Ekim)
   ayrıca haber kaynaklarıyla doğrulandı. Gün adları takvimdekiyle birebir tutuyor. 2027 TÜFE takvimi henüz yok.
 Saatler: PPK kararı 14:00, TÜFE 10:00 (TR saati).
-Resmi tatiller hesaba katılmaz: "işlem günü" = hafta içi gün (kaba).
+İşlem günleri Borsa İstanbul tatilleri ve yarım günleriyle sayılır (market_calendar).
 """
 from datetime import date, timedelta
 from typing import Dict, List, Optional
+
+from . import market_calendar
 
 CHECKED = "2026-11-07"
 SOURCES = {
@@ -44,22 +46,13 @@ def events() -> List[Dict]:
 
 
 def add_business_days(start: date, n: int) -> date:
-    d, left = start, n
-    while left > 0:
-        d += timedelta(days=1)
-        if d.weekday() < 5:
-            left -= 1
-    return d
+    """n işlem günü sonrası (Borsa İstanbul tatilleri hariç; market_calendar)."""
+    return market_calendar.add_trading_days(start, n)
 
 
 def business_days_between(a: date, b: date) -> int:
-    """a'dan sonra b'ye kadar (b dahil) hafta içi gün sayısı."""
-    n, d = 0, a
-    while d < b:
-        d += timedelta(days=1)
-        if d.weekday() < 5:
-            n += 1
-    return n
+    """a'dan sonra b'ye kadar (b dahil) işlem günü sayısı (tatiller hariç)."""
+    return market_calendar.trading_days_between(a, b)
 
 
 def upcoming(today: date, trading_days: int = 15) -> Dict:
@@ -72,7 +65,21 @@ def upcoming(today: date, trading_days: int = 15) -> Dict:
         if today <= d <= end:
             found.append(dict(e, is_gunu_sonra=business_days_between(today, d), bugun=d == today))
     unknown = [NAMES[k] for k, until in KNOWN_UNTIL.items() if date.fromisoformat(until) < end]
-    return {"olaylar": found, "bilinmeyen": unknown, "bitis": end.isoformat()}
+    # Borsa İstanbul tatil ve yarım günleri de pencerede gösterilir (işlem yapılamaz / seans 12:40'ta biter).
+    d = today
+    while d < end:
+        d += timedelta(days=1)
+        key = d.isoformat()
+        if key in market_calendar.CLOSED and d.weekday() < 5:
+            found.append({"tarih": key, "tur": "tatil", "ad": f"Borsa kapalı ({market_calendar.CLOSED[key]})",
+                          "saat": "tüm gün", "dogrulama": "doğrulandı", "is_gunu_sonra": None, "bugun": False})
+        elif key in market_calendar.HALF_DAYS:
+            found.append({"tarih": key, "tur": "yarim", "ad": f"Yarım gün ({market_calendar.HALF_DAYS[key]})",
+                          "saat": "12:40'ta kapanış", "dogrulama": "doğrulandı",
+                          "is_gunu_sonra": business_days_between(today, d), "bugun": False})
+    found.sort(key=lambda e: e["tarih"])
+    return {"olaylar": found, "bilinmeyen": unknown, "bitis": end.isoformat(),
+            "tatil_notu": market_calendar.coverage_note(today, end)}
 
 
 def stale(today: date, warn_days: int = 30) -> Optional[str]:

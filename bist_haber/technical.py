@@ -184,7 +184,8 @@ def data_checks(bars: List[dict], today: Optional[date] = None):
     warnings, critical = [], False
     today = today or datetime.now(config.TR_TZ).date()
     last_day = date.fromisoformat(bars[-1]["date"])
-    stale = _business_days_between(last_day, today)
+    from .market_calendar import trading_days_between  # tatiller sayılmaz (bayram sonrası yanlış "eski" uyarısı olmasın)
+    stale = trading_days_between(last_day, today)
     if stale > STALE_BUSINESS_DAYS:
         warnings.append(f"Fiyat verisi güncel değil: son fiyat {bars[-1]['date']} ({stale} iş günü önce)")
         critical = stale > 2 * STALE_BUSINESS_DAYS

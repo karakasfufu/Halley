@@ -98,8 +98,6 @@ def effective_date(published: datetime) -> str:
     Hafta içi seans kapanışından önce → aynı gün; sonra ya da hafta sonu → sonraki
     iş günü. Resmi tatiller henüz hesaba katılmıyor.
     """
-    local = published.astimezone(config.TR_TZ)
-    d = local.date()
-    if d.weekday() >= 5 or local.hour >= config.SESSION_CLOSE_HOUR:
-        return next_weekday(d).isoformat()
-    return d.isoformat()
+    # 2026-11-07: Borsa İstanbul tatilleri ve yarım günleri (12:40 kapanış) hesaba katılıyor (market_calendar).
+    from .market_calendar import effective_trading_day
+    return effective_trading_day(published.astimezone(config.TR_TZ)).isoformat()
