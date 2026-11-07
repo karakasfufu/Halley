@@ -9,7 +9,7 @@ from html import escape as esc
 import pandas as pd
 import streamlit as st
 
-from bist_haber import analyzer, config, db, pipeline, report, technical
+from bist_haber import analyzer, config, db, pipeline, report, technical, tradeplan
 
 st.set_page_config(page_title="Halley", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
 
@@ -206,6 +206,10 @@ def technical_block(t) -> None:
                  use_container_width=True)
     if t["notlar"]:
         st.caption("Notlar: " + " · ".join(t["notlar"]) + f" · {t['gun_sayisi']} işlem günü veriyle hesaplandı.")
+    for w in t.get("veri_uyarilari", []):
+        (st.error if t.get("veri_kritik") else st.warning)("Veri kontrolü: " + w)
+    if not t.get("veri_uyarilari"):
+        st.caption("✅ Veri kontrolü: fiyat güncel, sınırı aşan sıçrama ya da uzun boşluk yok.")
 
 
 def financial_block(ticker: str) -> None:
@@ -222,11 +226,52 @@ def financial_block(ticker: str) -> None:
     st.markdown("\n".join(f"- {esc(ln)}" for ln in lines))
 
 
+_PLAN_CACHE = {}
+
+
+def scenario(r: dict) -> dict:
+    """Haber + teknik + risk → SL/TP/vade senaryosu (kodla, kredi harcamaz)."""
+    if r["ticker"] not in _PLAN_CACHE:
+        imp = conn.execute("SELECT confidence, persistence, reason FROM impacts WHERE ticker=? AND direction!=0 "
+                           "ORDER BY published_at DESC LIMIT 1", (r["ticker"],)).fetchone()
+        news_info = {"score": r["score"], "direction": 1 if r["score"] > 0 else (-1 if r["score"] < 0 else 0),
+                     "confidence": imp["confidence"] if imp else None, "flags": r.get("flags", ""),
+                     "persistence": imp["persistence"] if imp else "orta",
+                     "reason": imp["reason"] if imp else "", "summary": r["last_news"]}
+        _PLAN_CACHE[r["ticker"]] = tradeplan.plan(tech(r["ticker"]), news_info)
+    return _PLAN_CACHE[r["ticker"]]
+
+
+def scenario_block(p: dict) -> None:
+    st.markdown("**🎯 İşlem senaryosu** <span class='news-meta'>(tahmini, geçmiş veriyle henüz test edilmedi; "
+                "yatırım tavsiyesi değildir)</span>", unsafe_allow_html=True)
+    if p["durum"] != "senaryo":
+        st.caption(p["neden_yok"])
+        if p["riskler"]:
+            st.markdown("Risk notları:\n" + "\n".join(f"- {esc(x)}" for x in p["riskler"]))
+        return
+    if p.get("elverissiz"):
+        st.warning("Mevcut seviyelerde risk/getiri elverişsiz: olası zarar olası kazançtan büyük.")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Referans fiyat", f"{p['giris']:.2f} TL")
+    c2.metric("Zarar durdur (SL)", f"{p['sl']:.2f} TL", f"{p['sl_%']:+.1f}%")
+    c3.metric("Kâr al (TP)", f"{p['tp']:.2f} TL", f"{p['tp_%']:+.1f}%")
+    c4.metric("Risk / getiri", f"1 : {p['rr']:.1f}" if p["rr"] else "—")
+    d1, d2 = st.columns(2)
+    d1.metric("Tahmini vade", f"{p['vade'][0]}–{p['vade'][1]} işlem günü")
+    d2.metric("Risk seviyesi", p["risk_seviyesi"].capitalize())
+    st.caption(f"SL dayanağı: {p['sl_dayanak']} · TP dayanağı: {p['tp_dayanak']}")
+    st.info(p["aciklama"])
+    if p["riskler"] or p["notlar"]:
+        st.markdown("**Risk faktörleri**\n" + "\n".join(f"- {esc(x)}" for x in p["riskler"] + p["notlar"]))
+
+
 def stock_details(r: dict) -> None:
-    """Bir hisseye tıklanınca açılan ayrıntı: haber skoru, teknik görünüm, finansal özet ve haberler."""
+    """Bir hisseye tıklanınca açılan ayrıntı: senaryo, teknik görünüm, finansal özet ve haberler."""
     pct = lambda v: "—" if v is None else f"{v:+.1f}%"
     st.caption(f"Haber skoru {r['score']:+.2f} · son 1 gün {pct(r['chg_1d'])} · son 5 gün {pct(r['chg_5d'])} · "
                f"{r['news_count']} haber. Emir vermeden önce haberin kendisini okuyun.")
+    scenario_block(scenario(r))
     technical_block(tech(r["ticker"]))
     financial_block(r["ticker"])
     st.markdown("**📰 Haberler ve analiz**")
@@ -296,7 +341,16 @@ with tab_list:
                     "52h zirveye uzaklık %": t.get("zirveye_uzaklik_%"), "Destek 20g": t.get("destek_20g"),
                     "Direnç 20g": t.get("direnc_20g"), "Günlük oynaklık %": t.get("atr_%"),
                     "Perf. 1g %": t.get("perf_1g_%"), "Perf. 5g %": t.get("perf_5g_%"),
-                    "Perf. 20g %": t.get("perf_20g_%"), "Son haber özeti": r["last_news"],
+                    "Perf. 20g %": t.get("perf_20g_%"),
+                    "Senaryo": ("elverişsiz" if scenario(r).get("elverissiz") else "var")
+                    if scenario(r)["durum"] == "senaryo" else "yok",
+                    "Referans fiyat": scenario(r).get("giris"), "Zarar durdur (SL)": scenario(r).get("sl"),
+                    "Kâr al (TP)": scenario(r).get("tp"), "Risk/getiri (1:x)": scenario(r).get("rr"),
+                    "Tahmini vade (işlem günü)": "{}–{}".format(*scenario(r)["vade"]) if scenario(r).get("vade") else "",
+                    "Risk seviyesi": scenario(r).get("risk_seviyesi", ""),
+                    "Risk faktörleri": " | ".join(scenario(r).get("riskler", [])),
+                    "Açıklama": scenario(r).get("aciklama", scenario(r).get("neden_yok", "")),
+                    "Son haber özeti": r["last_news"],
                     "Neden": last_imp["reason"] if last_imp else "",
                 })
             frame = pd.DataFrame(detail).round(2)

@@ -425,3 +425,35 @@ Kullanıcının onayladığı taslağa göre `app.py` yeniden düzenlendi; iş m
   Pilot kendi sorgusunu kullanır, etkilenmez. 1 yeni test; **81 test geçti**.
 - Gözlem: Sıradaki bazı KAP kayıtları (ör. "MERKEZİ KAYIT KURULUŞU: DÖNÜŞÜM", "BORSA İSTANBUL: Hak Kullanımı",
   borçlanma aracı ihraç limiti) rutin olabilir; kullanıcı geri bildirimiyle atlama listesine eklenebilir.
+
+## İşlem senaryosu (SL/TP, risk, vade, açıklama) ve teknik analiz doğruluğu (2026-11-07)
+Kullanıcı geri bildirimi: haberle seçim → teknik analiz → risk faktörleri → SL/TP → "neden" açıklaması → tahmini vade.
+Hepsi **kodla** hesaplanır (yapay zekâ yok, kredi harcamaz). Geçmiş veriyle HENÜZ TEST EDİLMEDİ; panelde "tahmini".
+
+**`tradeplan.py`** (yalnız olumlu haberli hisse için alım senaryosu; açığa satış yok):
+- SL: 20 günlük destek 1–3 ATR uzaktaysa desteğin %1 altı, değilse fiyat − 2×ATR; fiyatın %15'inden aşağı inmez.
+- TP: fiyatın üstündeki ilk gerçek direnç (20 gün / 60 gün / 52 hafta). Yalnız 20 günlük seviye fiyata 1 ATR'den
+  yakınsa "gürültü" sayılıp atlanır; 60 gün ve 52 hafta seviyeleri her zaman dikkate alınır. Daha uzak seviyeye
+  ATLANMAZ (aradaki direnç risk/getiriyi iyimser gösterirdi). Üstte direnç yoksa TP = 2R.
+- Risk/getiri <1 → "elverişsiz" (uyarı + risk en az "yüksek"); 1–2 → "zayıf".
+- Risk faktörleri: oynaklık ≥%5, RSI ≥70, fiyat 50g ort.+%15, hacim oranı <0,7, olumlu haber + düşüş trendi,
+  zayıf MACD, haber güveni <0,6, ⚠️ kontrol et, son gün kilit, <200 gün veri, veri uyarıları. Ağırlıklı puan →
+  düşük/orta/yüksek (elverişsiz 4, trend çelişkisi ve zayıf r/g 2, diğerleri 1).
+- Vade: haber kalıcılığı (kısa 1–5, orta 5–20, uzun 20–60 işlem günü) ve TP mesafesi / (0,5×ATR) ile genişletilir.
+- Açıklama "Neden olumlu görünüyor" dilinde; "yatırım tavsiyesi değildir" ibaresi. Program başkasına verildiği için
+  kişiye özel "al" tavsiyesi dilinden kaçınıldı (SPK yatırım danışmanlığı kapsamı).
+- Panel: hisse ayrıntısında senaryo kutuları (referans, SL, TP, r/g, vade, risk), açıklama, risk faktörleri;
+  detaylı CSV'de senaryo sütunları.
+
+**Teknik analiz doğruluğu (`technical.py`):**
+- ATR standart Wilder yöntemine, MACD sinyali tüm seri üzerinde 9 EMA'ya çevrildi.
+- Veri kontrolleri: fiyat >3 iş günü eskiyse uyarı (>6 kritik); 60 günde >10 günlük boşluk; günlük ±%10 sınırını
+  aşan sıçrama (düzeltilmemiş bölünme/bedelsiz/veri hatası şüphesi; son 60 günde ise kritik); 20 günde ≥3 hacimsiz
+  ya da tek fiyatlı gün; son 60 günde bedelsiz/bedelli/temettü haberi (seviyeler bozulmuş olabilir). Kritik veride
+  SL/TP senaryosu üretilmez. 60 günlük destek/direnç ve son gün kilit bilgisi eklendi.
+- Doğrulama: RSI StockCharts referans tablosuyla (tablo ara değerleri yuvarlıyor; sabit ~0,06 fark, algoritma doğru);
+  SMA/MACD/sinyal/ATR/RSI/seviyeler pandas ile bağımsız hesapla birebir (sentetik seri). **46 gerçek BIST hissesinde**
+  pandas ile fark 0; kritik veri sorunu yok, 2 hissede uyarı. Senaryo dağılımı (aynı varsayımsal haberle): 13 elverişsiz,
+  19 zayıf, 14 iyi; medyan r/g ~1:1,4 — iyimser değil.
+- Testler: `tests/test_technical_reference.py` (19 test). Python 3.9.13 ile **112 test geçti**.
+- Sonraki doğrulama önerisi: geçmiş veri pilotuna "TP mi önce geldi, SL mi?" ölçümü eklenmeli.
