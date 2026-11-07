@@ -180,6 +180,90 @@ class StoreTests(unittest.TestCase):
 
 
 
+FROTO_KAR = """Konunun Gündemde Yer Aldığı Genel Kurul Tarihi
+24.11.2026
+Nakit Kar Payı Ödeme Şekli
+Peşin
+Nakit Kar Payı Ödeme Tutar ve Oranları
+FROTO, TRAOTOSN91H6
+Peşin
+3,0700000
+307
+15
+2,6095000
+260,95
+Kar Payı Ödeme Tarihleri
+Ödeme
+Teklif Edilen
+Nakit Kar Payı Hak Kullanım Tarihi (1)
+Kesinleşen
+Nakit Kar Payı Hak Kullanım Tarihi (2)
+Ödeme Tarihi (3)
+Kayıt Tarihi (4)
+Peşin
+26.11.2026
+30.11.2026
+27.11.2026
+(1) Kar payının şirket tarafından ödeneceği ve payın kar payı hakkı bulunmadan işlem görmeye başlayacağı tarih (teklif edilen).
+Pay Olarak Kar Payı Ödeme Tutar ve Oranları"""
+
+SDTTR_TABLE = """B Grubu, SDTTR, TRESDTT00013
+1. Taksit
+0,0082909
+B Grubu, SDTTR, TRESDTT00013
+2. Taksit
+0,0082909
+B Grubu, SDTTR, TRESDTT00013
+TOPLAM
+0,0165818
+Kar Payı Ödeme Tarihleri
+Ödeme
+Teklif Edilen
+Nakit Kar Payı Hak Kullanım Tarihi (1)
+Kesinleşen
+Nakit Kar Payı Hak Kullanım Tarihi (2)
+Ödeme Tarihi (3)
+Kayıt Tarihi (4)
+1. Taksit
+25.11.2026
+27.11.2026
+26.11.2026
+2. Taksit
+23.12.2026
+25.12.2026
+24.12.2026
+(1) ...
+Pay Olarak Kar Payı Ödeme Tutar ve Oranları"""
+
+
+class PaymentTableTests(unittest.TestCase):
+    """Gerçek dolu tablolar (2026-11-07). MCARD 23.10.2026 hak kullanımı ve 2,5711 TL brüt tutarı Yahoo temettü
+    kaydıyla birebir aynı çıktı."""
+
+    def test_single_group_company_and_ex_date(self):  # FROTO: tek gruplu satır "FROTO, TRA..."
+        e = [x for x in C.parse_notice("Kar Payı Dağıtım İşlemlerine İlişkin Bildirim", FROTO_KAR, ["FROTO"], "t", "n")]
+        hak = next(x for x in e if x["tur"] == "temettu_hak")
+        self.assertEqual((hak["tarih"], hak["brut_tl"]), ("2026-11-26", 3.07))
+        self.assertEqual(next(x for x in e if x["tur"] == "temettu_odeme")["tarih"], "2026-11-30")
+
+    def test_instalments_each_row(self):
+        e = C.parse_notice("Kar Payı Dağıtım İşlemlerine İlişkin Bildirim", SDTTR_TABLE, ["SDTTR"], "t", "n")
+        hak = [(x["tarih"], x["brut_tl"]) for x in e if x["tur"] == "temettu_hak"]
+        self.assertEqual(hak, [("2026-11-25", 0.0082909), ("2026-12-23", 0.0082909)])
+
+    def test_inconsistent_order_is_not_labelled(self):
+        bad = FROTO_KAR.replace("26.11.2026\n30.11.2026\n27.11.2026", "30.11.2026\n26.11.2026\n27.11.2026")
+        e = C.parse_notice("Kar Payı Dağıtım İşlemlerine İlişkin Bildirim", bad, ["FROTO"], "t", "n")
+        self.assertFalse(any(x["tur"] == "temettu_hak" for x in e))
+        self.assertTrue(any(x["tur"] == "temettu_tarih" for x in e))   # tarihler "bildirimi açın" notuyla kalır
+
+    def test_dividend_risk_line_with_yield(self):
+        e = C.parse_notice("Kar Payı Dağıtım İşlemlerine İlişkin Bildirim", FROTO_KAR, ["FROTO"], "t", "n")
+        up = {"yaklasan": [x for x in e if x["tur"] == "temettu_hak"], "yakin_gecmis": []}
+        r = C.risk_lines(up, price=73.15)
+        self.assertTrue(any("26.11" in x and "%4.2" in x for x in r), r)
+
+
 class PlanIntegrationTests(unittest.TestCase):
     def test_price_adjustment_weighs_two_points(self):
         from bist_haber import tradeplan

@@ -12,12 +12,16 @@ from bist_haber import calendar_sync as S, config, macro_calendar as M
 FIX = Path(__file__).parent / "fixtures"
 TCMB_HTML = (FIX / "tcmb_takvim_2026-11-07.html").read_text(encoding="utf-8")
 FED_HTML = (FIX / "fed_fomc_2026-11-07.html").read_text(encoding="utf-8")
+TUIK_DAYS = json.loads((FIX / "tuik_takvim_2026-11-07.json").read_text(encoding="utf-8"))  # gerçek cevaplar
 NOW = datetime(2026, 11, 7, 12, 0, tzinfo=config.TR_TZ)
 
 
 class FakeResp:
-    def __init__(self, text, status=200):
-        self.text, self.status = text, status
+    def __init__(self, text, status=200, data=None):
+        self.text, self.status, self._data = text, status, data
+
+    def json(self):
+        return self._data
 
     def raise_for_status(self):
         if self.status >= 400:
@@ -25,7 +29,15 @@ class FakeResp:
 
 
 def fake_get(pages):
-    def get(url, headers=None, timeout=None):
+    def get(url, headers=None, timeout=None, params=None):
+        if params is not None:  # TÜİK günlük takvim: yalnız kaydedilmiş günler; diğer günler boş liste
+            if url not in pages:
+                return FakeResp("", 404)
+            day = params["value"]
+            data = pages[url].get(day, [])
+            if day == "03/11/2026":  # Ekim TÜFE (3 Kasım) için gerçek kaydın aynısı
+                data = [dict(TUIK_DAYS["03/12/2026"][0], donemi="Ekim 2026", g_TARIH="2026-11-03T10:00:00")]
+            return FakeResp("", 200, data)
         v = pages.get(url)
         if isinstance(v, Exception):
             raise v
@@ -77,10 +89,14 @@ class ParseTests(unittest.TestCase):
 
 class CheckTests(Isolated):
     def test_check_saves_official_data_and_tags_events(self):
-        r = S.check(get=fake_get({S.TCMB_URL: TCMB_HTML, S.FED_URL: FED_HTML}), now=NOW)
+        r = S.check(get=fake_get({S.TCMB_URL: TCMB_HTML, S.FED_URL: FED_HTML, S.TUIK_URL: TUIK_DAYS}), now=NOW)
         self.assertEqual(r["tcmb"], {"durum": "güncel", "farklar": []})
         self.assertEqual(r["fed"], {"durum": "güncel", "farklar": []})
-        self.assertEqual(len(r["elle"]), 2)
+        self.assertEqual(r["tuik"], {"durum": "güncel", "farklar": []})
+        self.assertEqual(len(r["elle"]), 1)                       # yalnız Borsa İstanbul elle
+        self.assertEqual(S.load()["sources"]["tuik"]["kapsam_sonu"], "2026-12-31")  # Ocak 2027 TÜİK'te henüz yok
+        e = next(e for e in M.events() if e["tarih"] == "2026-12-03" and e["tur"] == "tufe")
+        self.assertEqual(e["dogrulama"], "resmi sayfadan kontrol edildi")
         saved = json.loads(S.state_file().read_text(encoding="utf-8"))
         self.assertEqual(saved["sources"]["tcmb"]["url"], S.TCMB_URL)
         e = next(e for e in M.events() if e["tarih"] == "2026-12-10" and e["tur"] == "ppk")
@@ -104,7 +120,7 @@ class CheckTests(Isolated):
         self.assertIn("2026-12-10", M.lists()["ppk"])
 
     def test_no_saved_state_uses_builtin(self):
-        self.assertEqual(M.lists()["official"], {"tcmb": False, "fed": False})
+        self.assertEqual(M.lists()["official"], {"tcmb": False, "fed": False, "tuik": False})
         self.assertTrue(S.due(NOW))
 
     def test_due_after_24_hours(self):
@@ -126,6 +142,29 @@ class ViopAndRatingTests(unittest.TestCase):
 
 
 
+class TuikTests(unittest.TestCase):
+    def test_real_tuik_response_parsed(self):
+        self.assertEqual(S.parse_tuik_day(TUIK_DAYS["03/12/2026"]), [("2026-12-03", "Kasım 2026", "10:00")])
+        self.assertEqual(S.parse_tuik_day(TUIK_DAYS["04/12/2026"]), [])
+
+    def test_unapproved_or_other_bulletins_ignored(self):
+        x = dict(TUIK_DAYS["03/12/2026"][0], g_ONAY=0)
+        self.assertEqual(S.parse_tuik_day([x, TUIK_DAYS["03/12/2026"][1]]), [])   # ÜFE alınmaz
+
+    def test_bad_structure_rejected(self):
+        with self.assertRaises(S.ParseError):
+            S.parse_tuik_day({"hata": 1})
+        with self.assertRaises(S.ParseError):
+            S.parse_tuik_day([{"x": 1}])
+        with self.assertRaises(S.ParseError):
+            S.parse_tuik_day([dict(TUIK_DAYS["03/12/2026"][0], g_TARIH="2026-12-05T10:00:00")])  # cumartesi
+
+    def test_diff_against_builtin(self):
+        self.assertEqual(M.diff_with_builtin("tuik", [("2026-12-03", "Kasım 2026", "10:00")]), [])
+        d = M.diff_with_builtin("tuik", [("2026-12-04", "Kasım 2026", "10:00")])
+        self.assertTrue(any("2026-12-04" in x for x in d) and any("2026-12-03" in x for x in d))
+
+
 class PanelTests(Isolated):
     def test_auto_check_on_open_and_button(self):
         import os
@@ -136,7 +175,7 @@ class PanelTests(Isolated):
 
         def fake_check(get=None, now=None):
             calls.append(1)
-            return real_check(get=fake_get({S.TCMB_URL: TCMB_HTML, S.FED_URL: FED_HTML}), now=now)
+            return real_check(get=fake_get({S.TCMB_URL: TCMB_HTML, S.FED_URL: FED_HTML, S.TUIK_URL: TUIK_DAYS}), now=now)
 
         root = Path(self.tmp.name)
         env = {k: v for k, v in os.environ.items() if k != "HALLEY_OFFLINE"}

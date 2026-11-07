@@ -10,8 +10,8 @@ from html import escape as esc
 import pandas as pd
 import streamlit as st
 
-from bist_haber import (analyzer, calendar_sync, config, corp_events, db, earnings, entries, macro_calendar,
-                        pipeline, report, technical, tradeplan)
+from bist_haber import (analyzer, calendar_sync, config, corp_events, db, earnings, entries, kap_history,
+                        macro_calendar, pipeline, report, technical, tradeplan)
 
 st.set_page_config(page_title="Halley", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
 
@@ -557,7 +557,8 @@ with tab_adv:
     st.markdown("#### Durum")
     counts = dict(conn.execute("SELECT status, COUNT(*) FROM news GROUP BY status").fetchall())
     labels = {"new": "Analiz bekliyor", "analyzed": "Analiz edildi", "filtered_out": "Önemsiz bulundu (ön eleme)",
-              "skipped": "Atlandı (rutin/ilgisiz/eski)", "error": "Hata"}
+              "skipped": "Atlandı (rutin/ilgisiz/eski)", "error": "Hata",
+              "context": "Takvim için alındı (analiz edilmez)"}
     legacy_empty = conn.execute("SELECT COUNT(*) FROM news WHERE source='kap' AND status='analyzed' "
                                 "AND LENGTH(TRIM(COALESCE(body,''), char(9)||char(10)||char(13)||' '))=0").fetchone()[0]
     if legacy_empty:
@@ -607,6 +608,26 @@ with tab_adv:
             rows_cal.append({"Kaynak": item.split(" (")[0], "Durum": "elle kontrol gerekir",
                              "Ayrıntı": item.split(" (", 1)[1].rstrip(")") if " (" in item else ""})
         st.dataframe(pd.DataFrame(rows_cal), hide_index=True, use_container_width=True)
+
+    st.divider()
+    st.markdown("#### 📥 Takvim için KAP geçmişi")
+    ctx_total = conn.execute("SELECT COUNT(*) FROM news WHERE status='context'").fetchone()[0]
+    ctx_missing = conn.execute("SELECT COUNT(*) FROM news WHERE status='context' AND body IS NULL").fetchone()[0]
+    st.caption("Bilanço durumu ve şirket olayları (genel kurul, kâr payı, sermaye artırımı) için son 45 günün KAP "
+               "bildirimlerini alır. Yapay zekâ KULLANMAZ, kredi harcamaz; kayıtlar analiz sırasına girmez. KAP bekleme "
+               "süresi korunur (birkaç dakika sürebilir). KAP sınır uygularsa kalan sayfalar sonraki basışta tamamlanır.")
+    st.write(f"Kayıtlı takvim bildirimi: {ctx_total} · form alanları okunmayı bekleyen: {ctx_missing}")
+    if st.button("📥 Takvim için KAP geçmişini al (son 45 gün, ücretsiz)", key="kap_history"):
+        bar = st.progress(0.0, text="Başlıyor...")
+        try:
+            res = kap_history.backfill(conn, uni, days=45, progress=lambda m, p_: bar.progress(min(1.0, p_), text=m))
+            msg = (f"{res['eklenen']} yeni takvim bildirimi, {res['metin_alinan']} olay sayfası okundu"
+                   + (f"; {res['metin_bekleyen']} sayfa bekliyor" if res["metin_bekleyen"] else "") + ".")
+            (st.warning if res["kap_siniri"] else st.success)(
+                msg + (" KAP istek sınırı uyguladı; birkaç dakika sonra tekrar basın." if res["kap_siniri"] else ""))
+        except Exception as e:
+            conn.rollback()
+            st.error(f"KAP geçmişi alınamadı: {e}")
 
     st.divider()
     st.markdown("#### 🧪 Ucuz test analizi")

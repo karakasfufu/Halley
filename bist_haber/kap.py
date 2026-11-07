@@ -248,7 +248,15 @@ def collect(conn, universe: Dict[str, str], days: int = 1, fetch_bodies: bool = 
     now = datetime.now(config.TR_TZ).isoformat(timespec="seconds")
     for it in items:
         news_id = f"kap:{it['disclosureIndex']}"
-        if conn.execute("SELECT 1 FROM news WHERE id=?", (news_id,)).fetchone():
+        existing = conn.execute("SELECT status FROM news WHERE id=?", (news_id,)).fetchone()
+        if existing:
+            if existing["status"] == "context":
+                # Takvim için (analiz edilmeden) saklanmış bildirim günlük pencereye girdi: normal sıraya al.
+                skip = any(s in (it.get("subject") or "") for s in config.KAP_SKIP_SUBJECTS)
+                conn.execute("UPDATE news SET status=?, note=?, body=? WHERE id=?",
+                             ("skipped" if skip else "new", "konu listesi" if skip else None, "" if skip else None,
+                              news_id))
+                stats["new"] += 1
             continue
         tickers = [t for t in _tickers(it) if t in universe]
         if not tickers:

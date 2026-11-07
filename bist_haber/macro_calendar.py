@@ -107,6 +107,7 @@ def lists() -> Dict:
     """Yerleşik + resmi (otomatik kontrol) birleşik takvim ve kapsam sonları."""
     src = _official()
     tcmb, fed = (src.get("tcmb") or {}).get("data"), (src.get("fed") or {}).get("data")
+    tuik = (src.get("tuik") or {}).get("data")
     known = dict(BUILTIN_KNOWN_UNTIL)
     t_until = _month_end(tcmb["ppk"][-1]) if tcmb else None
     if t_until:
@@ -118,13 +119,20 @@ def lists() -> Dict:
     builtin_fomc = {d: sep for d, sep in FOMC}
     fomc_dates = _merge(list(builtin_fomc), [d for d, _ in fed] if fed else None, f_until)
     fed_sep = {d: sep for d, sep in fed} if fed else {}
+    tufe_period = dict(TUFE)
+    if tuik:  # TÜİK resmi takvimi: bulunan dönemler yerleşik listenin önüne geçer
+        tufe_period.update({d: p for d, p, _ in tuik})
+        until = (src.get("tuik") or {}).get("kapsam_sonu")
+        if until:
+            known["tufe"] = max(known["tufe"], until)
     return {
         "ppk": _merge([d for d, _ in PPK], tcmb and tcmb["ppk"], t_until),
         "ozet": _merge(PPK_OZET, tcmb and tcmb["ozet"], t_until),
         "er": _merge(ENFLASYON_RAPORU, tcmb and tcmb["er"], t_until),
         "fir": _merge(FINANSAL_ISTIKRAR, tcmb and tcmb["fir"], t_until),
         "fomc": [(d, fed_sep.get(d, builtin_fomc.get(d, False))) for d in fomc_dates],
-        "known": known, "official": {"tcmb": bool(tcmb), "fed": bool(fed)},
+        "tufe": sorted(tufe_period.items()),
+        "known": known, "official": {"tcmb": bool(tcmb), "fed": bool(fed), "tuik": bool(tuik)},
     }
 
 
@@ -136,6 +144,15 @@ def diff_with_builtin(name: str, data) -> List[str]:
         pairs = (("PPK kararı", [d for d, _ in PPK], data["ppk"]), ("PPK özeti", PPK_OZET, data["ozet"]),
                  ("Enflasyon Raporu", ENFLASYON_RAPORU, data["er"]),
                  ("Finansal İstikrar Raporu", FINANSAL_ISTIKRAR, data["fir"]))
+    elif name == "tuik":
+        found = {d for d, _, _ in data}
+        months = {d[:7] for d in found}
+        b = {d for d, _ in TUFE if d[:7] in months}       # yalnız TÜİK'te kaydı bulunan aylar karşılaştırılır
+        if found - b:
+            out.append("TÜFE: resmi takvimde yeni/değişen tarih: " + ", ".join(sorted(found - b)))
+        if b - found:
+            out.append("TÜFE: yerleşik takvimde olup resmi takvimde olmayan: " + ", ".join(sorted(b - found)))
+        return out
     else:
         until = data[-1][0][:4] + "-12-31"
         pairs = (("Fed kararı", [d for d, _ in FOMC], [d for d, _ in data]),)
@@ -156,7 +173,7 @@ def events() -> List[Dict]:
     out = [{"tarih": d, "tur": "ppk", "ad": "TCMB faiz kararı (PPK)", "saat": "14:00", "dogrulama": tag("tcmb")}
            for d in L["ppk"]]
     out += [{"tarih": d, "tur": "tufe", "ad": f"TÜİK enflasyon (TÜFE, {period} verisi)", "saat": "10:00",
-             "dogrulama": "doğrulandı"} for d, period in TUFE]
+             "dogrulama": tag("tuik")} for d, period in L["tufe"]]
     out += [{"tarih": d, "tur": "er", "ad": "TCMB Enflasyon Raporu (enflasyon tahminleri)", "saat": "",
              "dogrulama": tag("tcmb")} for d in L["er"]]
     out += [{"tarih": d, "tur": "fir", "ad": "TCMB Finansal İstikrar Raporu", "saat": "", "dogrulama": tag("tcmb")}
@@ -221,7 +238,7 @@ def stale(today: date, warn_days: int = 30) -> Optional[str]:
     if not soon:
         return None
     return ("Makro takvimin sonu yaklaştı ya da geçti: " + ", ".join(soon) + ". TCMB ve Fed tarihleri "
-            "'Takvimi kontrol et' ile resmi sayfalardan yenilenir; diğerleri (TÜFE, kredi notu) yayımlanınca "
+            "'Takvimi kontrol et' ile resmi sayfalardan yenilenir; TÜFE de TÜİK takviminden; kredi notu yayımlanınca "
             "bist_haber/macro_calendar.py dosyasına elle eklenmeli (tarihler tahmin edilmez).")
 
 

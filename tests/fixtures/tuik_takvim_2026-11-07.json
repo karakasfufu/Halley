@@ -1,0 +1,51 @@
+{
+ "03/12/2026": [
+  {
+   "id": 58299,
+   "hB_ID": 12,
+   "adi": "Tüketici Fiyat Endeksi",
+   "birimi": "TÜKETİCİ FİYATLARI GRUP BAŞKANLIĞI",
+   "donemi": "Kasım 2026",
+   "tablO_SAYISI": 5,
+   "g_TARIH": "2026-12-03T10:00:00",
+   "usT_GRUP": null,
+   "dad": "0240000",
+   "gad": "0240200",
+   "tad": "0240200",
+   "sorumlU_KURUM": "Türkiye İstatistik Kurumu",
+   "sorumlU_KURUM_KISA": "TÜİK",
+   "iC_DIS": "0",
+   "link": "https://veriportali.tuik.gov.tr/tr/press/58299",
+   "riP_UST_GRUP": "6",
+   "riP_ALT_GRUP": null,
+   "sorumlU_KURUM_KOD": null,
+   "d_TARIH": null,
+   "g_ONAY": 1
+  },
+  {
+   "id": 58036,
+   "hB_ID": 13,
+   "adi": "Yurt İçi Üretici Fiyat Endeksi",
+   "birimi": "ÜRETİCİ FİYATLARI GRUP BAŞKANLIĞI",
+   "donemi": "Kasım 2026",
+   "tablO_SAYISI": 3,
+   "g_TARIH": "2026-12-03T10:00:00",
+   "usT_GRUP": null,
+   "dad": "0170000",
+   "gad": "0170700",
+   "tad": "0170700",
+   "sorumlU_KURUM": "Türkiye İstatistik Kurumu",
+   "sorumlU_KURUM_KISA": "TÜİK",
+   "iC_DIS": "0",
+   "link": "https://veriportali.tuik.gov.tr/tr/press/58036",
+   "riP_UST_GRUP": "6",
+   "riP_ALT_GRUP": null,
+   "sorumlU_KURUM_KOD": null,
+   "d_TARIH": null,
+   "g_ONAY": 1
+  }
+ ],
+ "04/12/2026": [],
+ "05/01/2027": [],
+ "04/01/2027": []
+}

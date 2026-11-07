@@ -9,3 +9,4 @@ data/backtest/
 .pytest_cache/
 data/ayarlar.json
 data/takvim_guncel.json
+data/yedek/

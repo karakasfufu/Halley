@@ -4,8 +4,10 @@ açılışta otomatik kontrol").
 Kullanıcının bilgisayarından erişilebilen RESMİ sayfalar okunur:
 - TCMB "PPK toplantıları ve rapor takvimi" tablosu → PPK kararı, PPK özeti, Enflasyon Raporu, Finansal İstikrar Raporu
 - federalreserve.gov FOMC takvimi → Fed karar günleri ve projeksiyonlu toplantılar
-Otomatik okunamayanlar (elle kontrol gerekir): Borsa İstanbul tatilleri (site bağlantıyı reddediyor), TÜİK TÜFE
-takvimi (sayfa tarayıcıda JavaScript ile yükleniyor).
+- TÜİK ana sitesinin takvim verisi (www.tuik.gov.tr/Home/GetTakvim, gün gün JSON) → TÜFE açıklama günü ve saati.
+  Sitenin kendi takvim kutusu bu adresi kullanıyor (js/main.min.js, 2026-11-07). Her ayın ilk 10 günündeki iş günleri
+  taranır (2026'da TÜFE her ay 3–5'inde); bulunamazsa "takvimde yok" denir, tarih tahmin edilmez.
+Otomatik okunamayan (elle kontrol gerekir): Borsa İstanbul tatilleri (site bağlantıyı reddediyor).
 
 Güvenlik: sayfa yapısı beklenenden farklıysa ya da herhangi bir tarih okunamazsa O KAYNAK İÇİN HİÇBİR ŞEY
 DEĞİŞTİRİLMEZ ("kontrol edilemedi"). Tarih tahmin edilmez. Sonuç data/takvim_guncel.json'a yazılır; yerleşik
@@ -33,6 +35,9 @@ EN_MONTHS = {m: i for i, m in enumerate(["january", "february", "march", "april"
 TCMB_COLUMNS = ["Para Politikası Kurulu Toplantı Kararı", "Para Politikası Kurulu Toplantı Özeti", "Enflasyon Raporu",
                 "Finansal İstikrar Raporu"]
 TCMB_KINDS = ["ppk", "ozet", "er", "fir"]
+TUIK_URL = "https://www.tuik.gov.tr/Home/GetTakvim/"
+TUIK_MONTHS_AHEAD = 3
+TUIK_SCAN_DAYS = 10
 
 
 class ParseError(ValueError):
@@ -122,6 +127,51 @@ def parse_fed(html: str) -> List[Tuple[str, bool]]:
     return sorted(out)
 
 
+def parse_tuik_day(items) -> List[Tuple[str, str, str]]:
+    """TÜİK günlük takvim JSON'u → [(tarih, dönem, saat)] yalnız onaylı "Tüketici Fiyat Endeksi"."""
+    if not isinstance(items, list):
+        raise ParseError("TÜİK takvim cevabı liste değil")
+    out = []
+    for x in items:
+        if not isinstance(x, dict) or "adi" not in x or "g_TARIH" not in x:
+            raise ParseError("TÜİK takvim kaydının yapısı beklenenden farklı")
+        if x["adi"].strip() == "Tüketici Fiyat Endeksi" and x.get("g_ONAY") == 1:
+            t = datetime.fromisoformat(x["g_TARIH"])
+            if t.weekday() >= 5:
+                raise ParseError(f"TÜFE tarihi hafta sonu: {t}")
+            if not re.fullmatch(r"\w+ \d{4}", (x.get("donemi") or "").strip()):
+                raise ParseError(f"TÜFE dönemi okunamadı: {x.get('donemi')!r}")
+            out.append((t.date().isoformat(), x["donemi"].strip(), t.strftime("%H:%M")))
+    return out
+
+
+def fetch_tuik(get: Callable, today: date) -> Dict:
+    """Önümüzdeki aylar için TÜFE açıklama günü. {"data": [(tarih, dönem, saat)], "aylar": [taranan ay sonu...]}."""
+    found, scanned = [], []
+    y, m = today.year, today.month
+    for _ in range(TUIK_MONTHS_AHEAD + 1):
+        hit = None
+        for day in range(1, TUIK_SCAN_DAYS + 1):
+            d = date(y, m, day)
+            if d.weekday() >= 5:
+                continue
+            r = get(TUIK_URL, params={"value": d.strftime("%d/%m/%Y"), "dilId": 1},
+                    headers=dict(HEADERS, **{"X-Requested-With": "XMLHttpRequest"}), timeout=TIMEOUT)
+            r.raise_for_status()
+            rows = parse_tuik_day(r.json())
+            if rows:
+                hit = rows
+                break
+        last = (date(y + (m == 12), 1 if m == 12 else m + 1, 1) - timedelta(days=1)).isoformat()
+        if hit:
+            found += hit
+            scanned.append(last)
+        else:
+            break  # bu ayın takvimi yok (ör. yeni yıl takvimi yayımlanmadı): sonrası da bilinmez
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    return {"data": found, "kapsam_sonu": scanned[-1] if scanned else None}
+
+
 def _fetch(url: str, get: Callable) -> str:
     r = get(url, headers=HEADERS, timeout=TIMEOUT)
     r.raise_for_status()
@@ -161,8 +211,16 @@ def check(get: Optional[Callable] = None, now: Optional[datetime] = None) -> Dic
             continue
         state["sources"][name] = {"data": data, "fetched_at": now.isoformat(), "url": url}
         report[name] = {"durum": "güncel", "farklar": macro_calendar.diff_with_builtin(name, data)}
-    report["elle"] = ["Borsa İstanbul tatil/yarım gün takvimi (site otomatik erişimi reddediyor)",
-                      "TÜİK TÜFE yayın takvimi (sayfa JavaScript ile yükleniyor)"]
+    try:
+        tuik = fetch_tuik(get, now.date())
+        if not tuik["data"]:
+            raise ParseError("TÜİK takviminde bu ay ve sonrası için TÜFE kaydı bulunamadı")
+        state["sources"]["tuik"] = {"data": tuik["data"], "kapsam_sonu": tuik["kapsam_sonu"],
+                                    "fetched_at": now.isoformat(), "url": TUIK_URL}
+        report["tuik"] = {"durum": "güncel", "farklar": macro_calendar.diff_with_builtin("tuik", tuik["data"])}
+    except Exception as e:
+        report["tuik"] = {"durum": "kontrol edilemedi", "neden": str(e)[:200]}
+    report["elle"] = ["Borsa İstanbul tatil/yarım gün takvimi (site otomatik erişimi reddediyor)"]
     state["report"] = report
     path = state_file()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -188,7 +246,8 @@ def summary_line() -> str:
         return "Takvim henüz resmi kaynaklardan kontrol edilmedi (yerleşik takvim kullanılıyor)."
     t = datetime.fromisoformat(st["checked_at"])
     rep = st.get("report", {})
-    parts = [f"{label}: {rep.get(k, {}).get('durum', '—')}" for k, label in (("tcmb", "TCMB"), ("fed", "Fed"))]
+    parts = [f"{label}: {rep.get(k, {}).get('durum', '—')}" for k, label in (("tcmb", "TCMB"), ("fed", "Fed"),
+                                                                                  ("tuik", "TÜİK"))]
     return f"Takvim son kontrol {t:%d.%m %H:%M} · " + " · ".join(parts)
 
 

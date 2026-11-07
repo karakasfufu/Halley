@@ -656,3 +656,27 @@ kayıtlarıyla BİREBİR aynı.
 Risk: vade (15 işlem günü) içinde fiyat düzeltmesi 2 puan; kâr payı süreci (brüt TL ve fiyata oranı) ve genel kurul
 1'er puan. Panel: hisse ayrıntısında "🗓️ Şirket olayları", CSV "Şirket olayları". Canlı listede (4 hisse) kayıtlı olay
 yok. Sınır: yalnız kayıtlı bildirimler (ayar 1 gün → kısa pencere). **237 test geçti.**
+
+## 2026-11-07 — Takvim için KAP geçmişi (kullanıcı onayı) ve TÜİK TÜFE otomatik okuma
+
+**KAP geçmişi (`kap_history.py`):** son 45 gün listelendi (12.899 bildirim, 33 sn). Yalnız takvim konuları
+saklandı (1.426): Finansal Rapor, Sorumluluk Beyanı/Faaliyet Raporu (konsolide bilgisi; metin çekilmez) ve olay
+bildirimleri (GK, kâr payı, sermaye artırımı; yalnız ana sayfa, EK İNDİRİLMEZ). status='context' → yapay zekâ
+kuyruğuna girmez (kuyruk 87 → 87, kredi harcanmadı). Günlük güncelleme aynı bildirimi kendi penceresinde görürse
+normal sıraya alır (kap.collect). 213 olay sayfasından 100'ü okundu, sonra KAP istek sınırı uyguladı → tur kuralına
+göre bırakıldı; 113 sayfa Gelişmiş → "📥 Takvim için KAP geçmişini al" ile tamamlanacak (kaldığı yerden).
+Canlı veriye aktarım: önce yedek `data/yedek/bist_haber_2026-11-07_oncesi_kap_gecmisi.db`; INSERT OR IGNORE ile
++1.420 satır (6'sı zaten vardı), integrity ok.
+**Etkisi:** bilanço durumu 761 şirketin 753'ünde "bilinmiyor" iken → 398 açıklandı, 363 açıklanmadı (tam kapsam);
+konsolide bilgisi 398 şirkette. 15 iş günü içinde 39 şirket olayı. FROTO: 24.11 olağanüstü GK, 26.11 kâr payı hak
+kullanımı (brüt 3,07 TL ≈ fiyatın %4,2'si) → risk "yüksek".
+**Kâr payı ödeme tablosu çözüldü:** 6 gerçek dolu örnek; sütunlar teklif/kesinleşen hak kullanım, ödeme, kayıt (boş
+hücre düşer). Kural: 3 tarih → (hak, ödeme, kayıt), 4 → kesinleşen; hak ≤ kayıt ≤ ödeme değilse etiketlenmez.
+**Doğrulama:** MCARD 23.10.2026 hak kullanımı ve 2,5711 TL brüt → Yahoo temettü kaydıyla birebir. Yakalanan hata:
+tek gruplu şirketlerde ("OYAKC, TRA...") tutar okunmuyordu → düzeltildi (25 bildirimde okunamayan tutar kalmadı).
+
+**TÜİK TÜFE otomatik (kullanıcı isteği):** TÜİK ana sitesinin takvim kutusu `www.tuik.gov.tr/Home/GetTakvim/
+?value=GG/AA/YYYY&dilId=1` adresinden gün gün JSON alıyor (js/main.min.js). Yalnız onaylı (g_ONAY=1) "Tüketici
+Fiyat Endeksi" kayıtları; her ayın ilk 10 günündeki iş günleri taranır; bulunamayan ay ve sonrası "takvimde yok".
+Canlı: 3 Kasım ve 3 Aralık 2026 10:00 yerleşik takvimle aynı; Ocak 2027 henüz yok. Artık elle kontrol gereken tek
+kaynak Borsa İstanbul tatilleri. Testler gerçek cevaplarla (kişisel iletişim alanları çıkarıldı). **250 test geçti.**
