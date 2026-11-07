@@ -892,3 +892,27 @@ fiyattan bağımsız hesapla birebir aynı. Hepsi "haber yok": canlı veritaban�
 (beklenen). Not: yeniden kurulumda sonradan yapılmış analizler kalabilirdi; canlıda kararlar kayıttan okunduğu için bu
 sorun yok. 343 test, ağsız 0 bağlantı.
 **Sırada:** W5 — geçmiş raporlarla eğilim (kaynak, strateji, filtre, tekrar eden nedenler) ve onay bekleyen öneri listesi.
+
+## 2026-11-07 — W5: gelişim takibi ve onay bekleyen öneriler (`bist_haber/trends.py`, 🧭 Gelişim sekmesi)
+Kullanıcı isteği bölüm 4'ün soruları, yalnız kayıtlı veriden (yapay zekâ yok):
+- **Haber kaynağı / strateji / risk seviyesi:** kapanmış sanal işlemler gruplanır (işlem, kazanma %, ort. R, ort. net %);
+  kaynak = sinyal günündeki son olumlu haber etkisinin kaynağı (KAP / site adı).
+- **Hangi filtre fazla fırsat eliyor:** `missed_day_stats` (yeni, yalnız eklenir): penceresi tamamlanan her karar
+  gününde neden başına değerlendirilen / kaçırılan sayısı. Nedenin kaçırma oranı diğerleriyle iki-oran z testiyle
+  karşılaştırılır (Wilson güven aralığı gösterilir).
+- **Tekrar eden nedenler:** `missed_log` son 28 gün / önceki 28 gün. **Zamanla iyileşme:** haftalık + son 30 / önceki 30.
+**Öneri kuralları** (eşik değil, yeterli örnek + anlamlı fark şartı — "küçük pilotla eşik değiştirme"):
+filtre (≥ 200 hisse-gün, ≥ 10 kaçırılan, z ≥ 2,58 ve oran ≥ 1,5 × diğerleri); strateji/kaynak (≥ 30 kapanmış işlem
+ve ort. R'nin %95 üst sınırı < 0); kapsam (son 10 çalıştırmanın ≥ 5'inde analiz bekleyen pay ≥ %30); eşleştirme (≥ 3
+hissede başlıkta kod geçen eşleşmemiş haber); haber sonra geldi (≥ 5). "Haber yok" bir filtre değildir, önerilmez.
+**Onay akışı:** `suggestions` tablosu; metin/kanıt değiştirilemez, karar YALNIZ BİR KEZ (onaylandı/reddedildi + not),
+silinemez. Aynı öneri beklerken ya da 30 gün içinde karar verildiyse yeniden eklenmez. **Onay hiçbir ayarı
+değiştirmez** (testle doğrulandı: ayar dosyası bayt bayt aynı); ayar önerisini kullanıcı Ayarlar'dan değiştirir, kural
+önerisi geliştirme listesine girer. Akşam analizi önerileri günceller; bölüm 10'a gelişim özeti eklenir.
+**Test yalıtım hatası düzeltildi:** yeni bir test `pipeline.SETTINGS_FILE` modül yüklenirken sabitlendiği için tüm
+testler birlikte çalışınca geliştirme klasöründeki ayar dosyasına yazıyordu (içerik değişmedi; panel klasörüne
+dokunulmadı). Test artık geçici dosyaya yönlendiriyor; ayar dosyasının değiştirilme zamanı testlerden sonra aynı.
+**Gerçek veri:** canlı veride henüz kapanmış sanal işlem ve tamamlanmış karar penceresi yok → öneri üretilmiyor (beklenen).
+27.10 yeniden kurulmuş test kopyasında akşam akışı: `missed_day_stats` = HABER_YOK 584/4 (%0,7), öneri yok; akış 12 sn.
+357 test, ağsız 0 bağlantı. **W (bekçi) planı tamamlandı.** İsteğe bağlı W6 (yapay zekâ yorumu) yalnız maliyet
+tahmini ve onayla.

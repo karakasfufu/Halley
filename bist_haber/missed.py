@@ -124,6 +124,7 @@ def analyze_day(conn, b_day: str, run_id: int, today: date) -> Dict:
     bench_px = {b["date"]: b["close"] for b in bench_post}
     out = {"baz_gun": b_day, "run_id": run_id, "karar_ani": run["started_at"], "kind": run["kind"],
            "kacirilan": [], "veri_suphesi": 0, "degerlendirilen": 0, "pencere_gun": len(bench_post),
+           "neden_sayilari": {},     # W5: neden → değerlendirilen hisse sayısı (filtre başına kaçırma oranı için)
            "tamamlandi": len(bench_post) >= WINDOW_DAYS}
     if bench0 is None or not bench_post:
         out["yok"] = "Endeks fiyatı yok ya da baz günden sonra henüz işlem günü kapanmadı."
@@ -144,6 +145,7 @@ def analyze_day(conn, b_day: str, run_id: int, today: date) -> Dict:
             out["veri_suphesi"] += 1
             continue
         out["degerlendirilen"] += 1
+        out["neden_sayilari"][s["neden_kodu"]] = out["neden_sayilari"].get(s["neden_kodu"], 0) + 1
         c0 = pre[-1]["close"]
         best, peak = None, None
         for x in post:
@@ -203,6 +205,10 @@ def scan(conn, today: Optional[date] = None, lookback_trading_days: int = LOOKBA
         for d in days:
             if not d["tamamlandi"]:
                 continue
+            miss_by = Counter(x["neden_kodu"] for x in d["kacirilan"])
+            for code, n in d["neden_sayilari"].items():
+                conn.execute("INSERT OR IGNORE INTO missed_day_stats(baz_gun, neden_kodu, run_id, degerlendirilen, "
+                             "kacirilan) VALUES(?,?,?,?,?)", (d["baz_gun"], code, d["run_id"], n, miss_by.get(code, 0)))
             for x in d["kacirilan"]:
                 cur = conn.execute(
                     "INSERT OR IGNORE INTO missed_log(baz_gun, ticker, run_id, neden_kodu, modul, kazanc_pct, "

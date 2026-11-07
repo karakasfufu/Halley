@@ -5,7 +5,7 @@ Ayarlar katlanır bölümde; durum ve geçmiş veri pilotu "Gelişmiş" sekmesin
 """
 import json
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from html import escape as esc
 
 import pandas as pd
@@ -13,7 +13,7 @@ import streamlit as st
 
 from bist_haber import (analyzer, calendar_sync, config, corp_events, db, earnings, entries, journal, kap_history,
                         kap_worker, macro_calendar, pipeline, report, signals, technical, timeline, tradeplan,
-                        watchdog)
+                        trends, watchdog)
 
 st.set_page_config(page_title="Halley", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
 
@@ -292,8 +292,8 @@ if calendar_sync.due() and not os.environ.get("HALLEY_OFFLINE"):
     with st.spinner("Takvim resmi kaynaklardan kontrol ediliyor (günde bir kez, birkaç saniye)..."):
         calendar_sync.auto_check()
 
-tab_list, tab_journal, tab_reports, tab_news, tab_adv = st.tabs(["📈 Bugünün listesi", "📒 İşlem günlüğü",
-                                                                  "📋 Raporlar", "📰 Haberler", "🔧 Gelişmiş"])
+tab_list, tab_journal, tab_reports, tab_trend, tab_news, tab_adv = st.tabs(
+    ["📈 Bugünün listesi", "📒 İşlem günlüğü", "📋 Raporlar", "🧭 Gelişim", "📰 Haberler", "🔧 Gelişmiş"])
 
 
 # W1: panel ve bekçi aynı hesabı kullanır (bist_haber/signals.py)
@@ -872,6 +872,88 @@ with tab_adv:
                     st.write(f"- {imp.hisse}: {imp.yon}, etki {impact_word(imp.etki)} — {imp.gerekce}")
                 st.caption(f"Olay: {EVENT_TR.get(a.olay_tipi, a.olay_tipi)} · güven %{a.guven * 100:.0f} · "
                            "Bu sonuç kaydedilmedi; gerçek analiz yüksek doğrulukla ayrıca yapılır.")
+
+with tab_trend:
+    # W5: performans ve gelişim takibi + onay bekleyen öneriler. Onay hiçbir ayarı kendiliğinden değiştirmez.
+    _today = datetime.now(config.TR_TZ).date()
+    st.caption("Kayıtlı sanal işlemler, kaçırılan fırsat günlüğü ve karar izinden kodla hesaplanır (yapay zekâ yok). "
+               f"Karşılaştırma ve öneri için en az {trends.MIN_TRADES} kapanmış işlem / {trends.MIN_FILTER_N} hisse-gün "
+               "ve istatistiksel olarak anlamlı fark gerekir.")
+    st.markdown("##### 🗳️ Onayınızı bekleyen öneriler")
+    _pend = trends.pending(conn)
+    if not _pend:
+        st.info("Onay bekleyen öneri yok. Öneriler akşam analizinde, yeterli veri biriktikçe kendiliğinden oluşur.")
+    for s_ in _pend:
+        with st.container(border=True):
+            st.markdown(f"**{s_['baslik']}** · _{ {'ayar': 'ayar önerisi', 'kod': 'kural/kod değişikliği', 'bilgi': 'bilgi'}.get(s_['tur'], s_['tur'])}_")
+            st.markdown(md(s_["metin"]))
+            if s_.get("nerede"):
+                st.caption("Nerede: " + s_["nerede"])
+            note_ = st.text_input("Not (isteğe bağlı)", key=f"sug_note_{s_['id']}")
+            b1, b2, _ = st.columns([1, 1, 3])
+            if b1.button("✅ Onayla", key=f"sug_ok_{s_['id']}"):
+                trends.decide(conn, s_["id"], "onaylandı", note_)
+                conn.close()
+                st.rerun()
+            if b2.button("❌ Reddet", key=f"sug_no_{s_['id']}"):
+                trends.decide(conn, s_["id"], "reddedildi", note_)
+                conn.close()
+                st.rerun()
+    st.caption("Onay yalnız kararınızı kaydeder: ayar önerisini Ayarlar'dan siz değiştirirsiniz; kural/kod önerisi "
+               "geliştirme listesine girer. Hiçbir ayar ya da strateji kendiliğinden değişmez.")
+    _perf = trends.performance(conn)
+    _t = _perf["toplam"]
+    st.markdown("##### 📈 Performans zaman içinde")
+    if _t["n"]:
+        p1, p2, p3 = st.columns(3)
+        p1.metric("Kapanan sanal işlem", _t["n"])
+        p2.metric("Kazanma oranı", f"%{_t['kazanma_%']:.0f}")
+        p3.metric("Ortalama R", f"{_t['ort_R']:+.2f}" if _t["ort_R"] is not None else "—")
+        if not _t["yeterli"]:
+            st.warning(f"Örnek az ({_t['n']} < {trends.MIN_TRADES}): bu oranlar henüz güvenilir değil.")
+        if _perf["haftalik"]:
+            st.dataframe([{"Hafta": w["hafta"], "İşlem": w["n"], "Kazanma %": round(w["kazanma_%"], 1),
+                           "Ort. R": None if w["ort_R"] is None else round(w["ort_R"], 2),
+                           "Toplam R": None if w["toplam_R"] is None else round(w["toplam_R"], 2)}
+                          for w in _perf["haftalik"]], hide_index=True, use_container_width=True)
+        if "karsilastirma" in _perf:
+            a_, b_ = _perf["karsilastirma"]["son"], _perf["karsilastirma"]["onceki"]
+            st.caption(f"Son {trends.MIN_TRADES} işlem: {a_['ort_R']:+.2f} R · önceki {trends.MIN_TRADES}: {b_['ort_R']:+.2f} R")
+    else:
+        st.info("Henüz kapanmış sanal işlem yok.")
+    _ss = trends.strategy_stats(conn)
+    for key_, title_ in (("senaryo", "🎯 Stratejiye göre"), ("kaynak_haber", "📰 Haber kaynağına göre"),
+                         ("risk", "⚠️ Risk seviyesine göre")):
+        if _ss[key_]:
+            st.markdown(f"##### {title_}")
+            st.dataframe([{"Grup": r["grup"], "İşlem": r["n"], "Kazanma %": round(r["kazanma_%"], 1),
+                           "Ort. R": None if r["ort_R"] is None else round(r["ort_R"], 2),
+                           "Ort. net %": round(r["ort_net_%"], 2),
+                           "Yeterli örnek": "evet" if r["yeterli"] else f"hayır (< {trends.MIN_TRADES})"}
+                          for r in _ss[key_]], hide_index=True, use_container_width=True)
+    st.markdown("##### 🧹 Hangi neden/filtre sonradan yükselen hisseleri eledi?")
+    _fr = trends.filter_rates(conn, (_today - timedelta(days=180)).isoformat())
+    if _fr["toplam_n"]:
+        st.caption(f"{_fr['gun']} karar günü, {_fr['toplam_n']} hisse-gün; genel kaçırılan oranı %{_fr['genel_%']:.1f}. "
+                   "Bir nedenin oranı diğerlerinden anlamlı yüksekse o filtre fazla fırsat eliyor olabilir.")
+        st.dataframe([{"Neden": r["neden"], "Değerlendirilen": r["degerlendirilen"], "Kaçırılan": r["kacirilan"],
+                       "Oran %": round(r["oran_%"], 2), "Güven aralığı %": f"{r['alt_%']:.1f}–{r['ust_%']:.1f}",
+                       "Diğerleri %": None if r["digerleri_%"] is None else round(r["digerleri_%"], 2)}
+                      for r in _fr["satirlar"]], hide_index=True, use_container_width=True)
+    else:
+        st.info("Henüz penceresi tamamlanmış karar günü yok (bekçi en az bir akşam çalışmalı ve 5 işlem günü geçmeli).")
+    _rep = trends.repeated(conn, _today)
+    if _rep["son_sayi"] or _rep["onceki_sayi"]:
+        st.markdown(f"##### 🔁 Tekrar eden nedenler (son {trends.RECENT_DAYS} gün / önceki {trends.RECENT_DAYS} gün)")
+        codes_ = sorted(set(_rep["son_neden"]) | set(_rep["onceki_neden"]))
+        st.dataframe([{"Neden": c_, "Son": _rep["son_neden"].get(c_, 0), "Önceki": _rep["onceki_neden"].get(c_, 0)}
+                      for c_ in codes_], hide_index=True, use_container_width=True)
+    _done = trends.decided(conn)
+    if _done:
+        with st.expander(f"Karar verilmiş öneriler ({len(_done)})"):
+            st.dataframe([{"Tarih": (r["karar_ani"] or "")[:16].replace("T", " "), "Öneri": r["baslik"],
+                           "Karar": r["durum"], "Not": r["karar_notu"] or ""} for r in _done],
+                         hide_index=True, use_container_width=True)
 
 conn.close()
 

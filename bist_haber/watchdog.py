@@ -219,6 +219,8 @@ def run_session(conn, universe: Dict[str, str], kind: str, settings: Dict, ai: b
         from . import missed
         res = missed.scan(conn, now.date())
         out["kacirilan"] = dict(missed.report_md(res), ham=res)
+        from . import trends
+        out["oneriler"] = trends.sync(conn, now.date())
     say("Karar izi kaydediliyor...", 0.88)
     ctx = signals.Context(conn, now.date())
     out["calistirma"] = log_run(conn, universe, kind, window=int(settings.get("pencere", 7)), ctx=ctx)
@@ -560,8 +562,14 @@ def evening_report(conn, ctx, out) -> tuple:
     md += "## 10. Sistem iyileştirme önerileri\n"
     notes = observations(conn, out)
     md += ("".join(f"- {n}\n" for n in notes) or "_Bugün veriden çıkan bir gözlem yok._\n")
+    from . import trends
+    md += trends.summary_md(conn, ctx.today)
+    new = (out.get("oneriler") or {}).get("eklenen") or []
+    if new:
+        md += f"- Bu akşam {len(new)} yeni öneri eklendi: " + "; ".join(
+            r["baslik"] for r in trends.pending(conn) if r["id"] in new) + "\n"
     md += ("\n_Öneriler bilgi amaçlıdır; hiçbir ayar kendiliğinden değiştirilmez. Geçmiş raporlarla karşılaştırmalı "
-           "eğilim ve onay listesi W5'te._\n\n")
+           "eğilim ve onay listesi 🧭 Gelişim sekmesinde._\n\n")
     md += data_status_md(out, _data_status(conn), "Ek")
     md += DISCLAIMER
     strip = lambda xs: [{k: v for k, v in r.items() if k not in ("sonuc_json",)} for r in xs]

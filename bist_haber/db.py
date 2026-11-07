@@ -136,6 +136,40 @@ CREATE TRIGGER IF NOT EXISTS missed_log_no_update BEFORE UPDATE ON missed_log
 BEGIN SELECT RAISE(ABORT, 'kaçırılan fırsat kaydı değiştirilemez'); END;
 CREATE TRIGGER IF NOT EXISTS missed_log_no_delete BEFORE DELETE ON missed_log
 BEGIN SELECT RAISE(ABORT, 'kaçırılan fırsat kaydı silinemez'); END;
+-- W5: penceresi tamamlanmış karar günlerinde neden başına değerlendirilen / kaçırılan sayısı. YALNIZ EKLENİR.
+CREATE TABLE IF NOT EXISTS missed_day_stats (
+    baz_gun         TEXT NOT NULL,
+    neden_kodu      TEXT NOT NULL,
+    run_id          INTEGER NOT NULL,
+    degerlendirilen INTEGER NOT NULL,
+    kacirilan       INTEGER NOT NULL,
+    UNIQUE (baz_gun, neden_kodu)
+);
+CREATE TRIGGER IF NOT EXISTS missed_day_stats_no_update BEFORE UPDATE ON missed_day_stats
+BEGIN SELECT RAISE(ABORT, 'kayıt değiştirilemez'); END;
+CREATE TRIGGER IF NOT EXISTS missed_day_stats_no_delete BEFORE DELETE ON missed_day_stats
+BEGIN SELECT RAISE(ABORT, 'kayıt silinemez'); END;
+-- W5: onay bekleyen iyileştirme önerileri. Öneri metni/kanıtı değişmez; durum YALNIZ BİR KEZ (bekliyor → onaylandı/
+-- reddedildi) değiştirilebilir. Onay hiçbir ayarı kendiliğinden değiştirmez.
+CREATE TABLE IF NOT EXISTS suggestions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    anahtar     TEXT NOT NULL,
+    tur         TEXT NOT NULL,             -- ayar | kod | bilgi
+    baslik      TEXT NOT NULL,
+    metin       TEXT NOT NULL,
+    kanit_json  TEXT NOT NULL,
+    nerede      TEXT,
+    olusturma   TEXT NOT NULL,
+    durum       TEXT NOT NULL DEFAULT 'bekliyor',
+    karar_ani   TEXT,
+    karar_notu  TEXT
+);
+CREATE TRIGGER IF NOT EXISTS suggestions_once BEFORE UPDATE ON suggestions
+WHEN OLD.durum != 'bekliyor' OR NEW.anahtar != OLD.anahtar OR NEW.metin != OLD.metin OR NEW.kanit_json != OLD.kanit_json
+     OR NEW.baslik != OLD.baslik OR NEW.tur != OLD.tur OR NEW.olusturma != OLD.olusturma
+BEGIN SELECT RAISE(ABORT, 'öneri kaydı değiştirilemez (karar yalnız bir kez verilir)'); END;
+CREATE TRIGGER IF NOT EXISTS suggestions_no_delete BEFORE DELETE ON suggestions
+BEGIN SELECT RAISE(ABORT, 'öneri kaydı silinemez'); END;
 CREATE TABLE IF NOT EXISTS prices (
     ticker TEXT NOT NULL,
     date   TEXT NOT NULL,
