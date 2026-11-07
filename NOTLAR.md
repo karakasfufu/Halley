@@ -953,3 +953,18 @@ tradeplan) değişmedi. SOKM artık: önceki destek 51,50 > fiyat 48,44 → tepk
 Kalan "yeni dip günü" vakaları: (a) yakında 60 günlük eski destek +0,41 R (n=36, az), (b) fiyat gün içinde önceki
 desteği kırıp üstüne döndü −0,10 R, SL %68 (n=130) — fark anlamlı değil (z ≈ 1,5): **kural değiştirilmedi** (küçük
 örnekle değiştirme yok); W5 strateji takibi izleyecek. 370 test, ağsız 0 bağlantı.
+
+## 2026-11-08 — Son A+B bütünleşik testi (180 günlük takvim verisiyle)
+Okuma durumu (01:41): 95 sayfa kaldı — 90 takvim sayfası (hepsi Mayıs 2026) + 5 haber metni. Okunmuş Ağustos–Eylül
+sayfalarından ileri tarihli olay çıkmadığı için test bekletilmedi; okuyucu arka planda sürüyor.
+**Sonuç (canlı kopya, `integration_ab.py`):** sorun 0. Denetlenen: 761 bilanço durumu (ham KAP listesiyle çelişki 0),
+**1.391 şirket olayı** (45 günlük testte 220) — hepsi kaynaklı, işlem gününde; 79 makro olay; 44 hisse × 6 kesim = 264
+plan. Bilanço dağılımı: açıklandı 385, açıklanmadı 281, süresi geçti 95.
+**"Süresi geçti" 2 → 95 incelendi:** 95'in hepsi konsolide olmayan (180 günlük veride Ağustos 6 aylık raporundan
+öğrenildi → son tarih 9 Kasım yerine 30 Ekim; doğru) ve **hiçbirinin borsada fiyatı yok** (faktoring, varlık kiralama:
+ADLVY, AKCVR, AKDFA, AKFK, AKSFA, AKTVK…). SPK II-14.1 (RG 29968, 03.02.2017, metinden okundu): ara dönem 3/6/9 aylık
+rapor yükümlülüğü "ihraç ettiği sermaye piyasası araçları borsada işlem gören" işletmeler vb. için; pay dışı araç ihraç
+eden halka açık olmayan işletmeler "ihraç ettikleri araçların itfa tarihine kadar" tabidir. Aracın dolaşımda olup
+olmadığı verimizde yok → "süre geçti" kesin değil. **Değişiklik (yalnız açıklama metni):** `earnings.status` →
+`fiyat_var`; fiyatı hiç olmayan şirkette açıklamaya bu mevzuat uyarısı eklenir. Risk hesabı/öneri etkilenmez (bu
+şirketler için zaten senaryo yok). 370 test, ağsız 0 bağlantı.

@@ -107,6 +107,10 @@ def status(conn, ticker: str, today: Optional[date] = None) -> Dict:
             "ek_sure": _extension(conn, ticker, last["donem_sonu"]),
             "durum": state, "kapsam_basi": (first_kap or "")[:10], "bosluk": [d.isoformat() for d in gaps][:10],
             "bosluk_sayisi": len(gaps),
+            # 2026-11-08: fiyat verisi hiç yoksa pay büyük olasılıkla borsada işlem görmüyor (faktoring/varlık
+            # kiralama gibi yalnız borçlanma aracı ihraççısı). SPK II-14.1 (RG 29968) md. 1/4: bunlar ara dönem
+            # rapor yükümlülüğüne yalnız ihraç ettikleri aracın itfasına kadar tabi → "süre geçti" kesin değildir.
+            "fiyat_var": conn.execute("SELECT 1 FROM prices WHERE ticker=? LIMIT 1", (ticker,)).fetchone() is not None,
             "son_tarih": deadline}
 
 
@@ -141,6 +145,10 @@ def describe(s: Dict, today: Optional[date] = None) -> str:
     elif s["durum"] == "süresi geçti, kayıtlarda yok":
         text = (f"{p['donem']} raporunun yasal süresi doldu ({rule}) ama kayıtlarımızda raporu göremiyoruz; KAP'tan "
                 "kontrol edin (gecikme ya da ek süre olabilir).")
+        if s.get("fiyat_var") is False:
+            text += (" Bu şirketin borsada fiyatı yok (payı işlem görmüyor olabilir): yalnız borçlanma aracı ihraç eden "
+                     "şirketler ara dönem rapor yükümlülüğüne aracın vadesi dolana kadar tabidir (SPK II-14.1); "
+                     "dolaşımda aracı yoksa rapor zorunlu olmayabilir.")
     else:
         why = (f"{s['bosluk_sayisi']} günün KAP listesi alınmamış (ilk: {_fmt(s['bosluk'][0])})" if s.get("bosluk")
                else "KAP kayıtları yetersiz")

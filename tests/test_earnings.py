@@ -76,6 +76,13 @@ class StatusTests(unittest.TestCase):
         s = E.status(self.conn, "AAA", date(2026, 11, 7))
         self.assertEqual((s["durum"], s["konsolide"]), ("süresi geçti, kayıtlarda yok", False))
         self.assertIsNone(E.window_risk(s, date(2026, 11, 7), 15))
+        # fiyatı hiç yok (gerçek: 95 faktoring/varlık kiralama şirketi) → yükümlülük kesin değil uyarısı
+        self.assertFalse(s["fiyat_var"])
+        self.assertIn("aracın vadesi dolana kadar tabidir", E.describe(s, date(2026, 11, 7)))
+        self.conn.execute("INSERT INTO prices(ticker,date,close) VALUES('AAA','2026-11-06',10)")
+        s2 = E.status(self.conn, "AAA", date(2026, 11, 7))
+        self.assertTrue(s2["fiyat_var"])
+        self.assertNotIn("aracın vadesi", E.describe(s2, date(2026, 11, 7)))   # borsada işlem gören: uyarı yok
 
     def test_gap_in_listing_makes_status_unknown(self):  # uygulama birkaç gün açılmadı → kesinlik uydurulmaz
         self.cover("2026-10-01", "2026-10-20", "2026-10-21T09:00:00+03:00")
