@@ -20,7 +20,8 @@ from . import config, corp_events, db, kap, kap_history, market_calendar
 
 WAITS_MIN = (3, 5, 10)
 MAX_HOURS = 4.0
-AUTO_START_MIN_PAGES = 100   # kullanıcı: "100'den fazla okunabilecekse" — ya da önceki tur KAP sınırına takıldıysa
+AUTO_START_MIN_PAGES = 100
+PROGRESS_EVERY = 10          # tur içinde her 10 sayfada bir durum dosyası güncellenir   # kullanıcı: "100'den fazla okunabilecekse" — ya da önceki tur KAP sınırına takıldıysa
 _thread: Optional[threading.Thread] = None
 _lock = threading.Lock()
 
@@ -77,10 +78,24 @@ def run(db_path=None, sleep: Callable[[float], None] = time.sleep, clock: Callab
     from .universe import load_universe
     conn = db.connect(db_path)
     uni = load_universe(conn)
-    backfill_fn = backfill_fn or (lambda c: kap_history.backfill(c, uni, list_fn=lambda a, b: [], sleep=sleep))
-    fetch_new_fn = fetch_new_fn or (lambda c: kap.fetch_missing_bodies(c))
     t0 = clock()
     start = pending_counts(conn)
+    round_info = {"base_okunan": 0, "before": start["toplam"], "calls": 0}
+
+    def tick(*_):
+        """Tur içindeki ilerlemeyi her 10 sayfada bir kaydet (kullanıcı: sayaç dakikalarca 0 görünüyordu)."""
+        round_info["calls"] += 1
+        if round_info["calls"] % PROGRESS_EVERY:
+            return
+        now_left = pending_counts(conn)["toplam"]
+        st["okunan"] = round_info["base_okunan"] + max(0, round_info["before"] - now_left)
+        st["kalan"] = now_left
+        st["mesaj"] = f"Okunuyor... {now_left} sayfa kaldı."
+        _save(st)
+
+    backfill_fn = backfill_fn or (lambda c: kap_history.backfill(c, uni, list_fn=lambda a, b: [], sleep=sleep,
+                                                                 progress=tick))
+    fetch_new_fn = fetch_new_fn or (lambda c: kap.fetch_missing_bodies(c, tick))
     st = {"durum": "çalışıyor", "basladi": datetime.now(config.TR_TZ).isoformat(timespec="seconds"),
           "baslangic_bekleyen": start["toplam"], "okunan": 0, "kalan": start["toplam"], "tur": 0,
           "kap_siniri_sayisi": 0, "mesaj": "Okunuyor...", "ozet": None}
@@ -92,6 +107,7 @@ def run(db_path=None, sleep: Callable[[float], None] = time.sleep, clock: Callab
             if before["toplam"] == 0:
                 break
             st["tur"] += 1
+            round_info.update(base_okunan=st["okunan"], before=before["toplam"], calls=0)
             limited = False
             try:
                 r1 = backfill_fn(conn)
@@ -104,7 +120,7 @@ def run(db_path=None, sleep: Callable[[float], None] = time.sleep, clock: Callab
             except Exception as e:  # ağ hatası vb.: sınır gibi bekleyip dene
                 limited, st["son_hata"] = True, str(e)[:200]
             after = pending_counts(conn)
-            st["okunan"] += max(0, before["toplam"] - after["toplam"])
+            st["okunan"] = round_info["base_okunan"] + max(0, before["toplam"] - after["toplam"])
             st["kalan"] = after["toplam"]
             if after["toplam"] == 0:
                 break

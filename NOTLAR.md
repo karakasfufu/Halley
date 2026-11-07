@@ -770,3 +770,5 @@ aşarsa bir sonraki açılışta sürer. Yeni ilk kurulumda ilk güncelleme 180 
   pencerede başlatır (pencere kapanınca biter): 2 dk'da bir bakar, bekleyen > 100 sayfa ya da yarım iş varsa okuyucuyu
   çalıştırır; başka işlemde canlı okuyucu varsa karışmaz; tek bekçi (kilit dosyası); hata bekçiyi çökertmez.
   **287 test geçti.**
+- Kullanıcı gözlemi: kutu dakikalarca "0/2506" gösterdi (okuma aslında sürüyordu: ~11 sayfa/20 sn). Okuyucu ilerlemeyi
+  yalnız tur sonunda yazıyordu → artık tur içinde her 10 sayfada bir yazar. **288 test geçti.**

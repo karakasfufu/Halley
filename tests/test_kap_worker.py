@@ -64,6 +64,32 @@ class WorkerTests(unittest.TestCase):
         self.assertFalse(st["devam_gerek"])
         self.assertEqual(K.load()["durum"], "tamamlandı")              # panel bu dosyadan okur
 
+    def test_progress_saved_within_a_round(self):
+        seen = []
+
+        def slow_backfill(conn):
+            rows = conn.execute("SELECT id FROM news WHERE status='context' AND body IS NULL LIMIT 100").fetchall()
+            for r in rows:
+                conn.execute("UPDATE news SET body='x' WHERE id=?", (r["id"],))
+                conn.commit()
+                prog(None, None)
+                seen.append(K.load().get("okunan"))
+            left = conn.execute("SELECT COUNT(*) FROM news WHERE status='context' AND body IS NULL").fetchone()[0]
+            return {"kap_siniri": left > 0}
+
+        # run() içindeki ilerleme işlevine erişmek için varsayılan backfill'i sarmala
+        orig = K.kap_history.backfill
+        def fake_backfill(conn, uni, **kw):
+            global prog
+            prog = kw["progress"]
+            return slow_backfill(conn)
+        globals()["prog"] = None
+        with patch.object(K.kap_history, "backfill", fake_backfill):
+            K.run(self.path, sleep=self.fc.sleep, clock=self.fc.clock, fetch_new_fn=lambda c: {"rate_limited": False})
+        self.assertIn(10, seen)                       # tur bitmeden 10. sayfada sayaç güncellendi
+        self.assertIn(110, seen)                      # 2. turda önceki turun 100'ü üstüne eklenir
+        self.assertEqual(K.load()["okunan"], 250)
+
     def test_wait_grows_to_ten_minutes(self):
         self.run_worker(self.limited_backfill(per_round=50))         # 5 sınır: 3, 5, 10, 10
         self.assertEqual(self.fc.sleeps, [180, 300, 600, 600])
