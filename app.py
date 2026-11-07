@@ -3,13 +3,13 @@
 Sade düzen (2026-11-06): tek "Haberleri güncelle" düğmesi, 3 özet kutusu, olumlu/olumsuz hisse listeleri.
 Ayarlar katlanır bölümde; durum ve geçmiş veri pilotu "Gelişmiş" sekmesinde.
 """
-from datetime import datetime
+from datetime import date, datetime
 from html import escape as esc
 
 import pandas as pd
 import streamlit as st
 
-from bist_haber import analyzer, config, db, pipeline, report, technical, tradeplan, entries
+from bist_haber import analyzer, config, db, pipeline, report, technical, tradeplan, entries, macro_calendar
 
 st.set_page_config(page_title="Halley", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
 
@@ -391,8 +391,37 @@ def stock_list(items: list, empty_text: str) -> None:
             stock_details(r)
 
 
+def macro_block() -> None:
+    """Parça B1: piyasa geneli planlı olaylar (PPK, TÜFE). Tarihler yayımlanmış takvimden; tahmin edilmez."""
+    today = datetime.now(config.TR_TZ).date()
+    u = macro_calendar.upcoming(today, 15)
+    tr_date = lambda d: f"{int(d[8:10])} {AYLAR[int(d[5:7]) - 1]}"
+    if u["olaylar"]:
+        items = "; ".join(f"**{tr_date(e['tarih'])}** {e['ad']} saat {e['saat']}"
+                          + (" (bugün)" if e["bugun"] else f" ({e['is_gunu_sonra']} işlem günü sonra)")
+                          + (" — tek kaynak" if e["dogrulama"] == "tek kaynak" else "") for e in u["olaylar"])
+        text = f"📅 **Önümüzdeki 15 işlem günü** ({tr_date(u['bitis'])} dahil): {items}."
+    else:
+        text = f"📅 **Önümüzdeki 15 işlem günü** ({tr_date(u['bitis'])} dahil): piyasa geneli planlı makro olay yok."
+    later = [e for e in macro_calendar.next_of_each(today) if not any(x["tarih"] == e.get("tarih") for x in u["olaylar"])]
+    if later:
+        text += " Sonraki: " + "; ".join(
+            (f"{e['ad'].split(' (')[0]} {tr_date(e['tarih'])} ({macro_calendar.business_days_between(today, date.fromisoformat(e['tarih']))} işlem günü sonra)"
+             if e["tarih"] else f"{e['ad']} — takvimde yok (henüz yayımlanmadı)") for e in later) + "."
+    if u["bilinmeyen"]:
+        text += " Bu pencerede takvimi henüz bilinmeyen: " + ", ".join(u["bilinmeyen"]) + "."
+    st.markdown(text + " <span class='news-meta'>Faiz ve enflasyon açıklamaları tüm piyasayı oynatabilir; "
+                "resmi tatiller hesaba katılmadı.</span>", unsafe_allow_html=True)
+    warn = macro_calendar.stale(today)
+    if warn:
+        st.caption("🛠️ " + warn)
+
+
+AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+
 # ---------------- Bugünün listesi ----------------
 with tab_list:
+    macro_block()
     if not rows:
         st.info("Henüz liste yok. Yukarıdaki **Haberleri güncelle** düğmesine basın.")
     else:

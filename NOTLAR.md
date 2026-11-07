@@ -577,3 +577,22 @@ kırılım risk orta). Testler: `tests/test_a3_rules.py` (+ etki günü testi). 
 **Doğrulama:** 5.714 bozulmuş gerçek veri denemesi (eksik OHLC, hacimsiz, 30–252 gün, düz fiyat, boşluk, endeks
 yok/eksik) → hata 0, tutarlılık ihlali 0. 4.400 durumluk senaryo testi değişmedi (ihlal 0). Panel canlı veri
 kopyasıyla hatasız; CSV hazırlanıyor; pilot senaryo testi aynı. **175 test geçti.**
+
+## 2026-11-07 — Parça B1: makro takvim (`bist_haber/macro_calendar.py`)
+
+B planı: B1 makro takvim ✅ → B2 bilanço yasal son tarih → B3 şirket olayları (genel kurul, temettü hak kullanım,
+sermaye artırımı; eldeki KAP bildirimlerinden) → B4 panel "önümüzdeki 15 işlem günü" + "vade içinde olay" riski.
+
+- Tarihler TAHMİN EDİLMEZ; yayımlanmış takvimden elle girildi, kaynakları dosyada. TCMB sitesi otomatik erişime
+  kapalı (ECONNRESET / tarayıcı reddi) → PPK 2026 (8 toplantı) ve 21 Ocak 2027 duyuruyu aktaran 4 bağımsız
+  kaynakla karşılaştırıldı (Bloomberg HT 28.12.2025, CNBC-e, QNB Invest, 24 Saat; hepsi aynı). Mart/Nisan/Haziran
+  2027 yalnız QNB Invest'te → "tek kaynak" işaretli ve panelde öyle yazıyor. TÜFE 2026 (12 tarih): TÜİK 2 Ocak 2026
+  takvimi (Foreks aktarımı); Haziran ve Ekim haberlerle doğrulandı; gün adları kaynakla birebir. 2027 TÜFE takvimi
+  henüz yok → "takvimde yok".
+- Kapsam: TÜFE 2026-12-31'e, PPK 2027-06-30'a kadar bilinir; ötesine düşen pencerede "takvimi bilinmeyen" yazılır.
+  Kapsam sonuna 30 günden az kalınca panelde bakım uyarısı (yeni yıl takvimi eklenmeli). Resmi tatiller hesaba
+  katılmaz (işlem günü = hafta içi).
+- Panel: "Bugünün listesi" başında "📅 Önümüzdeki 15 işlem günü" + sonraki PPK/TÜFE. Bugün (7 Kasım): pencerede olay
+  yok; sonraki TÜFE 3 Aralık (19 işlem günü), PPK 10 Aralık (24). 26 Kasım ve 20 Aralık için de denendi.
+- Testler: `tests/test_macro_calendar.py` (12; veri tutarlılığı: hafta içi, PPK çarşamba/perşembe, TÜFE ayın ilk
+  5 günü ve önceki ayın verisi). **187 test geçti.**
