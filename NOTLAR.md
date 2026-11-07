@@ -457,3 +457,26 @@ Hepsi **kodla** hesaplanır (yapay zekâ yok, kredi harcamaz). Geçmiş veriyle 
   19 zayıf, 14 iyi; medyan r/g ~1:1,4 — iyimser değil.
 - Testler: `tests/test_technical_reference.py` (19 test). Python 3.9.13 ile **112 test geçti**.
 - Sonraki doğrulama önerisi: geçmiş veri pilotuna "TP mi önce geldi, SL mi?" ölçümü eklenmeli.
+
+## 2026-11-07 — Pilot: SL/TP senaryo testi ("önce TP mi geldi, SL mi?")
+
+**Amaç:** Panelin ürettiği SL/TP senaryosunun geçmiş olaylarda nasıl sonuçlandığını ücretsiz ölçmek (yapay zekâ yok).
+
+**Kurallar (`bist_haber/scenario_test.py`):**
+- Senaryo yalnız giriş gününden ÖNCEKİ fiyatlarla hesaplanır (geleceği görmeden). Giriş: yayından sonraki ilk
+  işlem gününün açılışı (pilotun olay ölçümüyle aynı).
+- Açılış SL'nin altındaysa SL, TP'nin üstündeyse TP açılış fiyatından sayılır. Aynı gün hem SL hem TP görülürse gün
+  içi sıra bilinmediği için temkinli olarak SL sayılır. Tavan/taban kilidi (tek fiyatlı gün) sayılır.
+- En fazla 30 işlem günü izlenir: ikisine de değmezse "süre doldu"; veri 30 günden kısaysa "devam ediyor".
+- Senaryo üretilmeyen olaylar (olumsuz/nötr haber, kritik veri) "senaryo yok" olarak ayrı sayılır. İşlem maliyeti dahil değil.
+- Pilot fiyat indirmesi artık seçim başlangıcından 400 gün önce başlıyor (200 günlük ortalama için geçmiş gerekir).
+  Pilot barlarında hacim yok; hacimsiz gün kontrolü yalnız hacmi bilinen günleri sayıyor.
+
+**Çıktı:** Pilot sekmesinde "🎯 SL/TP senaryo testi" bölümü; rapor ZIP'i 7 dosya
+(`halley_senaryo_testi.csv`, `halley_senaryo_testi.txt` eklendi).
+
+**Gerçek pilot verisinin kopyasında ilk sonuç:** 8 olay; 1'i test edildi (KZBGY: 9. günde SL, %−7,68); diğer 7'de
+olumlu sinyal yok → senaryo yok. Bu örnek kanıt değildir; eşik veya kural değiştirilmedi.
+
+**Testler:** `tests/test_scenario_test.py` (önce TP, önce SL, aynı gün ikisi → SL, açılış boşluğu, devam ediyor,
+gelecek fiyatların seviyeleri etkilememesi, olumsuz haber test edilmez, özet metni). Python 3.9.13 ile **120 test geçti**.

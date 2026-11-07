@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta
 import pandas as pd
 import streamlit as st
 
-from . import backtest, calibration, config, pipeline, pilot_export
+from . import backtest, calibration, config, pipeline, pilot_export, scenario_test
 
 
 def render():
@@ -107,8 +107,8 @@ def render():
             if st.button("İndirme düğmelerini gizle", key="bt_export_hide"):
                 st.session_state["bt_export_ready"] = False
                 st.rerun()
-            st.caption("ZIP içinde beş dosya bulunur: olay sonuçları, pozitif olay özeti, belge eksikleri, yöntem "
-                       "açıklaması ve skor eşiği ayarı raporu. Geri bildirim için geliştiriciye bu ZIP'i gönderin. "
+            st.caption("ZIP içinde yedi dosya bulunur: olay sonuçları, pozitif olay özeti, belge eksikleri, yöntem "
+                       "açıklaması, skor eşiği ayarı raporu ve SL/TP senaryo testi (CSV + özet). Geri bildirim için geliştiriciye bu ZIP'i gönderin. "
                        "İndirmek mevcut sonuçları kullanır; yeni analiz veya OpenAI harcaması başlatmaz.")
         if results:
             frame = exported["frame"]
@@ -138,6 +138,17 @@ def render():
             if ready:
                 st.download_button("Tüm olay sonuçlarını indir (CSV)", files["halley_pilot.csv"],
                                    file_name="halley_pilot.csv", mime="text/csv", key="bt_download")
+        with st.expander("🎯 SL/TP senaryo testi — önce TP mi geldi, SL mi?"):
+            scen = exported["scenarios"]
+            st.caption("Her olumlu olay için senaryo, giriş gününden ÖNCEKİ fiyatlarla hesaplanır (geleceği görmeden); "
+                       "sonra sonraki günlerde fiyatın önce kâr al (TP) mı yoksa zarar durdur (SL) seviyesine mi "
+                       "değdiğine bakılır. Aynı gün ikisi de görülürse temkinli olarak SL sayılır. Ücretsizdir. "
+                       "Fiyat geçmişi kısaysa önce 'Fiyatları al' düğmesine basın (olaydan önceki 1 yıl indirilir).")
+            st.code(scenario_test.as_text(scen), language=None)
+            tested = [r for r in scen if r["sonuç"] not in ("senaryo yok",)]
+            if tested:
+                st.dataframe(pd.DataFrame(tested, columns=scenario_test.COLUMNS), hide_index=True,
+                             use_container_width=True)
         with st.expander("📐 Skor eşiği ayarı (Faz 3) — ön kayıtlı test"):
             calib = exported["calibration"]
             st.write(f"**Durum:** {calib['durum']}")

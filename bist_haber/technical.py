@@ -101,7 +101,8 @@ def data_checks(bars: List[dict], today: Optional[date] = None):
                             "bölünme/bedelsiz ya da veri hatası olabilir" + ("; son 60 günde, seviyeler güvenilmez" if recent else ""))
             critical = critical or recent
     last20 = bars[-20:]
-    zero_vol = sum(1 for b in last20 if not b.get("volume"))
+    # Hacim bilgisi olmayan seriler (ör. pilot fiyatları) bu kontrole girmez.
+    zero_vol = sum(1 for b in last20 if b.get("volume") is not None and not b["volume"])
     if zero_vol >= 3:
         warnings.append(f"Son 20 günün {zero_vol}'inde hacim yok: hisse sığ, fiyatlar yanıltıcı olabilir")
     flat = sum(1 for b in last20 if b.get("high") and b.get("low") and b["high"] == b["low"])

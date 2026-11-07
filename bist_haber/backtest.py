@@ -410,7 +410,8 @@ def update_prices(conn):
     selection = metadata(conn).get("selection")
     if not selection:
         raise ValueError("Önce pilot belgelerini hazırlayın.")
-    start = date.fromisoformat(selection["start"]) - timedelta(days=5)
+    # Teknik göstergeler ve SL/TP senaryo testi için olaydan önceki ~1 yıl da indirilir (200 gün ort., 52 hafta).
+    start = date.fromisoformat(selection["start"]) - timedelta(days=400)
     end = min(date.fromisoformat(selection["end"]) + timedelta(days=40), datetime.now(config.TR_TZ).date())
     tickers = sorted({c for r in conn.execute("SELECT n.candidates FROM news n JOIN pilot_selection s ON s.news_id=n.id")
                       for c in r[0].split(",") if c} | {BENCHMARK})

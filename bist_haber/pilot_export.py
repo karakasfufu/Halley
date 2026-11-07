@@ -5,7 +5,7 @@ import zipfile
 
 import pandas as pd
 
-from . import backtest, calibration
+from . import backtest, calibration, scenario_test
 
 RESULT_COLUMNS = ["bildirim", "hisse", "yön", "vade", "giriş", "çıkış", "getiri_%",
                   "net_getiri_%", "endekse_göre_%", "en_düşük_%", "eksik", "uygulanabilirlik"]
@@ -54,6 +54,7 @@ def build_report(conn, results, cost_bps=20):
     summary = positive_summary(frame)
     gaps = document_gaps(conn)
     calib = calibration.calibrate(conn, results)
+    scen = scenario_test.run(conn)  # SL/TP senaryo testi (geleceği görmeden, ücretsiz)
     selection = backtest.metadata(conn).get("selection", {})
     missing_prices = int((frame["eksik"] != "").sum())
     methods = [
@@ -89,5 +90,8 @@ def build_report(conn, results, cost_bps=20):
         "halley_yontem.txt": ("\n\n".join(methods) + "\n").encode("utf-8-sig"),
         # Faz 3 ön kayıtlı eşik testi: programı kullanan kişi ZIP'i geri bildirim olarak gönderebilir.
         "halley_esik_ayari.txt": calibration.as_text(calib).encode("utf-8-sig"),
+        "halley_senaryo_testi.csv": csv_bytes(pd.DataFrame(scen, columns=scenario_test.COLUMNS)),
+        "halley_senaryo_testi.txt": scenario_test.as_text(scen).encode("utf-8-sig"),
     }
-    return {"frame": frame, "summary": summary, "gaps": gaps, "calibration": calib, "files": files}
+    return {"frame": frame, "summary": summary, "gaps": gaps, "calibration": calib, "scenarios": scen,
+            "files": files}
