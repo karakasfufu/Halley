@@ -480,3 +480,27 @@ olumlu sinyal yok → senaryo yok. Bu örnek kanıt değildir; eşik veya kural 
 
 **Testler:** `tests/test_scenario_test.py` (önce TP, önce SL, aynı gün ikisi → SL, açılış boşluğu, devam ediyor,
 gelecek fiyatların seviyeleri etkilememesi, olumsuz haber test edilmez, özet metni). Python 3.9.13 ile **120 test geçti**.
+
+## 2026-11-07 — Tasarım özeti (PDF) değerlendirmesi ve plan; Parça A1: yeni göstergeler
+
+**Kullanıcı geri bildirimi:** AI Swing Trader tasarım özeti (PDF) + çoklu zaman dilimi + üç giriş senaryosu
+(kırılım/geri çekilme/destekten tepki) + yaklaşan olay takvimi. Midas'ta koşullu emir yok: kırılım senaryosu
+"fiyat alarmı kur, gelince elle al" olarak yazılacak. Kullanıcının ilkesi: işler parça parça, her parça gerçek
+veriyle test edilerek; hata payı en az; uydurma yok.
+
+**Plan (sıra):** A işlem planı (A1 göstergeler ✅, A2 üç giriş senaryosu + TP1/TP2 + teyit/geçersizlik, A3 fiyatlanma
+ve likidite kuralları + "bugün fırsat yok") → B olay takvimi (ücretsiz kısım; yapay zekâ kısmı maliyet onayıyla)
+→ C işlem günlüğü, koşullu giriş testi, performans metrikleri, pozisyon hesaplayıcı → D saatlik veri kalite testi
+sonrası çoklu zaman dilimi, piyasa rejimi, sektör → E bildirimler vb. Teknik veriler birleşik puana ancak işlem
+günlüğü/pilot verisiyle test edildikten sonra katılabilir (eşikler değişmedi).
+
+**A1 — eklenen göstergeler (`technical.py`, yalnız gösterim, skora/senaryoya henüz etkisi yok):**
+EMA 20/50/200 (SMA tohumlu standart), Wilder ADX14 ve +DI/−DI, Bollinger 20/2 (ddof=0) ve sıkışma (bant son 120
+günün en dar %20'sinde), OBV 20 günlük eğilim, XU100'e göre güç 20/60 gün (endeksin iki tarihte de fiyatı yoksa
+boş; tahmin edilmez), 20 günlük ortalama işlem hacmi (TL), salınım dibi, haber öncesi 5 gün / haber sonrası hareket
+(taban: yayın gününden önceki son kapanış). Fiyat güncellemesi artık XU100'ü de indiriyor.
+
+**Doğrulama:** 44 gerçek BIST hissesinin 1 yıllık verisinde TA-Lib 0.8.1 (referans kütüphane) ile EMA, +DI/−DI,
+Bollinger, OBV yönü, endekse göre güç farkı 0; ADX en çok 5e-6 puan (TA-Lib iç yuvarlaması; etkisiz). TA-Lib
+değerleri sabit bir seri üzerinde dondurulup `tests/test_indicators_v2.py`'ye kondu (17 test). Canlı veri kopyasında
+4 hisse için panel hatasız çizildi. Python 3.9.13 ile **137 test geçti**.

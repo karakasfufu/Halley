@@ -200,6 +200,17 @@ def technical_block(t) -> None:
         ("52 haftalık dibe uzaklık", pct(t["dibe_uzaklik_%"]), f"Dip {_n(t['dip_52h'])} TL"),
         ("Destek / direnç (20 gün)", f"{_n(t['destek_20g'])} / {_n(t['direnc_20g'])} TL", "Son 20 günün en düşük / en yüksek fiyatı"),
         ("Günlük oynaklık", pct(t["atr_%"]).replace("+", ""), "Ortalama günlük fiyat aralığı (ATR 14)"),
+        ("Üstel ortalamalar 20 / 50 / 200", f"{_n(t['ema20'])} / {_n(t['ema50'])} / {_n(t['ema200'])} TL",
+         "EMA: son günlere daha çok ağırlık verir"),
+        ("Trend gücü (ADX 14)", _n(t["adx"], "{:.0f}") + (f" · +DI {t['arti_di']:.0f} / −DI {t['eksi_di']:.0f}" if t["adx"] is not None else ""),
+         "20 altı zayıf, 25 üstü güçlü trend; yönü +DI/−DI gösterir"),
+        ("Bollinger bantları", f"{_n(t['bb_alt'])} – {_n(t['bb_ust'])} TL" + (" · sıkışma" if t["bb_sikisma"] else ""),
+         "20 gün ± 2 standart sapma; sıkışma = bant son 120 günün en dar %20'sinde"),
+        ("OBV (20 gün)", t["obv_egilim"] or "—", "Hacmin yükselen/düşen günlere dağılımı: hareket hacimle destekleniyor mu?"),
+        ("Endekse göre güç 20 / 60 gün", f"{pct(t['rs_20g_%'])} / {pct(t['rs_60g_%'])}",
+         "Hissenin getirisi XU100'e göre; XU100 fiyatı yoksa boş"),
+        ("Ort. günlük işlem hacmi", _n(t["islem_hacmi_tl"] / 1e6 if t["islem_hacmi_tl"] else None, "{:,.0f} milyon TL"),
+         "Son 20 gün, fiyat × hacim; düşükse emir gerçekleşmesi zorlaşır"),
         ("Performans 1 / 5 / 20 gün", f"{pct(t['perf_1g_%'])} / {pct(t['perf_5g_%'])} / {pct(t['perf_20g_%'])}", ""),
     ]
     st.dataframe(pd.DataFrame(rows_, columns=["Gösterge", "Değer", "Açıklama"]), hide_index=True,
@@ -210,6 +221,24 @@ def technical_block(t) -> None:
         (st.error if t.get("veri_kritik") else st.warning)("Veri kontrolü: " + w)
     if not t.get("veri_uyarilari"):
         st.caption("✅ Veri kontrolü: fiyat güncel, sınırı aşan sıçrama ya da uzun boşluk yok.")
+
+
+def news_move_block(ticker: str) -> None:
+    """Haber fiyatlanmış mı? Son olumlu/olumsuz haberden önceki ve sonraki fiyat hareketi (yalnız ölçüm)."""
+    imp = conn.execute("SELECT published_at FROM impacts WHERE ticker=? AND direction!=0 ORDER BY published_at DESC LIMIT 1",
+                       (ticker,)).fetchone()
+    t = tech(ticker)
+    if not imp or not t:
+        return
+    m = technical.news_moves_for(conn, ticker, imp["published_at"], t.get("atr"))
+    if not m:
+        return
+    pct = lambda v: "—" if v is None else f"{v:+.1f}%"
+    after = pct(m.get("sonra_%")) + (f" ({m['sonra_atr']:+.1f} günlük ortalama hareket)" if m.get("sonra_atr") is not None else "")
+    st.caption(f"⏱️ Haber fiyatlanmış mı? Son haber {imp['published_at'][:10]} · haberden önceki 5 işlem günü: "
+               f"{pct(m.get('once_5g_%'))} · haberden bu yana: {after}. Haberden önceki büyük hareket beklentiyi ya da "
+               "sızıntıyı, sonraki büyük hareket etkinin bir kısmının fiyata yansıdığını gösterebilir (yalnız ölçüm, "
+               "yorum eşiği henüz test edilmedi).")
 
 
 def financial_block(ticker: str) -> None:
@@ -273,6 +302,7 @@ def stock_details(r: dict) -> None:
                f"{r['news_count']} haber. Emir vermeden önce haberin kendisini okuyun.")
     scenario_block(scenario(r))
     technical_block(tech(r["ticker"]))
+    news_move_block(r["ticker"])
     financial_block(r["ticker"])
     st.markdown("**📰 Haberler ve analiz**")
     for i in conn.execute("SELECT i.*, n.title, n.url, n.source, n.note FROM impacts i JOIN news n ON n.id=i.news_id "
@@ -342,6 +372,13 @@ with tab_list:
                     "Direnç 20g": t.get("direnc_20g"), "Günlük oynaklık %": t.get("atr_%"),
                     "Perf. 1g %": t.get("perf_1g_%"), "Perf. 5g %": t.get("perf_5g_%"),
                     "Perf. 20g %": t.get("perf_20g_%"),
+                    "EMA 20": t.get("ema20"), "EMA 50": t.get("ema50"), "EMA 200": t.get("ema200"),
+                    "ADX 14": t.get("adx"), "+DI": t.get("arti_di"), "-DI": t.get("eksi_di"),
+                    "Bollinger alt": t.get("bb_alt"), "Bollinger üst": t.get("bb_ust"),
+                    "Bollinger sıkışma": "evet" if t.get("bb_sikisma") else ("hayır" if t else ""),
+                    "OBV 20g": t.get("obv_egilim") or "",
+                    "Endekse göre 20g %": t.get("rs_20g_%"), "Endekse göre 60g %": t.get("rs_60g_%"),
+                    "Ort. işlem hacmi (mn TL)": t["islem_hacmi_tl"] / 1e6 if t.get("islem_hacmi_tl") else None,
                     "Senaryo": ("elverişsiz" if scenario(r).get("elverissiz") else "var")
                     if scenario(r)["durum"] == "senaryo" else "yok",
                     "Referans fiyat": scenario(r).get("giris"), "Zarar durdur (SL)": scenario(r).get("sl"),

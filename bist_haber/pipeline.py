@@ -2,7 +2,7 @@
 import os
 from typing import Callable, Dict, Optional
 
-from . import analyzer, config, kap, prices, rss
+from . import analyzer, config, kap, prices, rss, technical
 from .universe import Matcher, load_universe, refresh_companies
 
 Progress = Callable[[str, float], None]  # (mesaj, 0..1)
@@ -51,6 +51,7 @@ def update_all(conn, days: int = 1, progress: Optional[Progress] = None, analyze
         out["analyze"] = {"atlandı": "OpenAI anahtarı yok"}
     say("Fiyatlar güncelleniyor...", 0.94)
     tickers = [r["ticker"] for r in conn.execute("SELECT DISTINCT ticker FROM impacts")]
+    tickers.append(technical.BENCHMARK)  # endekse göre güç için XU100 (ücretsiz)
     try:
         out["prices"] = {"rows": prices.update(conn, tickers)}
     except Exception as e:  # fiyat servisi çökerse analiz sonuçları yine görünsün
