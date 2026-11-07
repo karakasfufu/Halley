@@ -58,6 +58,8 @@ def risk_factors(t: Dict, news: Dict) -> List[str]:
         out.append(f"Haber olumlu ama fiyat haberden bu yana %{abs(move['sonra_%']):.1f} düştü ({move['sonra_atr']:.1f} "
                    "günlük ortalama hareket): piyasa haberi olumsuz karşılamış ya da başka bir gelişme olabilir; haberi ve "
                    "gerekçeyi kendiniz kontrol edin")
+    if news.get("bilanco_riski"):  # Parça B2: yasal son bildirim günü işlem vadesi içinde
+        out.append(news["bilanco_riski"])
     pre, atr_pct = move.get("once_5g_%"), t.get("atr_%")
     if news.get("direction", 1) > 0 and pre is not None and atr_pct and pre / atr_pct >= PRE_MOVE_ATR:
         out.append(f"Haberden önceki 5 işlem gününde fiyat %{pre:.1f} yükselmiş ({pre / atr_pct:.1f} günlük ortalama "
@@ -66,7 +68,7 @@ def risk_factors(t: Dict, news: Dict) -> List[str]:
 
 
 HEAVY = ("Haber olumlu ama teknik trend", "Risk/getiri zayıf", "Düşük likidite", "Haberden bu yana",
-         "Haber olumlu ama fiyat")
+         "Haber olumlu ama fiyat", "Vade içinde bilanço açıklanacak")
 
 
 def _points(risks: List[str]) -> int:

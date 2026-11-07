@@ -10,8 +10,8 @@ from html import escape as esc
 import pandas as pd
 import streamlit as st
 
-from bist_haber import (analyzer, calendar_sync, config, db, entries, macro_calendar, pipeline, report, technical,
-                        tradeplan)
+from bist_haber import (analyzer, calendar_sync, config, db, earnings, entries, macro_calendar, pipeline, report,
+                        technical, tradeplan)
 
 st.set_page_config(page_title="Halley", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
 
@@ -263,6 +263,14 @@ def financial_block(ticker: str) -> None:
 
 
 _PLAN_CACHE = {}
+_EARN_CACHE = {}
+
+
+def earning(ticker: str) -> dict:
+    """Parça B2: bilanço yasal son tarihi ve açıklanıp açıklanmadığı (eldeki kayıtlardan)."""
+    if ticker not in _EARN_CACHE:
+        _EARN_CACHE[ticker] = earnings.status(conn, ticker)
+    return _EARN_CACHE[ticker]
 
 
 def scenario(r: dict) -> dict:
@@ -275,7 +283,8 @@ def scenario(r: dict) -> dict:
         news_info = {"score": r["score"], "direction": 1 if r["score"] > 0 else (-1 if r["score"] < 0 else 0),
                      "confidence": imp["confidence"] if imp else None, "flags": r.get("flags", ""),
                      "persistence": imp["persistence"] if imp else "orta",
-                     "reason": imp["reason"] if imp else "", "summary": r["last_news"], "hareket": move}
+                     "reason": imp["reason"] if imp else "", "summary": r["last_news"], "hareket": move,
+                     "bilanco_riski": earnings.window_risk(earning(r["ticker"]), datetime.now(config.TR_TZ).date(), 15)}
         _PLAN_CACHE[r["ticker"]] = tradeplan.plan(tech(r["ticker"]), news_info)
     return _PLAN_CACHE[r["ticker"]]
 
@@ -365,6 +374,8 @@ def stock_details(r: dict) -> None:
     scenario_block(scenario(r))
     technical_block(tech(r["ticker"]))
     news_move_block(r["ticker"])
+    st.caption("📑 Bilanço takvimi: " + earnings.describe(earning(r["ticker"])) +
+               " (Yasal süreler: SPK II-14.1 Md. 10–11; garanti değil, SPK ek süre verebilir.)")
     financial_block(r["ticker"])
     st.markdown("**📰 Haberler ve analiz**")
     for i in conn.execute("SELECT i.*, n.title, n.url, n.source, n.note FROM impacts i JOIN news n ON n.id=i.news_id "
@@ -493,6 +504,7 @@ with tab_list:
                     "Tahmini vade (işlem günü)": "{}–{}".format(*scenario(r)["vade"]) if scenario(r).get("vade") else "",
                     "Risk seviyesi": scenario(r).get("risk_seviyesi", ""),
                     **best_entry_columns(scenario(r)),
+                    "Bilanço durumu": earnings.describe(earning(r["ticker"])),
                     "Risk faktörleri": " | ".join(scenario(r).get("riskler", [])),
                     "Açıklama": scenario(r).get("aciklama", scenario(r).get("neden_yok", "")),
                     "Son haber özeti": r["last_news"],

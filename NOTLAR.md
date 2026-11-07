@@ -625,3 +625,17 @@ TCMB tablosu üzerinden 2027 ilk yarısını ve PPK özetlerini resmi olarak do�
 Gerçek Fed sayfasında 2023 "Jan/Feb 31-1" kısaltması yakalandı ve desteklendi. Sonuç `data/takvim_guncel.json`
 (GitHub'a yüklenmez). Testler ağa çıkmaz (`HALLEY_OFFLINE`, kaydedilmiş gerçek sayfalar `tests/fixtures`).
 **215 test geçti.**
+
+## 2026-11-07 — Parça B2: bilanço takvimi (`bist_haber/earnings.py`)
+
+Kural: SPK II-14.1 Md. 10–11 (II-14.1.a, Resmî Gazete 3.2.2017 sayı 29968; metin RG PDF'inden okundu). Yıllık 60 /
+konsolide 70 gün; ara dönem 30 / 40; sınırlı denetimli ara dönem +10 (6 aylık için varsayıldı → 40 / 50). Son gün
+tatil/hafta sonuysa sonraki iş günü. Banka/sigorta/leasing/faktoring/finansman: özel mevzuat daha kısa olabilir
+(doğrulanmadı, ekranda not). Konsolide mi: "Sorumluluk Beyanı / Faaliyet Raporu (Konsolide | Konsolide Olmayan)"
+bildirimlerinden; bilinmezse iki tarih ve temkinli geç tarih. Açıklandı mı: KAP "Finansal Rapor" bildirimi ya da
+haber analizinde "finansal_sonuc" olayı (dönem sonundan sonra; kaynak yazılır); KAP kayıtları dönem başından yoksa
+"bilinmiyor". Gerçek veride: SASA, EKGYO, ERBOS, MEGMT KAP'tan; FROTO, TOASO, SOKM, ISCTR Bloomberg HT bilanço
+haberlerinden açıklandı (dördü de gerçek 3Ç haberi). 9 aylık konsolide son gün 9 Kasım 2026.
+Senaryo riski: son gün 15 işlem günü içinde ve açıklanmadıysa 2 puan; bilinmiyorsa 1 puan. Panel: hisse ayrıntısında
+"📑 Bilanço takvimi", CSV'de "Bilanço durumu". Pilot senaryo testine henüz bağlanmadı. **226 test geçti.**
+Açık: KAP'tan şirket bazlı rapor durumu sorgusu (KAP isteği gerektirir; onay alınmadı), B3 şirket olayları, B4.
