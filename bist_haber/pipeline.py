@@ -29,7 +29,7 @@ def universe(conn) -> Dict[str, str]:
 
 
 def update_all(conn, days: int = 1, progress: Optional[Progress] = None, analyze: bool = True,
-               analysis_limit: int = 10) -> Dict[str, dict]:
+               analysis_limit: int = 10, quality: Optional[str] = None) -> Dict[str, dict]:
     if not isinstance(analysis_limit, int) or not 1 <= analysis_limit <= 10:
         raise ValueError("Bir güncellemede en fazla 10 haber analiz edilebilir.")
     say = progress or (lambda msg, p: None)
@@ -44,7 +44,7 @@ def update_all(conn, days: int = 1, progress: Optional[Progress] = None, analyze
     if analyze and has_api_key():
         say("Yapay zekâ haberleri analiz ediyor...", 0.5)
         out["analyze"] = analyzer.analyze(
-            conn, uni, limit=analysis_limit, progress=lambda i, n: say(f"Yapay zekâ haberleri analiz ediyor ({i}/{n})...",
+            conn, uni, limit=analysis_limit, quality=quality, progress=lambda i, n: say(f"Yapay zekâ haberleri analiz ediyor ({i}/{n})...",
                                                  0.5 + 0.42 * i / max(n, 1)))
         out["analyze"]["waiting"] = len(analyzer.pending(conn))
     elif analyze:
@@ -64,7 +64,7 @@ INPUT_USD_PER_TOKEN = 0.25 / 1_000_000
 OUTPUT_USD_PER_TOKEN = 2.0 / 1_000_000
 
 
-def estimate_next_run(conn, analysis_limit: int = 10) -> Dict[str, float]:
+def estimate_next_run(conn, analysis_limit: int = 10, quality: Optional[str] = None) -> Dict[str, float]:
     """Bir sonraki "Haberleri güncelle"nin yaklaşık maliyeti. Yapay zekâ çağrılmaz.
 
     Girdi tokenı metin uzunluğundan, çıktı tokenı bu bilgisayardaki geçmiş analizlerin ortalamasından
@@ -78,16 +78,40 @@ def estimate_next_run(conn, analysis_limit: int = 10) -> Dict[str, float]:
     n = len(rows)
     low = (f_tok + a_tok) * INPUT_USD_PER_TOKEN + n * avg_out * OUTPUT_USD_PER_TOKEN
     high = (f_tok + 2 * a_tok) * INPUT_USD_PER_TOKEN + 2 * n * avg_out * OUTPUT_USD_PER_TOKEN
+    if not analyzer.quality_profile(quality)["second_opinion"]:
+        high = low  # ikinci görüş kapalı
     return {"next_count": n, "waiting": len(analyzer.pending(conn)), "low_usd": low, "high_usd": high}
 
 
-def free_check(conn, days: int = 1, progress: Optional[Progress] = None, analysis_limit: int = 10) -> Dict[str, dict]:
+def free_check(conn, days: int = 1, progress: Optional[Progress] = None, analysis_limit: int = 10,
+               quality: Optional[str] = None) -> Dict[str, dict]:
     """Ücretsiz deneme: haberleri ve fiyatları toplar, yapay zekâyı HİÇ çağırmaz.
 
     Toplama (KAP, haber siteleri) ve fiyat servisi ücretsizdir; OpenAI kredisi harcanmaz. Sonunda
     bir sonraki gerçek güncellemede kaç haberin analiz edileceği ve yaklaşık maliyeti gösterilir.
     """
     out = update_all(conn, days=days, progress=progress, analyze=False, analysis_limit=analysis_limit)
-    out["estimate"] = estimate_next_run(conn, analysis_limit)
+    out["estimate"] = estimate_next_run(conn, analysis_limit, quality)
     out["free"] = True
     return out
+
+
+SETTINGS_FILE = config.DATA / "ayarlar.json"  # panel ayarları; git'e eklenmez
+
+
+def load_settings() -> dict:
+    """Paneldeki seçimler (ör. analiz kalitesi). Dosya yoksa/bozuksa varsayılanlar."""
+    import json
+    try:
+        data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_settings(**values) -> None:
+    import json
+    data = load_settings()
+    data.update(values)
+    SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    SETTINGS_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")

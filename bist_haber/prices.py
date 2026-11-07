@@ -9,13 +9,20 @@ import yfinance as yf
 from . import config
 
 
-def update(conn, tickers: Iterable[str], period: str = "3mo") -> int:
+def update(conn, tickers: Iterable[str], period: str = "1y") -> int:
+    """Günlük açılış/en yüksek/en düşük/kapanış ve hacim. Teknik analiz için 1 yıl (200 gün ortalaması,
+    52 haftalık zirve/dip) indirilir; ücretsizdir, yapay zekâ kullanmaz."""
     tickers = sorted(set(tickers))
     if not tickers:
         return 0
     df = yf.download([t + ".IS" for t in tickers], period=period, interval="1d",
                      auto_adjust=True, progress=False, group_by="ticker", threads=False)
     rows = 0
+
+    def num(rec, col):
+        v = rec.get(col)
+        return None if v is None or pd.isna(v) else float(v)
+
     for t in tickers:
         sym = t + ".IS"
         if isinstance(df.columns, pd.MultiIndex):
@@ -26,8 +33,9 @@ def update(conn, tickers: Iterable[str], period: str = "3mo") -> int:
             sub = df
         sub = sub.dropna(subset=["Close"])
         for idx, rec in sub.iterrows():
-            conn.execute("INSERT OR REPLACE INTO prices(ticker,date,close,volume) VALUES(?,?,?,?)",
-                         (t, idx.date().isoformat(), float(rec["Close"]), float(rec.get("Volume", 0) or 0)))
+            conn.execute("INSERT OR REPLACE INTO prices(ticker,date,open,high,low,close,volume) VALUES(?,?,?,?,?,?,?)",
+                         (t, idx.date().isoformat(), num(rec, "Open"), num(rec, "High"), num(rec, "Low"),
+                          float(rec["Close"]), float(rec.get("Volume", 0) or 0)))
             rows += 1
     conn.commit()
     return rows

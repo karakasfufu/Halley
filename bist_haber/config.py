@@ -30,6 +30,21 @@ ANALYSIS_REASONING_EFFORT = os.getenv("ANALYSIS_REASONING_EFFORT", "high")
 # kontrol edilir. Yön çelişirse etki nötrlenir ve "çelişkili" olarak işaretlenir.
 SECOND_OPINION = os.getenv("SECOND_OPINION", "1") == "1"
 SECOND_OPINION_MIN_IMPACT = 3
+
+# Kullanıcının panelden seçebileceği analiz kalitesi (2026-11-07). Varsayılan "yuksek" = yukarıdaki ayarlar.
+# Model her profilde gpt-5-mini. Geçmiş veri pilotu bu seçimden etkilenmez (her zaman "yuksek").
+# Maliyetin büyük kısmı modelin düşünme dahil çıktısıdır; "maliyet" alanı kabaca göreli tahmindir.
+QUALITY_PROFILES = {
+    "yuksek": {"etiket": "Yüksek doğruluk (önerilen)", "reasoning": ANALYSIS_REASONING_EFFORT,
+               "second_opinion": SECOND_OPINION, "second_min_impact": SECOND_OPINION_MIN_IMPACT,
+               "body_factor": 1.0, "maliyet": "tam maliyet"},
+    "dengeli": {"etiket": "Dengeli", "reasoning": "medium", "second_opinion": True, "second_min_impact": 4,
+                "body_factor": 1.0, "maliyet": "tahminen ~%55–70"},
+    "ekonomik": {"etiket": "Ekonomik", "reasoning": "low", "second_opinion": False, "second_min_impact": 5,
+                 "body_factor": 0.6, "maliyet": "tahminen ~%30–40"},
+}
+DEFAULT_QUALITY = "yuksek"
+TEST_QUALITY = "ekonomik"  # kaydedilmeyen ucuz test analizi için
 ANALYSIS_WORKERS = int(os.getenv("ANALYSIS_WORKERS", "5"))  # aynı anda kaç haber analiz edilsin
 
 # BIST sürekli işlem seansının bitişi (yerel saat). Sonrasında gelen haber

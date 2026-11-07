@@ -59,6 +59,9 @@ CREATE TABLE IF NOT EXISTS prices (
     date   TEXT NOT NULL,
     close  REAL,
     volume REAL,
+    open   REAL,
+    high   REAL,
+    low    REAL,
     PRIMARY KEY (ticker, date)
 );
 """
@@ -74,4 +77,8 @@ def connect(path=None) -> sqlite3.Connection:
     cols = {r[1] for r in conn.execute("PRAGMA table_info(impacts)")}
     if "flag" not in cols:
         conn.execute("ALTER TABLE impacts ADD COLUMN flag TEXT")  # ör. "çelişkili", "ikinci görüş"
+    price_cols = {r[1] for r in conn.execute("PRAGMA table_info(prices)")}
+    for col in ("open", "high", "low"):  # teknik analiz için (2026-11-07)
+        if col not in price_cols:
+            conn.execute(f"ALTER TABLE prices ADD COLUMN {col} REAL")
     return conn

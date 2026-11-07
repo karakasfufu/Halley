@@ -9,7 +9,7 @@ from html import escape as esc
 import pandas as pd
 import streamlit as st
 
-from bist_haber import config, db, pipeline, report
+from bist_haber import analyzer, config, db, pipeline, report, technical
 
 st.set_page_config(page_title="Halley", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
 
@@ -89,13 +89,27 @@ with st.expander("⚙️ Ayarlar"):
                                   help="KAP ve haber siteleri birlikte bu adede dahildir. Kalanlar sonraki güncellemeyi "
                                        "bekler. Bu bir adet sınırıdır, para tavanı değildir.", key="live_analysis_limit")
     window = s3.slider("Son kaç günün haberleri listeye katılsın?", 3, 30, 7)
+    # Analiz kalitesi: kullanıcı seçer, seçim bu bilgisayarda saklanır (data/ayarlar.json).
+    q_keys = list(config.QUALITY_PROFILES)
+    saved_q = pipeline.load_settings().get("analiz_kalitesi", config.DEFAULT_QUALITY)
+    quality = st.radio(
+        "Analiz kalitesi", q_keys, index=q_keys.index(saved_q) if saved_q in q_keys else 0, horizontal=True,
+        format_func=lambda k: f"{config.QUALITY_PROFILES[k]['etiket']} ({config.QUALITY_PROFILES[k]['maliyet']})",
+        help="Yüksek doğruluk: model daha uzun düşünür, büyük kararlar ikinci kez kontrol edilir. "
+             "Dengeli: orta düşünme, ikinci kontrol yalnız çok büyük kararlarda. Ekonomik: kısa düşünme, "
+             "ikinci kontrol yok, daha kısa metin okunur — daha ucuz ama hata payı daha yüksek.",
+        key="analysis_quality")
+    if quality != saved_q:
+        pipeline.save_settings(analiz_kalitesi=quality)
+    if quality != config.DEFAULT_QUALITY:
+        st.caption("⚠️ Bu ayarda maliyet düşer ama analizler daha az ayrıntılı ve hata payı daha yüksek olabilir.")
     st.caption("Kaynaklar: KAP + " + ", ".join(config.RSS_SOURCE_LABELS.get(n, n) for n in config.RSS_FEEDS)
                + ". KAP hızlı isteklere sınır koyduğu için ilk güncelleme birkaç dakika sürebilir.")
 
 if h2.button("🔄 Haberleri güncelle", type="primary", use_container_width=True):
     bar = st.progress(0.0, text="Başlıyor...")
     try:
-        res = pipeline.update_all(conn, days=days, analysis_limit=analysis_limit,
+        res = pipeline.update_all(conn, days=days, analysis_limit=analysis_limit, quality=quality,
                                   progress=lambda m, p: bar.progress(min(p, 1.0), text=m))
         st.session_state["last_update"] = datetime.now(config.TR_TZ).strftime("%H:%M")
         st.session_state["last_result"] = res
@@ -109,7 +123,7 @@ if h2.button("🧪 Ücretsiz dene", use_container_width=True, key="free_check",
                   "Bir sonraki gerçek güncellemenin yaklaşık maliyetini gösterir."):
     bar = st.progress(0.0, text="Başlıyor (yapay zekâ kullanılmayacak)...")
     try:
-        res = pipeline.free_check(conn, days=days, analysis_limit=analysis_limit,
+        res = pipeline.free_check(conn, days=days, analysis_limit=analysis_limit, quality=quality,
                                   progress=lambda m, p: bar.progress(min(p, 1.0), text=m))
         st.session_state["last_result"] = res
     except Exception as e:
@@ -151,11 +165,71 @@ m3.metric("Son güncelleme", last_update_text())
 tab_list, tab_news, tab_adv = st.tabs(["📈 Bugünün listesi", "📰 Haberler", "🔧 Gelişmiş"])
 
 
+_TECH_CACHE = {}
+
+
+def tech(ticker: str):
+    """Teknik göstergeler (kodla hesaplanır, kredi harcamaz). Sayfa çiziminde bir kez hesaplanır."""
+    if ticker not in _TECH_CACHE:
+        _TECH_CACHE[ticker] = technical.for_ticker(conn, ticker)
+    return _TECH_CACHE[ticker]
+
+
+def _n(v, fmt="{:.2f}"):
+    return "—" if v is None else fmt.format(v)
+
+
+def technical_block(t) -> None:
+    st.markdown("**📊 Teknik görünüm** <span class='news-meta'>(fiyat verisinden hesaplanır; haber skoruna katılmaz)</span>",
+                unsafe_allow_html=True)
+    if not t:
+        st.caption("Bu hisse için yeterli fiyat geçmişi yok (en az 30 işlem günü gerekir). "
+                   "Bir sonraki güncellemede 1 yıllık fiyat indirilir.")
+        return
+    pct = lambda v: _n(v, "{:+.1f}%")
+    rows_ = [
+        ("Trend", t["trend"], "Fiyatın 50 ve 200 günlük ortalamalara göre konumu"),
+        ("Son fiyat", f"{_n(t['son_fiyat'])} TL ({t['tarih']})", "Fiyatlar gecikmelidir"),
+        ("50 günlük ortalamaya göre", pct(t["fiyat_sma50_%"]), f"Ortalama {_n(t['sma50'])} TL"),
+        ("200 günlük ortalamaya göre", pct(t["fiyat_sma200_%"]), f"Ortalama {_n(t['sma200'])} TL"),
+        ("RSI (14 gün)", _n(t["rsi14"], "{:.0f}"), "70 üstü aşırı alım, 30 altı aşırı satım bölgesi"),
+        ("MACD ivmesi", "olumlu" if (t["macd_hist"] or 0) > 0 else ("zayıf" if t["macd_hist"] is not None else "—"),
+         "MACD çizgisi sinyal çizgisinin üstünde mi?"),
+        ("Hacim", _n(t["hacim_orani"], "{:.1f} kat"), "Son 5 günün ortalaması / önceki 20 günün ortalaması"),
+        ("52 haftalık zirveye uzaklık", pct(t["zirveye_uzaklik_%"]), f"Zirve {_n(t['zirve_52h'])} TL"),
+        ("52 haftalık dibe uzaklık", pct(t["dibe_uzaklik_%"]), f"Dip {_n(t['dip_52h'])} TL"),
+        ("Destek / direnç (20 gün)", f"{_n(t['destek_20g'])} / {_n(t['direnc_20g'])} TL", "Son 20 günün en düşük / en yüksek fiyatı"),
+        ("Günlük oynaklık", pct(t["atr_%"]).replace("+", ""), "Ortalama günlük fiyat aralığı (ATR 14)"),
+        ("Performans 1 / 5 / 20 gün", f"{pct(t['perf_1g_%'])} / {pct(t['perf_5g_%'])} / {pct(t['perf_20g_%'])}", ""),
+    ]
+    st.dataframe(pd.DataFrame(rows_, columns=["Gösterge", "Değer", "Açıklama"]), hide_index=True,
+                 use_container_width=True)
+    if t["notlar"]:
+        st.caption("Notlar: " + " · ".join(t["notlar"]) + f" · {t['gun_sayisi']} işlem günü veriyle hesaplandı.")
+
+
+def financial_block(ticker: str) -> None:
+    """Hissenin son finansal raporundan kodla hesaplanmış yıllık değişimler (varsa)."""
+    row = conn.execute("SELECT published_at, body FROM news WHERE source='kap' AND body LIKE '[FİNANSAL TABLO ÖZETİ%' "
+                       "AND (','||candidates||',') LIKE ? ORDER BY published_at DESC LIMIT 1",
+                       (f"%,{ticker},%",)).fetchone()
+    if not row or "YILLIK DEĞİŞİMLER" not in row["body"]:
+        return
+    part = row["body"].split("YILLIK DEĞİŞİMLER", 1)[1].split("\n\n", 1)[0]
+    lines = [ln for ln in part.splitlines()[1:] if ln.strip()][:8]
+    st.markdown(f"**📑 Son finansal rapor** <span class='news-meta'>({row['published_at'][:10]}, "
+                "yıllık değişimler kodla hesaplandı)</span>", unsafe_allow_html=True)
+    st.markdown("\n".join(f"- {esc(ln)}" for ln in lines))
+
+
 def stock_details(r: dict) -> None:
-    """Bir hisseye tıklanınca açılan ayrıntı: skor, fiyat değişimi ve haberler."""
+    """Bir hisseye tıklanınca açılan ayrıntı: haber skoru, teknik görünüm, finansal özet ve haberler."""
     pct = lambda v: "—" if v is None else f"{v:+.1f}%"
-    st.caption(f"Skor {r['score']:+.2f} · son 1 gün {pct(r['chg_1d'])} · son 5 gün {pct(r['chg_5d'])} · "
+    st.caption(f"Haber skoru {r['score']:+.2f} · son 1 gün {pct(r['chg_1d'])} · son 5 gün {pct(r['chg_5d'])} · "
                f"{r['news_count']} haber. Emir vermeden önce haberin kendisini okuyun.")
+    technical_block(tech(r["ticker"]))
+    financial_block(r["ticker"])
+    st.markdown("**📰 Haberler ve analiz**")
     for i in conn.execute("SELECT i.*, n.title, n.url, n.source, n.note FROM impacts i JOIN news n ON n.id=i.news_id "
                           "WHERE i.ticker=? ORDER BY i.published_at DESC LIMIT 5", (r["ticker"],)):
         cls, word = DIR_TR[i["direction"]]
@@ -180,9 +254,9 @@ def stock_list(items: list, empty_text: str) -> None:
         return
     for r in items:
         reason = (r["last_news"] or "").strip()
-        reason = reason if len(reason) <= 90 else reason[:88].rstrip() + "…"
+        reason = reason if len(reason) <= 80 else reason[:78].rstrip() + "…"
         badge = check_badge(r.get("flags", ""))
-        with st.expander(f"**{r['ticker']}** · {reason}   {badge}"):
+        with st.expander(f"**{r['ticker']}** · {reason}   {badge} · {technical.short_label(tech(r['ticker']))}"):
             st.markdown(f"**{esc(r['name'])}**")
             stock_details(r)
 
@@ -202,13 +276,31 @@ with tab_list:
         st.caption("Bir hisseye tıklayınca haberin özeti, nedeni ve kaynağı açılır. "
                    "✅ Teyitli: iki ayrı analiz aynı sonuca vardı · ⚠️ Kontrol et: analizler çelişti ya da emin değil.")
         if st.session_state.get("signals_export_ready"):
-            frame = pd.DataFrame(rows)
-            frame["kontrol"] = frame["flags"].map(check_badge).str.replace("✅ ", "").str.replace("⚠️ ", "")
-            frame = frame[["ticker", "name", "signal", "kontrol", "score", "news_count", "chg_1d", "chg_5d", "last_news"]]
-            frame.columns = ["Hisse", "Şirket", "Sinyal", "Kontrol", "Skor", "Haber sayısı",
-                             "Son 1 gün %", "Son 5 gün %", "Son haber özeti"]
-            frame = frame.round({"Skor": 2, "Son 1 gün %": 1, "Son 5 gün %": 1})
-            st.download_button("⬇️ Listeyi indir (Excel uyumlu CSV)", frame.to_csv(index=False).encode("utf-8-sig"),
+            # Detaylı liste: haber analizi + teknik göstergeler (hepsi kayıtlı veriden, kredi harcamaz).
+            detail = []
+            for r in rows:
+                t = tech(r["ticker"]) or {}
+                last_imp = conn.execute("SELECT event_type, magnitude, confidence, persistence, reason FROM impacts "
+                                        "WHERE ticker=? ORDER BY published_at DESC LIMIT 1", (r["ticker"],)).fetchone()
+                detail.append({
+                    "Hisse": r["ticker"], "Şirket": r["name"], "Sinyal": r["signal"],
+                    "Kontrol": check_badge(r.get("flags", "")).replace("✅ ", "").replace("⚠️ ", ""),
+                    "Haber skoru": round(r["score"], 2), "Haber sayısı": r["news_count"],
+                    "Olay türü": EVENT_TR.get(last_imp["event_type"], last_imp["event_type"]) if last_imp else "",
+                    "Etki": impact_word(last_imp["magnitude"]) if last_imp else "",
+                    "Güven %": round(last_imp["confidence"] * 100) if last_imp else None,
+                    "Kalıcılık": PERSIST_TR.get(last_imp["persistence"], "") if last_imp else "",
+                    "Teknik trend": t.get("trend", ""), "Son fiyat": t.get("son_fiyat"),
+                    "RSI 14": t.get("rsi14"), "50g ort. farkı %": t.get("fiyat_sma50_%"),
+                    "200g ort. farkı %": t.get("fiyat_sma200_%"), "Hacim oranı": t.get("hacim_orani"),
+                    "52h zirveye uzaklık %": t.get("zirveye_uzaklik_%"), "Destek 20g": t.get("destek_20g"),
+                    "Direnç 20g": t.get("direnc_20g"), "Günlük oynaklık %": t.get("atr_%"),
+                    "Perf. 1g %": t.get("perf_1g_%"), "Perf. 5g %": t.get("perf_5g_%"),
+                    "Perf. 20g %": t.get("perf_20g_%"), "Son haber özeti": r["last_news"],
+                    "Neden": last_imp["reason"] if last_imp else "",
+                })
+            frame = pd.DataFrame(detail).round(2)
+            st.download_button("⬇️ Detaylı listeyi indir (Excel uyumlu CSV)", frame.to_csv(index=False).encode("utf-8-sig"),
                                file_name=f"halley_liste_{datetime.now(config.TR_TZ).date()}.csv", mime="text/csv",
                                key="signals_download")
         elif st.button("⬇️ Listeyi indirmeye hazırla", key="signals_export_prepare"):
@@ -268,6 +360,40 @@ with tab_adv:
     if last:
         with st.expander("Son güncellemenin teknik ayrıntıları"):
             st.json(last)
+
+    st.divider()
+    st.markdown("#### 🧪 Ucuz test analizi")
+    st.caption("Sıradaki en yeni 1 haberi ekonomik ayarla (kısa düşünme, ikinci kontrol yok) analiz eder ve sonucu "
+               "burada gösterir. HİÇBİR ŞEY KAYDEDİLMEZ: listeye ve skora karışmaz, haber sırada kalır. Akışı denemek "
+               "içindir; tahmini maliyet haber başına ~0,003–0,005 $.")
+    if st.button("🧪 1 haberle ucuz test yap", key="cheap_test"):
+        if not pipeline.has_api_key():
+            st.warning("Test için OpenAI API anahtarı gerekli.")
+        else:
+            with st.spinner("Test analizi yapılıyor (kaydedilmeyecek)..."):
+                try:
+                    st.session_state["cheap_test_result"] = analyzer.test_one(conn, uni) or {"bos": True}
+                except Exception as e:
+                    st.session_state["cheap_test_result"] = {"hata": str(e)}
+    tr = st.session_state.get("cheap_test_result")
+    if tr:
+        if tr.get("bos"):
+            st.info("Sırada analiz edilecek haber yok. Önce 🧪 Ücretsiz dene ile haber toplayın.")
+        elif tr.get("hata"):
+            st.error(f"Test tamamlanamadı: {tr['hata']}")
+        else:
+            row_ = tr["row"]
+            st.write(f"**Haber:** {row_['title']}  \nKaynak: {row_['source']} · {row_['published_at'][:16].replace('T', ' ')}")
+            st.write(f"**Maliyet:** {tr['usd']:.4f} $ · girdi {tr['input_tokens']:,} · çıktı {tr['output_tokens']:,} token")
+            if tr["analysis"] is None:
+                st.write(f"Ön eleme bu haberi önemsiz buldu: {tr['filter'].neden if tr['filter'] else '-'}")
+            else:
+                a = tr["analysis"]
+                st.write(f"**Özet:** {a.ozet}")
+                for imp in a.etkiler:
+                    st.write(f"- {imp.hisse}: {imp.yon}, etki {impact_word(imp.etki)} — {imp.gerekce}")
+                st.caption(f"Olay: {EVENT_TR.get(a.olay_tipi, a.olay_tipi)} · güven %{a.guven * 100:.0f} · "
+                           "Bu sonuç kaydedilmedi; gerçek analiz yüksek doğrulukla ayrıca yapılır.")
 
 conn.close()
 

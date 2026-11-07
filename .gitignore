@@ -7,3 +7,4 @@ data/backtest/
 *.db-wal
 *.db-shm
 .pytest_cache/
+data/ayarlar.json

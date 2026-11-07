@@ -444,6 +444,8 @@ class PanelTests(unittest.TestCase):
                 self.assertTrue(any("Gelişmiş" in tab.label for tab in at.tabs))
                 self.assertTrue(any("Geçmiş veri pilotu" in m.value for m in at.markdown))
                 self.assertTrue(any(b.label == "🔄 Haberleri güncelle" for b in at.button))
+                self.assertTrue(any(b.key == "cheap_test" for b in at.button))
+                self.assertEqual(at.radio(key="analysis_quality").value, "yuksek")  # varsayılan yüksek doğruluk
                 # Ücretsiz deneme: toplama ağ gerektirdiği için sahte; yapay zekâ çağrılırsa test düşer.
                 from bist_haber import analyzer, pipeline
                 fake = {"free": True, "kap": {"new": 3}, "rss": {"new": 1},

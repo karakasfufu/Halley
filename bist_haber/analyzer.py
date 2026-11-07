@@ -245,10 +245,16 @@ def fetch_article(url: str) -> str:
         return ""
 
 
-def _needs_second_opinion(a: "FullAnalysis") -> bool:
+def _needs_second_opinion(a: "FullAnalysis", min_impact: Optional[int] = None) -> bool:
     """Büyük etkili ya da belirsiz yönlü kararlar ikinci, bağımsız bir analizle kontrol edilir."""
-    return any(i.etki >= config.SECOND_OPINION_MIN_IMPACT or (i.yon != "notr" and a.guven < 0.6)
-               for i in a.etkiler)
+    limit = config.SECOND_OPINION_MIN_IMPACT if min_impact is None else min_impact
+    return any(i.etki >= limit or (i.yon != "notr" and a.guven < 0.6) for i in a.etkiler)
+
+
+def quality_profile(name: Optional[str] = None) -> dict:
+    """Analiz kalitesi profili. Bilinmeyen/boş ad varsayılan (yüksek doğruluk) profile döner."""
+    return dict(config.QUALITY_PROFILES.get(name or config.DEFAULT_QUALITY,
+                                            config.QUALITY_PROFILES[config.DEFAULT_QUALITY]))
 
 
 def _reconcile(a1: "FullAnalysis", a2: "FullAnalysis") -> Tuple["FullAnalysis", Dict[str, str]]:
@@ -276,11 +282,13 @@ def _reconcile(a1: "FullAnalysis", a2: "FullAnalysis") -> Tuple["FullAnalysis", 
     return a1.model_copy(update={"etkiler": merged, "guven": guven}), flags
 
 
-def _work(llm: LLM, row, universe: Dict[str, str], stats: Dict[str, dict]):
+def _work(llm: LLM, row, universe: Dict[str, str], stats: Dict[str, dict], quality: Optional[dict] = None):
     """Tek haber için ağ ve LLM işleri (iş parçacığında; veritabanına dokunmaz).
 
-    Dönen sözlük _store tarafından kaydedilir.
+    Dönen sözlük _store tarafından kaydedilir. quality verilmezse yüksek doğruluk profili kullanılır
+    (geçmiş veri pilotu bu yolu kullanır ve kalitesi düşürülmez).
     """
+    q = quality or quality_profile()
     res = {"filter": None, "analysis": None, "flags": {}, "article": None, "tokens": [0, 0]}
 
     def call(model, prompt, msg, schema, effort=None):
@@ -306,10 +314,11 @@ def _work(llm: LLM, row, universe: Dict[str, str], stats: Dict[str, dict]):
             body = f"{row['body'] or ''}\n\n[TAM METİN]\n{article}"
 
     # Önemli konularda (pay alım teklifi, birleşme...) daha uzun metin okunur; diğerleri varsayılan sınırda.
-    msg = _user_message(row, universe, config.reading_limits(row["subject"] or "")["body_chars"], stats, body)
-    a = call(config.MODEL_ANALYSIS, ANALYSIS_PROMPT, msg, FullAnalysis, config.ANALYSIS_REASONING_EFFORT)
-    if config.SECOND_OPINION and _needs_second_opinion(a):
-        a2 = call(config.MODEL_ANALYSIS, ANALYSIS_PROMPT, msg, FullAnalysis, config.ANALYSIS_REASONING_EFFORT)
+    body_chars = int(config.reading_limits(row["subject"] or "")["body_chars"] * q["body_factor"])
+    msg = _user_message(row, universe, body_chars, stats, body)
+    a = call(config.MODEL_ANALYSIS, ANALYSIS_PROMPT, msg, FullAnalysis, q["reasoning"])
+    if q["second_opinion"] and _needs_second_opinion(a, q["second_min_impact"]):
+        a2 = call(config.MODEL_ANALYSIS, ANALYSIS_PROMPT, msg, FullAnalysis, q["reasoning"])
         a, res["flags"] = _reconcile(a, a2)
     res["analysis"] = a
     return res
@@ -364,9 +373,30 @@ def _store(conn, row, universe, res, stats) -> None:
     stats["analyzed"] += 1
 
 
+def test_one(conn, universe: Dict[str, str], llm: Optional[LLM] = None) -> Optional[dict]:
+    """Ucuz test analizi: sıradaki en yeni 1 haberi "ekonomik" profille analiz eder, HİÇBİR ŞEY KAYDETMEZ.
+
+    Geliştirici/kullanıcı akışı denemek için kullanır; listeye ve skora karışmaz, haber sırada kalır.
+    """
+    rows = pending(conn, 1)
+    if not rows:
+        return None
+    row = rows[0]
+    llm = llm or LLM()
+    res = _work(llm, row, universe, {}, quality_profile(config.TEST_QUALITY))
+    tin, tout = res["tokens"]
+    from .pipeline import INPUT_USD_PER_TOKEN, OUTPUT_USD_PER_TOKEN
+    return {"row": dict(row), "filter": res["filter"], "analysis": res["analysis"], "input_tokens": tin,
+            "output_tokens": tout, "usd": tin * INPUT_USD_PER_TOKEN + tout * OUTPUT_USD_PER_TOKEN}
+
+
 def analyze(conn, universe: Dict[str, str], limit: Optional[int] = None, llm: Optional[LLM] = None,
-            progress: Optional[Callable[[int, int], None]] = None) -> Dict[str, int]:
-    """Bekleyen haberleri analiz eder. LLM çağrıları paralel, veritabanı yazımı ana iş parçacığında."""
+            progress: Optional[Callable[[int, int], None]] = None, quality: Optional[str] = None) -> Dict[str, int]:
+    """Bekleyen haberleri analiz eder. LLM çağrıları paralel, veritabanı yazımı ana iş parçacığında.
+
+    quality: "yuksek" | "dengeli" | "ekonomik" (panel ayarı). Boşsa yüksek doğruluk.
+    """
+    q = quality_profile(quality)
     llm = llm or LLM()
     stats = {"analyzed": 0, "filtered_out": 0, "errors": 0, "impacts": 0, "dropped_tickers": 0,
              "flagged": 0, "input_tokens": 0, "output_tokens": 0}
@@ -381,7 +411,7 @@ def analyze(conn, universe: Dict[str, str], limit: Optional[int] = None, llm: Op
         cstats = {}
     done = 0
     with ThreadPoolExecutor(max_workers=config.ANALYSIS_WORKERS) as ex:
-        futures = {ex.submit(_work, llm, row, universe, cstats): row for row in rows}
+        futures = {ex.submit(_work, llm, row, universe, cstats, q): row for row in rows}
         for fut in as_completed(futures):
             row = futures[fut]
             done += 1
