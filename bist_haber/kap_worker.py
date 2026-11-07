@@ -4,8 +4,8 @@ Kullanıcı isteği: "Eksik kalan sayfa olursa otomatik yeniden okumaya çalış
 denemesin; olay özetini bildirip tamamlanana kadar devam etsin (100'den fazla okunacaksa)." KAP yaklaşık 100 istekten
 sonra geçici sınır uyguluyor (2026-11-07 gözlemi: iki turda 100 ve 99 sayfa).
 
-Ne yapar: takvim bildirimlerinin (status='context') ve günlük güncellemede metni alınamamış haberlerin
-(status='new', metin yok) sayfalarını okur. YAPAY ZEKÂ ÇAĞIRMAZ, kredi harcamaz; analiz yine "Haberleri güncelle" ile
+Ne yapar: önce günlük güncellemede metni alınamamış haberlerin (status='new', metin yok; en yeniden eskiye), sonra
+takvim bildirimlerinin (status='context') sayfalarını okur. YAPAY ZEKÂ ÇAĞIRMAZ, kredi harcamaz; analiz yine "Haberleri güncelle" ile
 yapılır. KAP bekleme süresi (1,5 sn) korunur. Sınır gelirse 3 → 5 → 10 dk bekleyip devam eder; en fazla 4 saat.
 İlerleme olmayan (sınır da gelmeyen) turda durur: o sayfalar bu sefer okunamıyor demektir. Durum data/kap_okuyucu.json
 dosyasındadır; panel buradan canlı gösterir. Aynı anda tek işçi çalışır.
@@ -110,11 +110,13 @@ def run(db_path=None, sleep: Callable[[float], None] = time.sleep, clock: Callab
             round_info.update(base_okunan=st["okunan"], before=before["toplam"], calls=0)
             limited = False
             try:
-                r1 = backfill_fn(conn)
-                limited = bool(r1.get("kap_siniri"))
-                if not limited:  # takvim bitti ya da sınır yok → günlük haber metinleri
-                    r2 = fetch_new_fn(conn)
-                    limited = bool(r2.get("rate_limited"))
+                # Önce güncel haber metinleri (en yeniden eskiye; swing için taze haber önemli, kullanıcı isteği
+                # 2026-11-07), sonra takvim sayfaları.
+                r2 = fetch_new_fn(conn)
+                limited = bool(r2.get("rate_limited"))
+                if not limited:
+                    r1 = backfill_fn(conn)
+                    limited = bool(r1.get("kap_siniri"))
             except kap.RateLimited:
                 limited = True
             except Exception as e:  # ağ hatası vb.: sınır gibi bekleyip dene

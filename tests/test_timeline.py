@@ -45,6 +45,17 @@ class TimelineTests(unittest.TestCase):
         txt = T.compact(T.for_ticker(self.conn, "ETILR", date(2026, 11, 7), 15))
         self.assertTrue(txt.startswith("9.11 2026 9 aylık bilanço yasal son günü; 12.11 TCMB Enflasyon Raporu"), txt)
 
+    def test_unread_calendar_pages_are_warned(self):
+        self.conn.execute("INSERT INTO news(id,source,published_at,effective_date,title,subject,body,candidates,status,"
+                          "fetched_at) VALUES('k9','kap','2026-10-15T10:00:00+03:00','2026-10-15','t',"
+                          "'Genel Kurul İşlemlerine İlişkin Bildirim',NULL,'ETILR','context','n')")
+        self.conn.commit()
+        tl = T.for_ticker(self.conn, "ETILR", date(2026, 11, 7), 15)
+        self.assertEqual(tl["okunmamis"], 1)
+        self.assertIn("1 takvim bildiriminin", tl["okunmamis_notu"])
+        self.conn.execute("UPDATE news SET body='x' WHERE id='k9'")
+        self.assertIsNone(T.for_ticker(self.conn, "ETILR", date(2026, 11, 7), 15)["okunmamis_notu"])
+
     def test_published_report_not_listed(self):
         self.conn.execute("INSERT INTO news(id,source,published_at,effective_date,title,subject,candidates,fetched_at,"
                           "donem) VALUES('k2','kap','2026-11-05T18:00:00+03:00','2026-11-06','x','Finansal Rapor','ETILR',"

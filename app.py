@@ -343,6 +343,8 @@ def timeline_block(ticker: str) -> None:
                                    for x in tl["olaylar"]]), hide_index=True, use_container_width=True)
     notes = [n for n in ([("Takvimi henüz bilinmeyen: " + ", ".join(tl["bilinmeyen"])) if tl["bilinmeyen"] else None,
                           tl.get("tatil_notu"), tl.get("kap_boslugu")]) if n]
+    if tl.get("okunmamis_notu"):
+        st.warning("⏳ " + tl["okunmamis_notu"])
     if notes:
         st.caption(" · ".join(notes))
 

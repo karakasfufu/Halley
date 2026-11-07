@@ -44,8 +44,14 @@ def for_ticker(conn, ticker: str, today: Optional[date] = None, days: int = 15) 
     gaps = coverage_gaps(conn, today - timedelta(days=config.KAP_HISTORY_DAYS - 1), today, today)
     gap_note = (f"KAP listesi {len(gaps)} gün için alınmamış: bu günlerde açıklanan şirket olayları eksik olabilir "
                 "(bir sonraki güncellemede kendiliğinden tamamlanır)." if gaps else None)
+    unread = conn.execute("SELECT COUNT(*) FROM news WHERE status='context' AND body IS NULL AND (','||candidates||',') "
+                          "LIKE ? AND subject IN (%s)" % ",".join("?" * len(corp_events.SUBJECTS)),
+                          (f"%,{ticker},%", *corp_events.SUBJECTS)).fetchone()[0]
+    unread_note = (f"Bu hisse için {unread} takvim bildiriminin (genel kurul / kâr payı / sermaye artırımı) sayfası henüz "
+                   "okunmadı: şirket olayları eksik olabilir; arka planda okunuyor, tamamlanınca kendiliğinden görünür."
+                   if unread else None)
     return {"olaylar": items, "bitis": end, "bilinmeyen": up["bilinmeyen"], "tatil_notu": up.get("tatil_notu"),
-            "kap_boslugu": gap_note}
+            "kap_boslugu": gap_note, "okunmamis": unread, "okunmamis_notu": unread_note}
 
 
 def macro_risk(today: Optional[date] = None, days: int = 15) -> Optional[str]:

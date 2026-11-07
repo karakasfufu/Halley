@@ -90,6 +90,13 @@ class WorkerTests(unittest.TestCase):
         self.assertIn(110, seen)                      # 2. turda önceki turun 100'ü üstüne eklenir
         self.assertEqual(K.load()["okunan"], 250)
 
+    def test_news_bodies_read_before_calendar_pages(self):
+        order = []
+        K.run(self.path, sleep=self.fc.sleep, clock=self.fc.clock,
+              backfill_fn=lambda c: (order.append("takvim"), self.limited_backfill(per_round=300)(c))[1],
+              fetch_new_fn=lambda c: (order.append("haber"), {"rate_limited": False})[1])
+        self.assertEqual(order[:2], ["haber", "takvim"])
+
     def test_wait_grows_to_ten_minutes(self):
         self.run_worker(self.limited_backfill(per_round=50))         # 5 sınır: 3, 5, 10, 10
         self.assertEqual(self.fc.sleeps, [180, 300, 600, 600])
