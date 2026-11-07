@@ -11,7 +11,7 @@ import pandas as pd
 import streamlit as st
 
 from bist_haber import (analyzer, calendar_sync, config, corp_events, db, earnings, entries, kap_history,
-                        macro_calendar, pipeline, report, technical, tradeplan)
+                        kap_worker, macro_calendar, pipeline, report, technical, tradeplan)
 
 st.set_page_config(page_title="Halley", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
 
@@ -115,6 +115,8 @@ if h2.button("🔄 Haberleri güncelle", type="primary", use_container_width=Tru
                                   progress=lambda m, p: bar.progress(min(p, 1.0), text=m))
         st.session_state["last_update"] = datetime.now(config.TR_TZ).strftime("%H:%M")
         st.session_state["last_result"] = res
+        if res.get("kap", {}).get("rate_limited") and not os.environ.get("HALLEY_OFFLINE"):
+            kap_worker.start()   # yarım kalan metinleri arka planda, KAP sınırına göre bekleyerek tamamla
     except Exception as e:
         st.error(f"Güncelleme tamamlanamadı: {e}")
     conn.close()  # sayfa yenilenmeden önce bağlantıyı bırak (aksi hâlde açık kalıyordu)
@@ -145,7 +147,8 @@ if last.get("free"):
             f"{est.get('low_usd', 0):.3f}–{est.get('high_usd', 0):.3f} $).")
 if last:
     if last.get("kap", {}).get("rate_limited"):
-        st.warning("KAP geçici olarak istek sınırı uyguladı; kalan bildirimler bir sonraki güncellemede okunacak.")
+        st.warning("KAP geçici olarak istek sınırı uyguladı; kalan bildirimler arka planda, sınır kalkınca "
+                   "kendiliğinden okunuyor (aşağıdaki durum kutusu). Tekrar basmanız gerekmez.")
     an = last.get("analyze", {})
     if an.get("errors"):
         st.error(f"{an['errors']} haber analiz edilemedi. Ayrıntı: Gelişmiş sekmesi.")
@@ -163,6 +166,42 @@ m1, m2, m3 = st.columns(3)
 m1.metric("Olumlu haber", f"{len(positives)} hisse")
 m2.metric("Olumsuz haber", f"{len(negatives)} hisse")
 m3.metric("Son güncelleme", last_update_text())
+
+def kap_reader_box() -> None:
+    """Arka plan KAP okuyucusunun durumu (kullanıcı isteği: eksik sayfalar kendiliğinden tamamlansın, özet bildirilsin)."""
+    s_ = kap_worker.load()
+    if not s_:
+        return
+    total = (s_.get("okunan") or 0) + (s_.get("kalan") or 0)
+    if kap_worker.running() or s_.get("durum") == "çalışıyor":
+        st.info(f"📥 KAP sayfaları arka planda okunuyor: {s_.get('okunan', 0)}/{total} · {s_.get('mesaj', '')} "
+                "Paneli kullanmaya devam edebilirsiniz; bu kutu kendiliğinden yenilenir.")
+        if total:
+            st.progress(min(1.0, (s_.get("okunan") or 0) / total))
+    elif s_.get("durum") == "tamamlandı" and s_.get("bitti", "") >= (datetime.now(config.TR_TZ).date().isoformat()):
+        oz = s_.get("ozet") or {}
+        text = f"✅ KAP okuması {s_['mesaj'][len('Tamamlandı: '):] if s_['mesaj'].startswith('Tamamlandı: ') else s_['mesaj']}"
+        if oz:
+            text += (f" Önümüzdeki 15 işlem günü: {oz.get('sirket', 0)} şirkette {oz.get('olay', 0)} olay"
+                     + (" — öne çıkanlar: " + "; ".join(oz["onemli"]) if oz.get("onemli") else "") + ".")
+        if s_.get("analiz_bekleyen"):
+            text += f" {s_['analiz_bekleyen']} haberin metni hazır; analiz için **Haberleri güncelle**."
+        st.success(text)
+    elif s_.get("durum") == "durdu":
+        st.warning("📥 KAP okuyucu durdu: " + s_.get("mesaj", ""))
+
+
+@st.fragment(run_every=15)
+def kap_reader_live() -> None:
+    kap_reader_box()
+
+
+if not os.environ.get("HALLEY_OFFLINE"):
+    kap_worker.start()   # bekleyen çok sayfa varsa ya da önceki iş yarım kaldıysa kendiliğinden başlar
+if kap_worker.running() or kap_worker.load().get("durum") == "çalışıyor":
+    kap_reader_live()
+else:
+    kap_reader_box()
 
 if calendar_sync.due() and not os.environ.get("HALLEY_OFFLINE"):
     # Kullanıcı isteği: takvim her açılışta (günde en fazla bir kez) resmi kaynaklardan kontrol edilsin.
@@ -615,16 +654,18 @@ with tab_adv:
     ctx_missing = conn.execute("SELECT COUNT(*) FROM news WHERE status='context' AND body IS NULL").fetchone()[0]
     st.caption("Bilanço durumu ve şirket olayları (genel kurul, kâr payı, sermaye artırımı) için son 45 günün KAP "
                "bildirimlerini alır. Yapay zekâ KULLANMAZ, kredi harcamaz; kayıtlar analiz sırasına girmez. KAP bekleme "
-               "süresi korunur (birkaç dakika sürebilir). KAP sınır uygularsa kalan sayfalar sonraki basışta tamamlanır.")
+               "süresi korunur. KAP sınır uygularsa okuyucu 3–10 dk bekleyip KENDİLİĞİNDEN devam eder; tamamlanınca "
+               "üstte özet çıkar. Tekrar basmanız gerekmez.")
     st.write(f"Kayıtlı takvim bildirimi: {ctx_total} · form alanları okunmayı bekleyen: {ctx_missing}")
     if st.button("📥 Takvim için KAP geçmişini al (son 45 gün, ücretsiz)", key="kap_history"):
-        bar = st.progress(0.0, text="Başlıyor...")
+        bar = st.progress(0.0, text="KAP bildirim listesi alınıyor...")
         try:
-            res = kap_history.backfill(conn, uni, days=45, progress=lambda m, p_: bar.progress(min(1.0, p_), text=m))
-            msg = (f"{res['eklenen']} yeni takvim bildirimi, {res['metin_alinan']} olay sayfası okundu"
-                   + (f"; {res['metin_bekleyen']} sayfa bekliyor" if res["metin_bekleyen"] else "") + ".")
-            (st.warning if res["kap_siniri"] else st.success)(
-                msg + (" KAP istek sınırı uyguladı; birkaç dakika sonra tekrar basın." if res["kap_siniri"] else ""))
+            res = kap_history.backfill(conn, uni, days=45, fetch_pages=False,
+                                       progress=lambda m, p_: bar.progress(min(1.0, p_), text=m))
+            started = kap_worker.start(force=True) if not os.environ.get("HALLEY_OFFLINE") else False
+            st.success(f"{res['eklenen']} yeni takvim bildirimi listeye eklendi. "
+                       + ("Olay sayfaları arka planda okunuyor; ilerleme sayfanın üstündeki kutuda."
+                          if started or kap_worker.running() else "Okunacak sayfa kalmadı."))
         except Exception as e:
             conn.rollback()
             st.error(f"KAP geçmişi alınamadı: {e}")

@@ -32,7 +32,7 @@ def _wanted(subject: str) -> Optional[str]:
 
 
 def backfill(conn, universe: Dict[str, str], days: int = 45, progress: Optional[Callable[[str, float], None]] = None,
-             today=None, list_fn=None, page_fn=None, sleep=time.sleep) -> Dict[str, int]:
+             today=None, list_fn=None, page_fn=None, sleep=time.sleep, fetch_pages: bool = True) -> Dict[str, int]:
     say = progress or (lambda m, p: None)
     list_fn = list_fn or kap.list_disclosures
     page_fn = page_fn or (lambda index: kap._parse_page(kap._get(kap.DETAIL_URL.format(index=index)).text)[0])
@@ -63,6 +63,8 @@ def backfill(conn, universe: Dict[str, str], days: int = 45, progress: Optional[
              kap.DETAIL_URL.format(index=it["disclosureIndex"]), ",".join(tickers), "context", CONTEXT_NOTE, now))
         st["eklenen"] += 1
     conn.commit()
+    if not fetch_pages:  # sayfaları arka plan okuyucu (kap_worker) KAP sınırına göre bekleyerek okur
+        return st
     rows = conn.execute("SELECT id, subject FROM news WHERE status='context' AND body IS NULL AND subject IN (%s) "
                         "ORDER BY published_at DESC" % ",".join("?" * len(corp_events.SUBJECTS)),
                         corp_events.SUBJECTS).fetchall()
@@ -81,10 +83,11 @@ def backfill(conn, universe: Dict[str, str], days: int = 45, progress: Optional[
             sleep(config.KAP_REQUEST_DELAY)
         if body and body.strip():
             conn.execute("UPDATE news SET body=? WHERE id=?", (body, r["id"]))
-            conn.commit()
             st["metin_alinan"] += 1
-        else:
-            st["metin_bekleyen"] += 1
+        else:  # sayfa boş: tekrar tekrar denenmesin (olay tarihi çıkarılamaz, kayıt yine durur)
+            conn.execute("UPDATE news SET body='', note=? WHERE id=?", (CONTEXT_NOTE + "; sayfa boş", r["id"]))
+            st["bos_sayfa"] = st.get("bos_sayfa", 0) + 1
+        conn.commit()
     say("Tamamlandı.", 1.0)
     return st
 

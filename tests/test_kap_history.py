@@ -47,7 +47,7 @@ class BackfillTests(unittest.TestCase):
         self.assertTrue(all(r["status"] == "context" for r in rows.values()))
         self.assertEqual(analyzer.pending(self.conn), [])            # yapay zekâ kuyruğu boş → kredi yok
         self.assertEqual(sorted(self.pages), [3, 6])                 # yalnız olay bildirimlerinin sayfası okundu
-        self.assertEqual((st["eklenen"], st["metin_alinan"], st["metin_bekleyen"]), (4, 1, 1))
+        self.assertEqual((st["eklenen"], st["metin_alinan"], st["metin_bekleyen"], st["bos_sayfa"]), (4, 1, 0, 1))
 
     def test_calendar_modules_use_backfilled_records(self):
         self.run_backfill()
@@ -56,12 +56,22 @@ class BackfillTests(unittest.TestCase):
         up = corp_events.upcoming(self.conn, "AAA", date(2026, 11, 7), 15)
         self.assertIn("2026-11-12", [e["tarih"] for e in up["yaklasan"] if e["tur"] == "bedelsiz_hak"])
 
-    def test_rerun_is_idempotent_and_retries_missing_pages(self):
+    def test_rerun_is_idempotent_empty_pages_not_retried_network_errors_retried(self):
         self.run_backfill()
         self.pages.clear()
         st = self.run_backfill()
         self.assertEqual(st["eklenen"], 0)
-        self.assertEqual(self.pages, [6])                            # yalnız metni eksik kalan yeniden denenir
+        self.assertEqual(self.pages, [])                              # boş sayfa sonsuz denenmez
+        import requests
+        self.conn.execute("UPDATE news SET body=NULL WHERE id='kap:3'")
+        calls = []
+        def flaky(index):
+            calls.append(index)
+            raise requests.ConnectionError("koptu")
+        st = kap_history.backfill(self.conn, self.uni, today=date(2026, 11, 7), list_fn=lambda a, b: ITEMS,
+                                  page_fn=flaky, sleep=lambda s: None)
+        self.assertEqual((calls, st["metin_bekleyen"]), ([3], 1))     # ağ hatası → yeniden denenecek
+        self.assertIsNone(self.conn.execute("SELECT body FROM news WHERE id='kap:3'").fetchone()[0])
 
     def test_rate_limit_stops_round(self):
         def limited(index):

@@ -41,6 +41,10 @@ def update_all(conn, days: int = 1, progress: Optional[Progress] = None, analyze
     out["rss"] = rss.collect(conn, Matcher(uni))
     out["kap"].update(kap.fetch_missing_bodies(
         conn, lambda i, n: say(f"KAP bildirim metinleri okunuyor ({i + 1}/{n})...", 0.08 + 0.42 * i / max(n, 1))))
+    if out["kap"].get("rate_limited"):
+        # Yarım kalan metinleri arka plan okuyucu KAP sınırına göre bekleyerek tamamlar (kullanıcı tekrar basmaz).
+        from . import kap_worker
+        kap_worker.note_rate_limited()
     if analyze and has_api_key():
         say("Yapay zekâ haberleri analiz ediyor...", 0.5)
         out["analyze"] = analyzer.analyze(

@@ -680,3 +680,23 @@ tek gruplu şirketlerde ("OYAKC, TRA...") tutar okunmuyordu → düzeltildi (25 
 Fiyat Endeksi" kayıtları; her ayın ilk 10 günündeki iş günleri taranır; bulunamayan ay ve sonrası "takvimde yok".
 Canlı: 3 Kasım ve 3 Aralık 2026 10:00 yerleşik takvimle aynı; Ocak 2027 henüz yok. Artık elle kontrol gereken tek
 kaynak Borsa İstanbul tatilleri. Testler gerçek cevaplarla (kişisel iletişim alanları çıkarıldı). **250 test geçti.**
+
+## 2026-11-07 — Arka plan KAP okuyucu: eksik sayfalar kendiliğinden tamamlanır (`kap_worker.py`)
+
+Kullanıcı isteği: "Eksik kalan sayfa olursa otomatik yeniden okusun; kullanıcı dakika sayıp tekrar denemesin; olay
+özetini bildirip tamamlanana kadar devam etsin (100'den fazla okunabilecekse)." Gözlem: KAP ~100 istekten sonra
+geçici sınır uyguluyor (iki turda 100 ve 99 sayfa; hemen tekrar deneme yine sınır).
+- Okuduğu: takvim bildirimlerinin (context) ve günlük güncellemede metni alınamamış haberlerin sayfaları. Yapay zekâ
+  ÇAĞIRMAZ; analiz yine "Haberleri güncelle" ile. KAP 1,5 sn beklemesi korunur.
+- Sınırda 3 → 5 → 10 dk bekleyip kaldığı yerden sürer; en fazla 4 saat (sonra "devam_gerek" ile bir sonraki
+  açılışta sürer). Sınır olmadan ilerleme yoksa durur ("bu sefer okunamadı"). Boş dönen takvim sayfası "" olarak
+  işaretlenir (sonsuz deneme yok); ağ hatası yeniden denenir.
+- Kendiliğinden başlama: panel açılışında bekleyen > 100 sayfa varsa ya da önceki iş yarım kaldıysa (KAP sınırı,
+  süre, panel kapanması); "Haberleri güncelle" KAP sınırına takılırsa. "📥 Takvim için KAP geçmişini al" artık yalnız
+  listeyi alır (~35 sn) ve sayfaları okuyucuya bırakır. Aynı anda tek okuyucu.
+- Panel: üstte 15 sn'de bir kendiliğinden yenilenen durum kutusu (okunan/toplam, "X dk bekleniyor, HH:MM civarı
+  devam"); bitince özet: okunan sayfa, 15 işlem günündeki şirket olayları ve öne çıkanlar (fiyat düzeltmesi, temettü
+  hak kullanımı, genel kurul), metni hazır haber sayısı. Durum `data/kap_okuyucu.json`.
+- SQLite bağlantı beklemesi 5 → 30 sn (panel ve okuyucu aynı anda yazabilir).
+- Testler: `tests/test_kap_worker.py` (sahte KAP her turda 100 sayfadan sonra sınır; bekleme dizisi 3/5/10, tamamlanma,
+  özet, ilerlemesiz durma, süre sınırı, kendiliğinden başlama koşulları, panel kutusu). **260 test geçti.**

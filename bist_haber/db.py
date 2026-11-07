@@ -70,7 +70,8 @@ CREATE TABLE IF NOT EXISTS prices (
 def connect(path=None) -> sqlite3.Connection:
     path = path or config.DB_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(path)
+    # Panel ve arka plan KAP okuyucusu aynı anda yazabilir: kilitte 30 sn bekle (varsayılan 5 sn).
+    conn = sqlite3.connect(path, timeout=30)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
     # Eski veritabanlarına sonradan eklenen sütunlar
