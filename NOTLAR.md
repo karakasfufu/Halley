@@ -639,3 +639,20 @@ haberlerinden açıklandı (dördü de gerçek 3Ç haberi). 9 aylık konsolide s
 Senaryo riski: son gün 15 işlem günü içinde ve açıklanmadıysa 2 puan; bilinmiyorsa 1 puan. Panel: hisse ayrıntısında
 "📑 Bilanço takvimi", CSV'de "Bilanço durumu". Pilot senaryo testine henüz bağlanmadı. **226 test geçti.**
 Açık: KAP'tan şirket bazlı rapor durumu sorgusu (KAP isteği gerektirir; onay alınmadı), B3 şirket olayları, B4.
+
+## 2026-11-07 — Parça B3: şirket olayları (`bist_haber/corp_events.py`)
+
+Kaynak: eldeki KAP bildirimlerinin yapılandırılmış form alanları (etiket satırı + altındaki değer); serbest metin
+tarihleri kullanılmaz. 22 gerçek bildirim incelendi (canlı + pilot). Alanlar: Genel Kurul Tarihi/Saati/Tipi, katılım
+için son pay sahipliği günü, "yapıldı mı", gündemdeki hak süreçleri (eski iki dilli form dahil); kâr payının
+görüşüleceği GK tarihi, ödeme şekli, işlem gören grubun brüt TL/pay (taksitliyse TOPLAM); bedelsiz hak kullanım
+başlangıcı, rüçhan başlangıç/bitiş (fiyat düzeltme günleri), SPK onay, kayıt, ödeme tarihleri ve artırım türü.
+Aynı tür için en son bildirim geçerli. Kâr payı ödeme tablosunun dolu örneği yoktu → tarih geçerse "bildirimi
+açın" notuyla, hak kullanım günü varsayılmaz.
+**Gerçek veride yakalanan hatalar:** (1) İngilizce etiket atlama kuralı "Evet"/"Yoktur" değerlerini de atlıyordu →
+yalnız bilinen İngilizce etiketler; (2) "Bedelli Sermaye Artırımında ..." özet satırı tür sanılıyordu → tam eşleşme.
+**Bağımsız doğrulama:** bedelsiz hak kullanım günleri KORDS 14.09, AKFYE 21.09, MEGMT 21.09.2026 → Yahoo bölünme
+kayıtlarıyla BİREBİR aynı.
+Risk: vade (15 işlem günü) içinde fiyat düzeltmesi 2 puan; kâr payı süreci (brüt TL ve fiyata oranı) ve genel kurul
+1'er puan. Panel: hisse ayrıntısında "🗓️ Şirket olayları", CSV "Şirket olayları". Canlı listede (4 hisse) kayıtlı olay
+yok. Sınır: yalnız kayıtlı bildirimler (ayar 1 gün → kısa pencere). **237 test geçti.**
