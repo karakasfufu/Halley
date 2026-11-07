@@ -161,11 +161,17 @@ def pullback(t: Dict) -> Dict:
 def bounce(t: Dict) -> Dict:
     price, atr = t["son_fiyat"], t["atr"]
     support, name = None, ""
-    for lvl, nm in ((t.get("destek_20g"), "20 günlük destek"), (t.get("destek_60g"), "60 günlük destek")):
+    # Destek bugün HARİÇ önceki günlerin en düşüğüdür (bugünkü dip test edilmiş destek değildir; bkz. technical.py).
+    s20, s60 = t.get("onceki_destek_20g"), t.get("onceki_destek_60g")
+    for lvl, nm in ((s20, "20 günlük destek"), (s60, "60 günlük destek")):
         if lvl and 0 <= price - lvl <= BOUNCE_NEAR_ATR * atr:
             support, name = lvl, nm
             break
     if support is None:
+        if s20 and price < s20:
+            return {"tur": "destek", "ad": NAMES["destek"], "uygulanamaz":
+                    f"Fiyat önceki 20 günün desteğinin ({s20:.2f} TL) altına indi: destek kırıldı, yeni dip oluşuyor "
+                    "(düşen bıçak). Tepki senaryosu için fiyatın önce bir dip oluşturması beklenir."}
         return {"tur": "destek", "ad": NAMES["destek"], "uygulanamaz":
                 f"Fiyat 20/60 günlük desteğe {BOUNCE_NEAR_ATR:.0f} günlük ortalama hareketten uzak."}
     entry = min(price, support + BOUNCE_ENTRY_ATR * atr)

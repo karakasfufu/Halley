@@ -239,6 +239,13 @@ def analyze(bars: List[dict], today: Optional[date] = None, bench: Optional[List
     mid = bars[-60:]  # daha uzak destek/direnç (hedef ve zarar durdur için ikinci seviye)
     support60 = min(b.get("low") or b["close"] for b in mid)
     resistance60 = max(b.get("high") or b["close"] for b in mid)
+    # 2026-11-07 (kullanıcı onayı): tepki senaryosu için destek BUGÜN HARİÇ önceki günlerden. Bugünkü dip "destek"
+    # sayılınca çöküş gününde tepki alımı öneriliyordu (SOKM 06.11: %-9,9, destek = günün dibi). Gerçek veri (44 hisse,
+    # ~3 yıl): destek = bugünkü dip olan tepki senaryoları ort. −0,02 R / SL %70 (n=328), önceden oluşmuş destek +0,14 R
+    # / SL %59 (n=648); fark anlamlı (z≈2,7).
+    prior20, prior60 = bars[-21:-1], bars[-61:-1]
+    prior_support = min(b.get("low") or b["close"] for b in prior20) if prior20 else None
+    prior_support60 = min(b.get("low") or b["close"] for b in prior60) if prior60 else None
     # Oynaklık: Wilder ATR(14), fiyatın yüzdesi (en yüksek/en düşük yoksa kapanış farkı).
     a = atr(bars)
     atr_pct = a / last * 100 if a else None
@@ -291,6 +298,7 @@ def analyze(bars: List[dict], today: Optional[date] = None, bench: Optional[List
         "zirve_52h": max(highs), "dip_52h": min(lows),
         "zirveye_uzaklik_%": _pct(last, max(highs)), "dibe_uzaklik_%": _pct(last, min(lows)),
         "destek_20g": support, "direnc_20g": resistance, "destek_60g": support60, "direnc_60g": resistance60,
+        "onceki_destek_20g": prior_support, "onceki_destek_60g": prior_support60,
         "atr_%": atr_pct, "atr": a,
         "ema20": e20, "ema50": e50, "ema200": e200,
         "adx": ax[0] if ax else None, "arti_di": ax[1] if ax else None, "eksi_di": ax[2] if ax else None,

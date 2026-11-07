@@ -936,3 +936,20 @@ en fazla 5 YENİ çağrı/akşam, daha önce açıklanan önbellekten ücretsiz 
   düşük düşünme). Kaçırılan açıklaması gerçek veride denenemedi: kopyadaki 4 kaçırılanın hepsi "haber yok" (metin yok,
   kurala göre çağrı yapılmadı); sahte istemcili testlerle doğrulandı.
 - Testler `tests/test_ai_comment.py` (sahte istemci, ücretsiz). 368 test, ağsız 0 bağlantı.
+
+## 2026-11-07 — Destek (tepki) senaryosu düzeltmesi: bugünkü dip destek sayılmaz (kullanıcı onayı)
+**Bulgu (gerçek veri, bekçi akşam raporu):** SOKM 06.11 — olumlu bilanço haberi, ertesi gün 6 kat hacimle %−9,9.
+"20 günlük destek" = o günün kendi dibi (48,38) olduğu için fiyat "desteğe yakın" sayıldı → tepki senaryosu "uygun",
+hedef 20 EMA (54,84), risk/getiri "iyi". Yani çöküş gününde tepki alımı öneriliyordu (düşen bıçak).
+**Ölçüm (önbellekteki 44 hisse × ~3 yıl, haber yok, journal.evaluate kuralları + maliyet):** destek = bugünkü dip olan
+tepki senaryoları ort. −0,02 R, SL %70, kazanma %33 (n=328 kapanan); önceden oluşmuş destek +0,14 R, SL %59, %42
+(n=648). Kazanma oranı farkı anlamlı (z ≈ 2,7).
+**Değişiklik:** `technical.analyze` yeni alanlar `onceki_destek_20g/60g` = bugün HARİÇ önceki 20/60 günün en düşüğü.
+`entries.bounce` yalnız bunları kullanır; fiyat önceki 20 günlük desteğin altındaysa "destek kırıldı, yeni dip
+oluşuyor" → senaryo yok (altında yakın 60 günlük eski destek varsa o kullanılır). `destek_20g` (panel tablosu,
+tradeplan) değişmedi. SOKM artık: önceki destek 51,50 > fiyat 48,44 → tepki senaryosu yok, öneri yok.
+**Yeniden ölçüm:** 4.400 durumluk A2 testi (tam çıkış TP1'de, maliyet yok): destek uygun 1.955 → 1.706; TP1 önce %34 →
+%36; SL önce %65 → %63; ort. getiri %0,26 → %0,19 (karışık/küçük); diğer senaryolar aynı, tutarlılık ihlali 0.
+Kalan "yeni dip günü" vakaları: (a) yakında 60 günlük eski destek +0,41 R (n=36, az), (b) fiyat gün içinde önceki
+desteği kırıp üstüne döndü −0,10 R, SL %68 (n=130) — fark anlamlı değil (z ≈ 1,5): **kural değiştirilmedi** (küçük
+örnekle değiştirme yok); W5 strateji takibi izleyecek. 370 test, ağsız 0 bağlantı.

@@ -11,6 +11,9 @@ def base(**kw):
          "veri_uyarilari": [], "veri_kritik": False, "gun_sayisi": 252, "macd_hist": 0.1, "fiyat_sma50_%": 4.0,
          "hacim_orani": 1.0, "son_gun_kilitli": False, "dip_52h": 80.0, "destek_60g_": None}
     t.update(kw)
+    # varsayılan: bugünkü dip yeni dip değil (önceki destek = 20 günlük destek)
+    t.setdefault("onceki_destek_20g", t["destek_20g"])
+    t.setdefault("onceki_destek_60g", t["destek_60g"])
     return t
 
 
@@ -82,6 +85,18 @@ class BounceTests(unittest.TestCase):
 
     def test_far_support_not_applicable(self):
         self.assertIn("uzak", entries.bounce(base(destek_20g=90.0, destek_60g=85.0))["uygulanamaz"])
+
+    def test_todays_new_low_is_not_support(self):
+        # SOKM 06.11 benzeri: bugün yeni dip (20 günlük destek = bugünkü en düşük 96,9), önceki destek 105
+        s = entries.bounce(base(son_fiyat=97.0, destek_20g=96.9, destek_60g=96.9, onceki_destek_20g=105.0,
+                                onceki_destek_60g=104.0))
+        self.assertIn("destek kırıldı", s["uygulanamaz"])
+
+    def test_older_60_day_support_still_usable(self):
+        # 20 günlük destek kırıldı ama altında, yakında 60 günlük (önceden test edilmiş) destek var
+        s = entries.bounce(base(son_fiyat=97.0, destek_20g=96.9, onceki_destek_20g=105.0, onceki_destek_60g=96.5))
+        self.assertNotIn("uygulanamaz", s)
+        self.assertIn("60 günlük destek", s["emir"])
 
     def test_downtrend_note(self):
         s = entries.bounce(base(trend="Düşüş"))

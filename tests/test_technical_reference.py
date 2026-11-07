@@ -78,6 +78,8 @@ class PandasCrossCheckTests(unittest.TestCase):
     def test_levels_and_performance(self):
         d = self.df
         self.assertAlmostEqual(self.t["destek_20g"], d["low"].iloc[-20:].min(), places=9)
+        self.assertAlmostEqual(self.t["onceki_destek_20g"], d["low"].iloc[-21:-1].min(), places=9)  # bugün hariç
+        self.assertAlmostEqual(self.t["onceki_destek_60g"], d["low"].iloc[-61:-1].min(), places=9)
         self.assertAlmostEqual(self.t["direnc_20g"], d["high"].iloc[-20:].max(), places=9)
         self.assertAlmostEqual(self.t["zirve_52h"], d["high"].iloc[-252:].max(), places=9)
         self.assertAlmostEqual(self.t["perf_20g_%"], (d["close"].iloc[-1] / d["close"].iloc[-21] - 1) * 100, places=9)
