@@ -56,7 +56,7 @@ class PanelFlowTests(unittest.TestCase):
         self.assertEqual(len(at.exception), 0, str(at.exception))
         self.assertTrue(pipeline.load_settings()["karanlik_mod"])          # seçim saklandı
         self.assertEqual(st_config.get_option("theme.base"), "dark")
-        self.assertTrue(any("--h-bg:#0B1120" in m.value for m in at.markdown))   # koyu renk takımı çizildi
+        self.assertTrue(any("--h-bg:#0D1322" in m.value for m in at.markdown))   # koyu renk takımı çizildi
         at.toggle(key="dark_mode").set_value(False).run()
         self.assertFalse(pipeline.load_settings()["karanlik_mod"])
         self.assertEqual(st_config.get_option("theme.base"), "light")

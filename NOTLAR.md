@@ -1173,3 +1173,34 @@ nadiren değişir, gerekirse aynı yolla yenilenir.
   "güçlü olumlu" ve "olumsuz" gruplarında umut verici; genel "olumlu" grubu tek başına ayırt edici görünmüyor.
   Doğrulamak için 2. adım (≈600 bildirim, 6–10 $) gerekir — kullanıcı kararı bekliyor.
 - Betikler: scratchpad `run_pilot_step1.py`, `pilot_eval.py` (repo dışında; salt okuma kopya üzerinde).
+
+## 2026-11-09 — Karanlık mod iyileştirmesi + Windows kurulum paketi (Halley_Kurulum.exe)
+- Karanlık mod: düğme, giriş kutusu ve uyarı renkleri artık temaya bırakılmıyor, iki tema için CSS değişkenleriyle açıkça
+  veriliyor (tema sonradan değişince tarayıcı eski beyaz düğme rengini tutabiliyordu). Koyu zemin biraz yumuşatıldı
+  (#0D1322), üst bant koyu temada mor-indigo, uyarılar: sarı/mavi/yeşil/kırmızı kenarlı, okunur yazı. Açık tema da aynı
+  kurallarla (ölçüldü: koyu düğme #1A2338, üstüne gelince #262F55 + indigo kenar; açık #FFFFFF → #EEF2FF).
+- Kurulum paketi (`paket/`): PyInstaller KULLANILMADI (Streamlit+pandas+pyarrow ile kırılgan). Bu bilgisayardaki
+  gerçek Python 3.9.13 + sanal ortamdaki kütüphaneler olduğu gibi kopyalanır, VC++ çalışma zamanı DLL'leri yanına konur.
+  - `paket/Halley.cs` → Halley.exe (C# 5, Windows'taki .NET 4 derleyicisi): siyah pencere yok, panel + okuyucu başlatır,
+    saat yanında simge (Paneli aç / Günlük klasörü / Kapat), tek kopya (ikinci açılış paneli öne getirir), `--kapat`,
+    `--kaldir` (verileri Belgeler'e taşıma seçeneği), port doluysa sonraki boş port. Günlükler: app\data\gunluk\.
+  - `paket/Kurulum.cs` → Halley_Kurulum.exe: tek dosya (155 MB), %LOCALAPPDATA%\Programs\Halley'e kurar, yönetici izni
+    gerekmez, masaüstü + Başlat menüsü kısayolu. Yeniden kurulum = güncelleme: app\data\ altındaki MEVCUT dosyalara ve
+    app\.env'e dokunmaz; program dosyalarını yeniler. `/sessiz /hedef= /kisayolsuz /baslatma` deneme seçenekleri.
+  - `paket/build_package.py --cikti <klasör> --veri <data>`: veritabanları SQLite yedekleme API'siyle tutarlı kopyalanır
+    (integrity_check), .env ASLA pakete girmez. `--hazir-klasor`: Python'u yeniden kopyalamadan yeniden derler.
+  - Okuyucuya `HALLEY_OKUYUCU_KAPALI` ortam değişkeni eklendi (paket denemesinde KAP/fiyat isteği yapmasın; test eklendi).
+- Doğrulama (2026-11-09):
+  - Sessiz kurulum 39 sn, 448 MB, 18.290 dosya; .env yok.
+  - PATH yalnız Windows klasörleriyken paketteki Python tüm kütüphaneleri yükledi; sanal ortama / Store Python'a yol yok.
+  - 405 test PAKETİN Python'u ve paketteki uygulama koduyla: hepsi geçti.
+  - Halley.exe: 2 sn'de sağlıklı; 2 süreç (panel, okuyucu); ikinci açılış yeni kopya başlatmadı; `--kapat` tüm
+    süreçleri bitirdi; tüm sekmeler + hisse ayrıntısı + açık/koyu geçişi hatasız; günlüklerde hata yok.
+  - Denemede bulunan hata: canlı panel 8501'i 0.0.0.0/:: üzerinde dinlerken başlatıcı 127.0.0.1:8501'i boş sandı (iki
+    sunucu aynı portta) → port kontrolü "önce bağlan, sonra tüm arayüzlerde özel kullanımla aç" yapıldı; yeniden
+    denemede 8502'ye geçti, canlı panel etkilenmedi.
+  - Güncelleme kurulumu: .env, kullanıcı dosyası, değiştirilmiş ayar ve veritabanı korundu; program dosyası yenilendi;
+    sonra panel API anahtarını tanıdı.
+  - Denenemeyen: başka (temiz) bir bilgisayar — bu makinede Python ve VC++ kurulu olduğundan "hiçbir şey kurulu değil"
+    durumu tam benzetilemedi (VC++ DLL'leri bu yüzden pakete kondu). Kurulum penceresinin görünümü ve `--kaldir`
+    (onay pencereleri) elle denenmeli. Program imzasız: Windows SmartScreen "Ek bilgi → Yine de çalıştır" isteyebilir.

@@ -6,7 +6,13 @@ tavsiyesi değildir.
 
 ## Açmak
 
-- **`baslat.bat`** dosyasına çift tıklayın. Tarayıcıda panel açılır. Kapatmak için siyah pencereyi kapatın.
+- **Kurulum paketiyle (Halley_Kurulum.exe):** masaüstündeki **Halley** simgesine çift tıklayın; siyah pencere açılmaz,
+  panel tarayıcıda açılır ve saatin yanında Halley simgesi görünür. Kapatmak için o simgeye sağ tıklayıp
+  **Halley'i kapat** deyin (tarayıcı sekmesini kapatmak programı kapatmaz). Kaldırmak: Başlat menüsü → Halley →
+  **Halley'i kaldır** (verileri saklamayı sorar). Windows ilk açılışta "Windows bilgisayarınızı korudu" derse:
+  **Ek bilgi → Yine de çalıştır** (program imzasız olduğu için çıkan olağan uyarı).
+- **Geliştirici klasöründen:** **`baslat.bat`** dosyasına çift tıklayın. Kapatmak için siyah pencereyi kapatın.
+- Üst bantta **🌙 Karanlık mod** düğmesi koyu görünümü açar; seçim saklanır.
 - İlk açılışta üstteki kutuya OpenAI API anahtarını bir kez girin (yalnız bu bilgisayarda saklanır).
 - Arka planda bir "okuyucu" çalışır: KAP sayfalarını kendiliğinden tamamlar. Panelin üstündeki
   **📥 KAP sayfaları** kutusu ilerlemeyi gösterir; bir şey yapmanız gerekmez.

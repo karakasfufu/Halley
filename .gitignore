@@ -13,3 +13,8 @@ data/yedek/
 data/raporlar/
 data/fiyat_yok.json
 data/analiz_durumu.json
+
+# paket çıktıları (veritabanı içerir; GitHub'a yüklenmez)
+paket_cikti/
+*.exe
+data/gunluk/

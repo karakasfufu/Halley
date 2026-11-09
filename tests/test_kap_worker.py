@@ -1,5 +1,6 @@
 """Arka plan KAP okuyucu: sahte KAP her turda 100 sayfadan sonra sınır uygular (2026-11-07 gözlemine benzer).
 Ağ ve gerçek bekleme yok; saat ve uyku sahte."""
+import os
 import tempfile
 import time
 import unittest
@@ -284,6 +285,13 @@ class ServeTests(unittest.TestCase):
     def test_runs_when_pending_and_nobody_else(self):
         K.serve(self.path, once=True, run_fn=lambda db_path=None: self.calls.append(db_path))
         self.assertEqual(self.calls, [self.path])
+
+    def test_reader_disabled_flag_skips_all_network_work(self):
+        # paket denemesi (2026-11-09): HALLEY_OKUYUCU_KAPALI varken KAP okuması ve günlük fiyat indirmesi yapılmaz
+        with patch.dict(os.environ, {"HALLEY_OKUYUCU_KAPALI": "1"}), \
+                patch("bist_haber.journal.daily_refresh", side_effect=AssertionError("ağa çıkıldı")):
+            K.serve(self.path, once=True, run_fn=lambda db_path=None: self.calls.append(db_path))
+        self.assertEqual(self.calls, [])
 
     def test_does_not_disturb_live_reader_elsewhere(self):
         K._save({"durum": "çalışıyor"})                                # taze canlılık zamanı

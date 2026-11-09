@@ -243,6 +243,11 @@ def serve(db_path=None, sleep: Callable[[float], None] = time.sleep, once: bool 
         lock.write_text(json.dumps({"nabiz": datetime.now(config.TR_TZ).isoformat(timespec="seconds"), "sahip": me}),
                         encoding="utf-8")
         try:
+            if os.environ.get("HALLEY_OKUYUCU_KAPALI"):   # paket denemesi: ağa çıkma (KAP, fiyat); yalnız canlı kal
+                if once:
+                    return
+                sleep(SERVE_CHECK_SEC)
+                continue
             conn = db.connect(db_path)
             try:
                 pend = pending_counts(conn)["toplam"]

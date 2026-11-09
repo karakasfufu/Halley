@@ -26,7 +26,7 @@ _RENDER_T0 = time.time()   # sayfa çizim süresi (otomatik yenileme aralığı 
 from streamlit import config as _st_config  # noqa: E402
 
 DARK = bool(pipeline.load_settings().get("karanlik_mod", False))
-_THEME = ({"base": "dark", "primaryColor": "#818CF8", "backgroundColor": "#0B1120", "secondaryBackgroundColor": "#162033",
+_THEME = ({"base": "dark", "primaryColor": "#818CF8", "backgroundColor": "#0D1322", "secondaryBackgroundColor": "#1A2338",
            "textColor": "#E2E8F0", "linkColor": "#A5B4FC", "borderColor": "#2A3850",
            "dataframeHeaderBackgroundColor": "#1E293B"} if DARK else
           {"base": "light", "primaryColor": "#4F46E5", "backgroundColor": "#F3F5FA", "secondaryBackgroundColor": "#FFFFFF",
@@ -41,8 +41,8 @@ if _theme_changed and st.session_state.get("_theme_applied") != DARK:
     st.session_state["_theme_applied"] = DARK      # tek sefer: tema tarayıcıya bir sonraki çizimde gider
     st.rerun()
 st.session_state["_theme_applied"] = DARK
-_CSS_VARS = ('--h-ink:#F1F5F9; --h-sub:#E2E8F0; --h-muted:#B6C2D4; --h-line:#2A3850; --h-pos:#22C55E; --h-neg:#F87171; --h-acc:#818CF8; --h-amber:#F59E0B; --h-card:#121A2B; --h-card2:#0F1726; --h-hover:#1E2A44; --h-cnt-bg:#1E2A4A; --h-cnt-fg:#C7D2FE; --h-pos-bg:rgba(34,197,94,.16); --h-pos-fg:#86EFAC; --h-neg-bg:rgba(248,113,113,.16); --h-neg-fg:#FCA5A5; --h-warn-bg:rgba(245,158,11,.16); --h-warn-fg:#FCD34D; --h-neu-bg:#243049; --h-neu-fg:#E2E8F0; --h-pos-txt:#4ADE80; --h-neg-txt:#F87171; --h-opp-a:#0B2A20; --h-opp-line:#1F5F3F; --h-opp-h:#6EE7B7; --h-bg:#0B1120; --h-glow1:rgba(79,70,229,.24); --h-glow2:rgba(245,158,11,.07);' if DARK else
-             '--h-ink:#0F172A; --h-sub:#1E293B; --h-muted:#334155; --h-line:#D5DBE8; --h-pos:#16A34A; --h-neg:#DC2626; --h-acc:#4F46E5; --h-amber:#D97706; --h-card:#FFFFFF; --h-card2:#FFFFFF; --h-hover:#EEF2FF; --h-cnt-bg:#EEF2FF; --h-cnt-fg:#3730A3; --h-pos-bg:#DCFCE7; --h-pos-fg:#166534; --h-neg-bg:#FEE2E2; --h-neg-fg:#991B1B; --h-warn-bg:#FEF3C7; --h-warn-fg:#92400E; --h-neu-bg:#E2E8F0; --h-neu-fg:#1E293B; --h-pos-txt:#15803D; --h-neg-txt:#B91C1C; --h-opp-a:#ECFDF5; --h-opp-line:#A7F3D0; --h-opp-h:#065F46; --h-bg:#F3F5FA; --h-glow1:#E0E7FF; --h-glow2:#FEF3C7;')
+_CSS_VARS = ('--h-ink:#F1F5F9; --h-sub:#E2E8F0; --h-muted:#B6C2D4; --h-line:#2B3852; --h-pos:#22C55E; --h-neg:#F87171; --h-acc:#818CF8; --h-amber:#F59E0B; --h-card:#151E31; --h-card2:#111A2C; --h-hover:#1E2A44; --h-cnt-bg:#1E2A4A; --h-cnt-fg:#C7D2FE; --h-pos-bg:rgba(34,197,94,.16); --h-pos-fg:#86EFAC; --h-neg-bg:rgba(248,113,113,.16); --h-neg-fg:#FCA5A5; --h-warn-bg:rgba(245,158,11,.16); --h-warn-fg:#FCD34D; --h-neu-bg:#243049; --h-neu-fg:#E2E8F0; --h-pos-txt:#4ADE80; --h-neg-txt:#F87171; --h-opp-a:#0B2A20; --h-opp-line:#1F5F3F; --h-opp-h:#6EE7B7; --h-bg:#0D1322; --h-glow1:rgba(99,102,241,.20); --h-glow2:rgba(245,158,11,.06); --h-btn:#1A2338; --h-btn-hover:#262F55; --h-btn-hover-fg:#E0E7FF; --h-input:#0F1729; --h-hero:linear-gradient(118deg, #1E1B4B 0%, #3730A3 55%, #6D28D9 100%); --a-warn-bg:rgba(245,158,11,.10); --a-warn-bd:#F59E0B; --a-warn-fg:#FDE68A; --a-info-bg:rgba(129,140,248,.12); --a-info-bd:#818CF8; --a-info-fg:#E0E7FF; --a-ok-bg:rgba(34,197,94,.10); --a-ok-bd:#22C55E; --a-ok-fg:#BBF7D0; --a-err-bg:rgba(248,113,113,.12); --a-err-bd:#F87171; --a-err-fg:#FECACA;' if DARK else
+             '--h-ink:#0F172A; --h-sub:#1E293B; --h-muted:#334155; --h-line:#D5DBE8; --h-pos:#16A34A; --h-neg:#DC2626; --h-acc:#4F46E5; --h-amber:#D97706; --h-card:#FFFFFF; --h-card2:#FFFFFF; --h-hover:#EEF2FF; --h-cnt-bg:#EEF2FF; --h-cnt-fg:#3730A3; --h-pos-bg:#DCFCE7; --h-pos-fg:#166534; --h-neg-bg:#FEE2E2; --h-neg-fg:#991B1B; --h-warn-bg:#FEF3C7; --h-warn-fg:#92400E; --h-neu-bg:#E2E8F0; --h-neu-fg:#1E293B; --h-pos-txt:#15803D; --h-neg-txt:#B91C1C; --h-opp-a:#ECFDF5; --h-opp-line:#A7F3D0; --h-opp-h:#065F46; --h-bg:#F3F5FA; --h-glow1:#E0E7FF; --h-glow2:#FEF3C7; --h-btn:#FFFFFF; --h-btn-hover:#EEF2FF; --h-btn-hover-fg:#4338CA; --h-input:#FFFFFF; --h-hero:linear-gradient(118deg, #0F172A 0%, #1E1B4B 52%, #3730A3 100%); --a-warn-bg:#FFFBEB; --a-warn-bd:#F59E0B; --a-warn-fg:#78350F; --a-info-bg:#EEF2FF; --a-info-bd:#6366F1; --a-info-fg:#1E1B4B; --a-ok-bg:#F0FDF4; --a-ok-bd:#22C55E; --a-ok-fg:#14532D; --a-err-bg:#FEF2F2; --a-err-bd:#EF4444; --a-err-fg:#7F1D1D;')
 
 # Görünüm (2026-11-09 kullanıcı isteği: "dağınık, önemli bilgiler silik"): koyu ve okunur yazı, kart düzeni, renkli
 # bölüm başlıkları. Yalnız sunum; hiçbir hesap değişmez.
@@ -59,7 +59,7 @@ header[data-testid="stHeader"] {background: transparent;}
 [data-testid="stWidgetLabel"] p {color: var(--h-ink); font-weight: 600;}
 .stMarkdown p, .stMarkdown li {color: var(--h-sub);}
 /* üst bant */
-.hero {background: linear-gradient(118deg, #0F172A 0%, #1E1B4B 52%, #3730A3 100%); border-radius: 18px; margin-bottom: 18px;
+.hero {background: var(--h-hero); border-radius: 18px; margin-bottom: 18px;
   padding: 20px 26px 18px; position: relative; overflow: hidden; border: 1px solid rgba(129,140,248,.25); box-shadow: 0 14px 34px -16px rgba(30,27,75,.55);}
 .hero::before {content: ""; position: absolute; right: 70px; top: 34px; width: 210px; height: 3px; transform: rotate(-16deg);
   background: linear-gradient(90deg, rgba(251,191,36,0), rgba(251,191,36,.85)); border-radius: 3px;}
@@ -116,7 +116,33 @@ button[data-baseweb="tab"][aria-selected="true"] {background: linear-gradient(11
 button[data-baseweb="tab"][aria-selected="true"] p {color: #FFFFFF;}
 [data-baseweb="tab-highlight"], [data-baseweb="tab-border"] {display: none;}
 /* düğmeler ve uyarılar */
-.stButton button, .stDownloadButton button {font-weight: 700; border-radius: 10px;}
+.stButton button, .stDownloadButton button, [data-testid="stFormSubmitButton"] button {font-weight: 700; border-radius: 10px;
+  transition: background .15s, border-color .15s, color .15s;}
+/* ikincil düğmeler: tema değişse de tarayıcı eski rengi tutmasın diye renk açıkça verilir */
+.stButton button[kind="secondary"], .stDownloadButton button, [data-testid="stFormSubmitButton"] button[kind="secondaryFormSubmit"] {
+  background: var(--h-btn) !important; color: var(--h-ink) !important; border: 1px solid var(--h-line) !important;}
+.stButton button[kind="secondary"]:hover, .stDownloadButton button:hover,
+[data-testid="stFormSubmitButton"] button[kind="secondaryFormSubmit"]:hover {
+  background: var(--h-btn-hover) !important; color: var(--h-btn-hover-fg) !important; border-color: var(--h-acc) !important;}
+.stButton button p, .stDownloadButton button p, [data-testid="stFormSubmitButton"] button p {color: inherit !important;}
+.stButton button:disabled {opacity: .55;}
+.stButton button[kind="primary"]:hover {filter: brightness(1.12);}
+/* giriş kutuları */
+[data-baseweb="input"], [data-baseweb="base-input"], [data-baseweb="select"] > div, [data-baseweb="textarea"] {
+  background: var(--h-input) !important; border-color: var(--h-line) !important;}
+[data-baseweb="input"] input, [data-baseweb="textarea"] textarea {color: var(--h-ink) !important;}
+[data-testid="stNumberInputStepDown"], [data-testid="stNumberInputStepUp"] {background: var(--h-btn) !important;}
+[data-testid="stExpander"] summary:hover {background: var(--h-hover); border-radius: 14px;}
+/* uyarı kutuları: iki temada da okunur renkler */
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentWarning"]) {background: var(--a-warn-bg) !important; border-left: 4px solid var(--a-warn-bd);}
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentWarning"]) * {color: var(--a-warn-fg) !important;}
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentInfo"]) {background: var(--a-info-bg) !important; border-left: 4px solid var(--a-info-bd);}
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentInfo"]) * {color: var(--a-info-fg) !important;}
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentSuccess"]) {background: var(--a-ok-bg) !important; border-left: 4px solid var(--a-ok-bd);}
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentSuccess"]) * {color: var(--a-ok-fg) !important;}
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentError"]) {background: var(--a-err-bg) !important; border-left: 4px solid var(--a-err-bd);}
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentError"]) * {color: var(--a-err-fg) !important;}
+[data-testid="stAlertContainer"] a {text-decoration: underline;}
 .stButton button[kind="primary"] {background: linear-gradient(118deg, #4F46E5, #7C3AED); border: none;
   box-shadow: 0 8px 18px -10px rgba(79,70,229,.8);}
 [data-testid="stAlertContainer"] {border-radius: 12px;}
