@@ -1029,3 +1029,7 @@ uçtan uca kontrol temiz. 380 test, ağsız 0 bağlantı.
 **1.3 Kullanım kılavuzu:** `KULLANIM.md` (açma, günlük sabah/akşam akışı, maliyetler, sekmeler, senaryo kartı, ayarlar,
 bilinmesi gerekenler) + panelde "❓ Nasıl kullanılır" bölümü; README'den bağlantı. Test: kılavuzdaki 14 düğme/sekme adı
 panel kodunda birebir var. 381 test.
+**Kayma ölçümü (gerçek işlemlerden):** `journal.slippage_stats` — gerçek alış fiyatı ↔ aynı senaryonun sanal giriş
+fiyatı (sanal gerçekleştiyse onun dolumu, değilse planlanan giriş); yalnız alış tarafı (satışlar kaydedilmiyor).
+İşlem günlüğünde gerçek işlemlerin altında ortalama/medyan/en kötü ve ayar varsayımının alış payıyla karşılaştırma;
+10 işlemden az örnekte "varsayımı değiştirmeyin" uyarısı. Ayar kendiliğinden değişmez. 382 test.

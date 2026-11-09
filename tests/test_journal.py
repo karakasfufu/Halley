@@ -49,6 +49,30 @@ class EvaluateTests(unittest.TestCase):
         r = J.evaluate(REC, bars((101, 101.5, 99.5, 100.5), (90, 91, 89, 90)))
         self.assertAlmostEqual(r["brut_getiri_pct"], -10.0)
 
+    def test_slippage_stats(self):
+        import tempfile
+        from pathlib import Path
+        from bist_haber import db
+        with tempfile.TemporaryDirectory() as d:
+            c = db.connect(Path(d) / "t.db")
+            c.execute("INSERT INTO trade_journal(created_at,signal_day,ticker,kaynak,senaryo,giris,sl,tp1,tp2,gecerlilik,"
+                      "sonuc_json) VALUES('x','2026-11-02','AAA','otomatik','destek',100,95,104,110,5,?)",
+                      ('{"giris_fiyati": 99.5}',))                                 # sanal limit 99,5'ten doldu
+            c.execute("INSERT INTO trade_journal(created_at,signal_day,ticker,kaynak,senaryo,giris,sl,tp1,tp2,gecerlilik)"
+                      " VALUES('x','2026-11-02','BBB','otomatik','kirilim',50,48,53,56,10)")   # sanal gerçekleşmedi
+            c.execute("INSERT INTO trade_journal(created_at,signal_day,ticker,kaynak,senaryo,giris,sl,tp1,tp2,gecerlilik,"
+                      "gercek_giris_gunu,gercek_giris_fiyati,ana_id) VALUES('x','2026-11-02','AAA','gercek','destek',100,"
+                      "95,104,110,5,'2026-11-03',100.0,1)")
+            c.execute("INSERT INTO trade_journal(created_at,signal_day,ticker,kaynak,senaryo,giris,sl,tp1,tp2,gecerlilik,"
+                      "gercek_giris_gunu,gercek_giris_fiyati,ana_id) VALUES('x','2026-11-02','BBB','gercek','kirilim',50,"
+                      "48,53,56,10,'2026-11-03',49.5,2)")
+            s = J.slippage_stats(c)
+            self.assertEqual(s["n"], 2)
+            got = {x["hisse"]: round(x["kayma_%"], 4) for x in s["islemler"]}
+            self.assertEqual(got, {"AAA": round((100 / 99.5 - 1) * 100, 4), "BBB": -1.0})   # referans: sanal dolum / plan
+            self.assertAlmostEqual(s["ortalama_pct"], ((100 / 99.5 - 1) * 100 - 1.0) / 2)
+            c.close()
+
     def test_record_real_guards(self):
         import tempfile
         from datetime import datetime

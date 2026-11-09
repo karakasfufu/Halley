@@ -769,6 +769,13 @@ with tab_journal:
                "geleceği garanti etmez; yatırım tavsiyesi değildir.")
     metrics_block("Sanal (otomatik) işlemler", journal.metrics(conn, "otomatik"))
     metrics_block("Gerçek işlemleriniz", journal.metrics(conn, "gercek"))
+    _sl = journal.slippage_stats(conn)
+    if _sl["n"]:
+        st.caption(f"Kayma (yalnız alış): {_sl['n']} gerçek alışınızda planlanan girişe göre ortalama "
+                   f"%{_sl['ortalama_pct']:+.2f} (medyan %{_sl['medyan_pct']:+.2f}, en kötü %{_sl['en_kotu_pct']:+.2f}; "
+                   "pozitif = pahalı alış). Ayarlardaki kayma varsayımı alış+satış toplamı "
+                   f"%{slippage:.2f} (alış payı ≈ %{slippage / 2:.2f})."
+                   + (" Örnek az: varsayımı değiştirmeden önce daha fazla işlem bekleyin." if _sl["n"] < 10 else ""))
     rows_j = conn.execute("SELECT * FROM trade_journal ORDER BY id DESC LIMIT 200").fetchall()
     if rows_j:
         tbl = []

@@ -217,6 +217,28 @@ def open_tickers(conn) -> List[str]:
 
 
 # ---------------------------------------------------------------- metrikler
+def slippage_stats(conn) -> Dict:
+    """Gerçek alışlarınızda kayma (plan 2026-11-09): gerçek alış fiyatı ↔ aynı senaryonun sanal giriş fiyatı.
+    Referans: sanal kayıt gerçekleştiyse onun giriş fiyatı (limit = limit fiyatı/açılış; kırılım = alarm sonrası açılış),
+    gerçekleşmediyse planlanan giriş. Pozitif = planlanandan pahalı aldınız. Yalnız ALIŞ tarafı ölçülür (satışlar
+    kaydedilmiyor). Ayar kendiliğinden değişmez."""
+    rows = conn.execute("SELECT g.id, g.ticker, g.senaryo, g.gercek_giris_fiyati AS fill, a.giris AS plan, "
+                        "a.sonuc_json AS a_res FROM trade_journal g JOIN trade_journal a ON a.id=g.ana_id "
+                        "WHERE g.kaynak='gercek' AND g.gercek_giris_fiyati>0").fetchall()
+    items = []
+    for r in rows:
+        ares = json.loads(r["a_res"]) if r["a_res"] else {}
+        ref = ares.get("giris_fiyati") or r["plan"]
+        if ref:
+            items.append({"id": r["id"], "hisse": r["ticker"], "senaryo": r["senaryo"], "referans": ref,
+                          "alis": r["fill"], "kayma_%": (r["fill"] / ref - 1) * 100})
+    vals = sorted(x["kayma_%"] for x in items)
+    out = {"n": len(items), "islemler": items}
+    if vals:
+        out.update(ortalama_pct=sum(vals) / len(vals), medyan_pct=vals[len(vals) // 2], en_kotu_pct=vals[-1])
+    return out
+
+
 def metrics(conn, kaynak: str = "otomatik") -> Dict:
     rows = conn.execute("SELECT durum, sonuc_json FROM trade_journal WHERE kaynak=?", (kaynak,)).fetchall()
     res = [json.loads(r["sonuc_json"]) for r in rows if r["sonuc_json"]]
