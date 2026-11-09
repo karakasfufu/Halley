@@ -222,6 +222,50 @@ CREATE TABLE IF NOT EXISTS prices (
     low    REAL,
     PRIMARY KEY (ticker, date)
 );
+-- 2026-11-09 Takip Listem (kullanıcı isteği): seçilen hisseler, senaryoları ve bekçi olayları. Takipten çıkarılan
+-- hissenin kaydı SİLİNMEZ (aktif=0); yalnız yeni bildirimler durur.
+CREATE TABLE IF NOT EXISTS watchlist (
+    ticker      TEXT PRIMARY KEY,
+    eklendi     TEXT NOT NULL,
+    aktif       INTEGER NOT NULL DEFAULT 1,
+    cikarildi   TEXT,
+    bildirimler TEXT,                 -- JSON liste: açık bildirim türleri (NULL = hepsi açık)
+    son_trend   TEXT                  -- teknik görünüm değişikliğini yakalamak için
+);
+CREATE TABLE IF NOT EXISTS takip_senaryo (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticker       TEXT NOT NULL,
+    senaryo      TEXT NOT NULL,       -- kirilim | geri_cekilme | destek
+    signal_day   TEXT NOT NULL,       -- seviyelerin hesaplandığı son fiyat günü (sonraki günler değerlendirilir)
+    olusturuldu  TEXT NOT NULL,
+    emir         TEXT,
+    alarm        REAL,
+    giris        REAL NOT NULL,
+    sl           REAL NOT NULL,
+    tp1          REAL NOT NULL,
+    tp2          REAL NOT NULL,
+    gecerlilik   INTEGER NOT NULL,
+    kalite       TEXT,
+    bildirim     INTEGER NOT NULL DEFAULT 1,   -- kullanıcı bu senaryonun bildirimini kapatabilir
+    durum        TEXT NOT NULL DEFAULT 'bekliyor',
+    sonuc_json   TEXT,
+    guncellendi  TEXT,
+    UNIQUE (ticker, senaryo, signal_day)
+);
+CREATE TABLE IF NOT EXISTS takip_olay (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    zaman       TEXT NOT NULL,
+    gun         TEXT NOT NULL,
+    ticker      TEXT NOT NULL,
+    senaryo_id  INTEGER,
+    tur         TEXT NOT NULL,        -- giris | sl | tp | gecersiz | hacim | kirilim | teyit | haber | teknik
+    mesaj       TEXT NOT NULL,
+    anahtar     TEXT NOT NULL UNIQUE, -- aynı olay ikinci kez kaydedilmez / bildirilmez
+    kesin       INTEGER NOT NULL DEFAULT 1,  -- 0 = gün içi (kapanışla teyit edilmedi)
+    gonderildi  INTEGER NOT NULL DEFAULT 0,  -- 1 gönderildi, -1 bildirim kapalı (yalnız kayıt)
+    hata        TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_takip_olay_ticker ON takip_olay(ticker, zaman);
 """
 
 

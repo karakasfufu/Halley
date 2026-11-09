@@ -440,7 +440,7 @@ class PanelTests(unittest.TestCase):
                 at.run(timeout=30)
                 self.assertEqual(len(at.exception), 0, str(at.exception))
                 # Sade düzen: 4 sekme; durum ve geçmiş veri pilotu "Gelişmiş" sekmesinde.
-                self.assertEqual(len(at.tabs), 6)   # + Gelişim (W5), Raporlar (W3), İşlem günlüğü (Parça C2)
+                self.assertEqual(len(at.tabs), 7)   # + Gelişim (W5), Raporlar (W3), İşlem günlüğü (Parça C2), Takip Listem
                 self.assertTrue(any("İşlem günlüğü" in tab.label for tab in at.tabs))
                 self.assertTrue(any("Gelişmiş" in tab.label for tab in at.tabs))
                 self.assertTrue(any("Geçmiş veri pilotu" in m.value for m in at.markdown))

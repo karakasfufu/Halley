@@ -102,10 +102,18 @@ class NotifyTests(unittest.TestCase):
                 "takip": [{"ticker": "SISE"}], "riskli": [{"no": 3, "hisse": "EREGL", "stop_uzaklik_%": 1.2}]}
         t = notify.session_message("sabah", out, data)
         for s in ("🌅 Halley sabah analizi — 09.11 09:15", "THYAO — kirilim · giriş 300.00 · SL 290.00",
-                  "Takip listesi: SISE", "#3 EREGL: stopa yalnız %1.2", "#7 ASELS (gerçek): kapandı — TP2 · net %+8.40",
+                  "henüz önerilmeyen: SISE", "#3 EREGL: stopa yalnız %1.2", "#7 ASELS (gerçek): kapandı — TP2 · net %+8.40",
                   "#8 BRK (sanal): süresi doldu", "yatırım tavsiyesi değildir"):
             self.assertIn(s, t)
         self.assertIn("uygun giriş senaryosu yok", notify.session_message("aksam", out, {}))
+        # takip listesine daraltma: THYAO takipte değil → yazılmaz, sayısı belirtilir; GERÇEK işlem her zaman yazılır
+        n = notify.session_message("sabah", out, data, watch={"SISE"})
+        self.assertNotIn("THYAO —", n)
+        self.assertIn("Takip listeniz dışında 1 hissede", n)
+        self.assertIn("#7 ASELS (gerçek)", n)
+        self.assertNotIn("#8 BRK", n)
+        self.assertNotIn("EREGL", n)
+        self.assertIn("SISE", n)
 
 
 class SessionHookTests(unittest.TestCase):

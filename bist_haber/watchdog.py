@@ -244,7 +244,9 @@ def run_session(conn, universe: Dict[str, str], kind: str, settings: Dict, ai: b
     if settings.get("telegram"):  # 2026-11-09: rapor arşive yazıldıktan SONRA; hata analizi bozmaz
         from . import notify
         say("Telegram bildirimi gönderiliyor...", 0.99)
-        out["bildirim"] = notify.send(notify.session_message(kind, out, data))
+        from . import tracker
+        watch = {w["ticker"] for w in tracker.watched(conn)}
+        out["bildirim"] = notify.send(notify.session_message(kind, out, data, watch))
     say("Tamamlandı.", 1.0)
     return out
 

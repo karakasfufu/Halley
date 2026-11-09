@@ -44,6 +44,7 @@ tavsiyesi değildir.
 | Sekme | İçerik |
 |---|---|
 | **📈 Bugünün listesi** | Haberi olan hisseler, haber skoru, teknik durum ve giriş senaryoları. Bir hisseye tıklayınca haber, gerekçe, takvim (bilanço, genel kurul, temettü) ve riskler açılır. |
+| **⭐ Takip Listem** | Takibe aldığınız hisseler, senaryoları ve durumları, bildirim türleri, bekçi olayları ve takip senaryolarının sonuçları. |
 | **📒 İşlem günlüğü** | Önerilen senaryolar burada **sanal işlem** olarak izlenir. Gerçekten aldıysanız **✍️ Bu işleme girdim** bölümünden alış günü ve fiyatını kaydedin; gerçek işleminiz ayrıca izlenir. |
 | **📋 Raporlar** | Tüm sabah/akşam raporlarının arşivi. Raporlar sonradan değişmez; .md ve .json olarak indirilebilir. |
 | **🧭 Gelişim** | Strateji, haber kaynağı, olay türü ve risk seviyesine göre başarı; hangi filtrenin sonradan yükselen hisseleri elediği; haftalık performans. **Onayınızı bekleyen öneriler** burada; onay hiçbir ayarı kendiliğinden değiştirmez. |
@@ -66,6 +67,32 @@ tavsiyesi değildir.
 - **Sermaye ve işlem başına risk (%):** girilirse kartta kaç adet alınabileceği ve azami kayıp, raporlarda TL
   karşılıkları görünür. 0 bırakılırsa bu hesaplar gösterilmez.
 - **Bekçi yapay zekâ yorumu aylık bütçesi ($).**
+
+## ⭐ Takip Listem ve bekçi
+
+Halley bütün BIST'i taramaya devam eder; ama **Telegram'a yalnız takibe aldığınız hisselerin olayları gider.**
+
+- **Takibe almak:** hisse kartındaki **+ Takibe Al** düğmesi ya da **⭐ Takip Listem** sekmesinde hisse seçip
+  **+ Takibe Al**. Halley o hissenin fiyatını tazeler ve uygun her senaryoyu (kırılım, geri çekilme, destekten
+  tepki) **ayrı ayrı** kaydeder. Takip listesindeki hisse için haber şartı yoktur; fiyat verisi sorunluysa ya da
+  likidite çok düşükse senaryo üretilmez (nedeni yazılır).
+- **Bekçi kendisi izler** (siz görev vermezsiniz). Halley açıkken arka planda çalışır:
+  - **Seans içinde ~5 dakikada bir** (Yahoo verisi ~15 dakika gecikmeli): fiyatın giriş seviyesine gelmesi, kırılım
+    denemesi, SL / TP1 / TP2'ye değmesi, hacim artışı. Bunlar "gün içi, kapanışla teyit edilmedi" diye yazılır.
+  - **Kapanıştan 20 dakika sonra** (günlük mum kesinleşince): giriş gerçekleşti, kırılım teyidi, TP1, TP2, SL,
+    başabaş stop, süresi doldu / geçersiz, alt fitil + yükselen kapanış teyidi, destek / direnç kırılımı, hacim
+    artışı, trend değişikliği, yeni senaryo. Halley o saatte kapalıysa, açıldığı ilk anda yapılır.
+  - Tatil ve yarım günler hesaba katılır. **Fiyat verisi gelmezse ya da eskiyse olay üretilmez** (sahte sinyal yok).
+  - Aynı olay **bir kez** bildirilir. İnternet kesilirse bildirim 24 saat içinde yeniden denenir.
+- **Bildirim ayarları (⭐ Takip Listem):** her hisse için bildirim türlerini seçin (ör. yalnız giriş, SL ve TP);
+  her senaryonun **Bildirim** düğmesiyle yalnız istediğiniz senaryoyu açık bırakın. Genel aç/kapa: ⚙️ Ayarlar →
+  "Takip listemdeki hisselerin bekçi olaylarını gönder".
+- **Takipten çıkarmak:** yeni bildirimler durur; senaryolar, olaylar ve sonuçlar **silinmez**.
+- Sabah/akşam analizi Telegram özeti de artık yalnız takip listenizdeki hisseleri yazar (gerçek işlemleriniz her
+  zaman yazılır); diğer hisselerin sayısı belirtilir.
+- **Takip senaryolarının sonuçları** tablosu strateji türüne göre TP1 / TP2 / SL oranlarını gösterir; 30'dan az
+  örnekte oranlar güvenilir değildir.
+- Bekçi **Halley kapalıyken çalışmaz.** Takip için Halley'i açık bırakın (pencereyi küçültmek yeterli).
 
 ## Telegram bildirimi (⚙️ Ayarlar → 📨 Telegram bildirimi)
 

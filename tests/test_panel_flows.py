@@ -94,6 +94,33 @@ class PanelFlowTests(unittest.TestCase):
             self.assertEqual(len(sent), 1)
             self.assertTrue(any("1 alıcıya gönderildi" in str(s.value) for s in at.success))
 
+    def test_follow_from_card_and_watchlist_tab(self):
+        from bist_haber import tracker
+
+        def q(fn, *a, **k):
+            c = db.connect()
+            try:
+                return fn(c, *a, **k)
+            finally:
+                c.close()
+        at = self.app()
+        at.button(key="fol_card_POS").click().run()                     # hisse kartındaki "+ Takibe Al"
+        self.assertEqual(len(at.exception), 0, str(at.exception))
+        self.assertTrue(q(tracker.is_watched, "POS"))
+        self.assertTrue(any("POS takibe alındı" in str(m.value) for m in list(at.success) + list(at.warning)))
+        self.assertTrue(any(b.key == "unf_card_POS" for b in at.button))   # artık "takipte" düğmesi
+        at.multiselect(key="tk_types_POS").set_value(["sl", "tp"]).run()   # yalnız SL ve TP bildirimi
+        self.assertEqual(len(at.exception), 0, str(at.exception))
+        self.assertEqual(q(tracker.watched)[0]["bildirimler"], ["sl", "tp"])
+        sc = q(tracker.scenarios, "POS", active_only=True)
+        if sc:                                                            # senaryo bildirimini kapat
+            at.toggle(key=f"tk_sw_{sc[0]['id']}").set_value(False).run()
+            self.assertEqual(next(s for s in q(tracker.scenarios, "POS") if s["id"] == sc[0]["id"])["bildirim"], 0)
+        at.button(key="tk_rm_POS").click().run()
+        self.assertFalse(q(tracker.is_watched, "POS"))
+        self.assertEqual(len(q(tracker.scenarios, "POS")), len(sc))      # geçmiş duruyor
+        self.assertTrue(any("Takipten çıkarılanlar" in c.value for c in at.caption))
+
     def test_settings_file_with_bom_is_not_lost(self):
         # Not Defteri dosyayı BOM ile kaydederse ayarlar okunamayıp sıfırlanıyordu (2026-11-09 önizlemede görüldü)
         pipeline.SETTINGS_FILE.write_bytes(b'\xef\xbb\xbf{"karanlik_mod": true, "komisyon_pct": 0.3}')

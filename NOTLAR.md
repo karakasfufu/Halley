@@ -1280,3 +1280,39 @@ nadiren değişir, gerekirse aynı yolla yenilenir.
 - Gerçek Telegram sunucusuna sahte anahtarla deneme: "bot anahtarı geçersiz" Türkçe mesajı geldi (bağlantı çalışıyor).
   Gerçek bir bota gönderim DENENMEDİ: bot anahtarı kullanıcıda (BotFather'da bot açmak kullanıcının işi).
 - Sınır: bildirim yalnız sabah/akşam analizi düğmeye basılınca gider; Halley kendiliğinden zamanlı analiz yapmaz.
+
+## 2026-11-09 — Swing terminali planı (kullanıcı talebi, onaylandı) — Aşama 1–2: Takip Listem + bekçi
+Onaylanan varsayılanlar: bekçi yalnız Halley açıkken; sabah/akşam Telegram özeti takip listesine daraltılır; önce
+motor (Aşama 1–2), sonra arayüz (Aşama 3); haber bildirimi bütçe tavanı içinde otomatik (Aşama 4).
+- Veritabanı (db.py): watchlist (aktif/çıkarıldı, bildirim türleri, son trend), takip_senaryo (seviyeler, durum,
+  sonuç, senaryo bazında bildirim aç/kapa), takip_olay (anahtar UNIQUE → aynı olay bir kez; kesin=0 gün içi;
+  gonderildi 1/0/-1). Takipten çıkarılınca hiçbir kayıt silinmez.
+- `bist_haber/tracker.py`: add (fiyatı tazeler: geçmiş <200 gün → 1 yıl, son fiyat son kapanmış günden eski → 1 ay;
+  sonra entries.scenarios — mevcut kurallar AYNEN; takip listesinde haber şartı yok, veri kritik/likidite <2 mn TL ise
+  senaryo yok), remove, set_types, set_scenario_alert, refresh_scenarios (aynı türde etkin takip varsa yenisi yok).
+  close_check(gün): journal.evaluate ile (işlem günlüğüyle aynı kurallar) giriş, kırılım teyidi, TP1, TP2/SL/başabaş/
+  süre doldu, iptal; limit senaryoda giriş olmadan kapanış SL altı → geçersiz (kırılımda DEĞİL: SL kırılan seviyenin
+  altı, kırılımdan önce fiyatın SL altında olması olağan — gerçek veride ASELS'te yanlış "geçersiz" görüldü,
+  düzeltildi); bugün hariç 20 günlük zirve/dip kapanış kırılımı; hacim ≥ 2× 20 gün ort.; destek/geri çekilme giriş
+  bölgesinde alt fitil (≥ mum boyunun yarısı) + yükselen kapanış; trend değişimi; yeni senaryo. O güne ait fiyatı
+  olmayan hisse için olay yok (veri_yok). intraday_check: Yahoo 5 dk mumları (~15 dk gecikmeli, prices tablosuna
+  YAZILMAZ); son mum 45 dk'dan eski ya da başka günse olay yok; giriş seviyesine değme, kırılım denemesi, stop/TP1/TP2
+  değme, gün içi hacim ≥ 1,5× günlük ort. dispatch: gönderilmemiş olaylar (24 saat) hisse türü + senaryo anahtarına
+  göre tek mesaj; başarısızsa yeniden dener; Telegram kapalıysa yalnız kayıt. tick: kapanış+20 dk sonrası (yalnız
+  ileri gün; kaçırılırsa ilk fırsatta) kapanış kontrolü, seans içinde 5 dk'da bir gün içi kontrol. performance:
+  strateji türüne göre TP1/TP2/SL/başabaş/süre doldu oranları.
+- kap_worker.serve döngüsü (baslat.bat ve Halley.exe'deki okuyucu) her turda tracker.safe_tick (hata okuyucuyu
+  durdurmaz; durum data/takip_durum.json).
+- Panel: hisse kartında "+ Takibe Al"/"takipten çıkar"; yeni ⭐ Takip Listem sekmesi (bekçi durumu, hisse ekle,
+  senaryo kartları + senaryo bildirim düğmesi, bildirim türleri, son olaylar, bekçi olay tablosu, sonuç tablosu,
+  takipten çıkarılanlar). Ayarlar → Telegram: "takip listesi olaylarını gönder" (varsayılan açık). Sabah/akşam
+  özeti takip listesine daraltıldı (gerçek işlemler her zaman yazılır). `bist_haber/takip_ui.py` (Aşama 3'te sayfa).
+- Bulunan ve düzeltilen hatalar: kapanıştan hemen önce önceki günün yeniden işlenmesi (yalnız ileri); takip
+  düğmelerinin sayfa yenilerken veritabanı bağlantısını açık bırakması; eski fiyatla senaryo; kırılımda yanlış
+  geçersizlik.
+- Testler: tests/test_tracker.py (16) + panel akışı (karttan takibe al → türleri seç → senaryo bildirimini kapat →
+  takipten çıkar, geçmiş durur) + özet daraltma. Tam takım geçti.
+- Gerçek veriyle (canlı verinin KOPYASI, Telegram'a gönderim yok): THYAO/ASELS/AKGRT takibe alındı → 4 senaryo;
+  Yahoo gün içi verisi 17:55'e kadar geldi; 9 Kasım kapanış kontrolü: THYAO 310,00 kapanışla 20 günlük zirveyi
+  (304,75) aştı → tek olay. Gerçek Telegram gönderimi DENENMEDİ (bot anahtarı kullanıcıda).
+- Sınırlar: Yahoo ~15 dk gecikmeli; bekçi yalnız Halley açıkken; gün içi olaylar kapanışla teyit edilmez (öyle yazılır).

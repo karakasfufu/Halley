@@ -15,7 +15,7 @@ import streamlit as st
 
 from bist_haber import (analyzer, calendar_sync, config, corp_events, db, earnings, entries, journal, kap_history,
                         kap_worker, macro_calendar, pipeline, report, signals, technical, timeline, tradeplan,
-                        trends, watchdog, ai_comment, sectors, transfer, notify)
+                        trends, watchdog, ai_comment, sectors, transfer, notify, takip_ui)
 
 st.set_page_config(page_title="Halley", page_icon="☄️", layout="wide", initial_sidebar_state="collapsed")
 _RENDER_T0 = time.time()   # sayfa çizim süresi (otomatik yenileme aralığı buna göre)
@@ -333,12 +333,17 @@ with st.expander("⚙️ Ayarlar"):
     st.markdown("**📨 Telegram bildirimi**")
     if "_tg_on_set" in st.session_state:       # alıcı kaydedilince düğmeyi de aç (yoksa eski konumu ayarı geri kapatır)
         st.session_state["tg_on"] = st.session_state.pop("_tg_on_set")
-    tg_on =st.toggle("Sabah ve akşam analizi bitince özetini Telegram'a gönder", key="tg_on",
+    tg_on = st.toggle("Sabah ve akşam analizi bitince özetini Telegram'a gönder", key="tg_on",
                       value=bool(saved.get("telegram_acik", False)), disabled=not notify.configured(),
                       help="Önerilen senaryolar, takip listesi, stopa yaklaşan işlemler, TP/SL olan işlemler. "
                            "Ücretsizdir; emir vermez.")
     if notify.configured() and tg_on != bool(saved.get("telegram_acik", False)):
         pipeline.save_settings(telegram_acik=tg_on)
+    tk_on = st.toggle("⭐ Takip listemdeki hisselerin bekçi olaylarını gönder (giriş, SL, TP, kırılım…)", key="tk_tg_on",
+                      value=bool(saved.get("takip_bildirim", True)), disabled=not notify.configured(),
+                      help="Yalnız takibe aldığınız hisseler; türleri hisse bazında ⭐ Takip Listem sekmesinden seçilir.")
+    if notify.configured() and tk_on != bool(saved.get("takip_bildirim", True)):
+        pipeline.save_settings(takip_bildirim=tk_on)
     with st.container(border=True, key="tg_box"):
         st.caption("**Telegram kurulumu**" + (f" — {len(notify.chat_ids())} alıcı ayarlı ✅" if notify.configured()
                                               else " — henüz ayarlanmadı"))
@@ -653,8 +658,8 @@ if calendar_sync.due() and not os.environ.get("HALLEY_OFFLINE"):
     with st.spinner("Takvim resmi kaynaklardan kontrol ediliyor (günde bir kez, birkaç saniye)..."):
         calendar_sync.auto_check()
 
-tab_list, tab_journal, tab_reports, tab_trend, tab_news, tab_adv = st.tabs(
-    ["📈 Bugünün listesi", "📒 İşlem günlüğü", "📋 Raporlar", "🧭 Gelişim", "📰 Haberler", "🔧 Gelişmiş"])
+tab_list, tab_watch, tab_journal, tab_reports, tab_trend, tab_news, tab_adv = st.tabs(
+    ["📈 Bugünün listesi", "⭐ Takip Listem", "📒 İşlem günlüğü", "📋 Raporlar", "🧭 Gelişim", "📰 Haberler", "🔧 Gelişmiş"])
 
 
 # W1: panel ve bekçi aynı hesabı kullanır (bist_haber/signals.py)
@@ -894,6 +899,7 @@ def best_entry_columns(p: dict) -> dict:
 def stock_details(r: dict) -> None:
     """Bir hisseye tıklanınca açılan ayrıntı: senaryo, teknik görünüm, finansal özet ve haberler."""
     pct = lambda v: "—" if v is None else f"{v:+.1f}%"
+    takip_ui.follow_button(conn, r["ticker"], f"card_{r['ticker']}")
     st.caption(f"Haber skoru {r['score']:+.2f} · son 1 gün {pct(r['chg_1d'])} · son 5 gün {pct(r['chg_5d'])} · "
                f"{r['news_count']} haber. Emir vermeden önce haberin kendisini okuyun.")
     scenario_block(scenario(r))
@@ -1085,6 +1091,9 @@ def metrics_block(title: str, m: dict) -> None:
         st.warning(f"Yalnız {m['kapanan']} kapanan işlem var: {journal.MIN_TRADES_FOR_STATS}'dan az örnekte bu oranlar "
                    "rastlantıdan ayırt edilemez; karar için kullanmayın.")
 
+
+with tab_watch:
+    takip_ui.render(conn)
 
 with tab_journal:
     st.markdown("#### 📒 İşlem günlüğü")

@@ -254,6 +254,8 @@ def serve(db_path=None, sleep: Callable[[float], None] = time.sleep, once: bool 
             finally:
                 conn.close()
             _daily_journal(db_path)
+            from . import tracker   # 2026-11-09 Takip Listem bekçisi: kendi hatasını kendisi yakalar, okuyucuyu durdurmaz
+            tracker.safe_tick(db_path)
             prev = load()
             need = pend > 0 and (pend > AUTO_START_MIN_PAGES or prev.get("devam_gerek") or prev.get("durum") == "çalışıyor")
             if need and not alive_elsewhere(prev) and not running():
