@@ -1248,3 +1248,7 @@ nadiren değişir, gerekirse aynı yolla yenilenir.
   canlıyla birebir; yeni bilgisayarın .env'i değişmedi; önceki veri yedeklendi.
 - Bilinen sınır: yeni bilgisayarda Halley ilk açılışta KAP şirket listesini indirir (internet gerekir); KAP o an
   sınır uygularsa panel açılmaz ve içe aktarma bölümüne ulaşılamaz (birkaç dakika sonra yeniden açmak yeterli).
+- Dağıtım (2026-11-09 17:45): masaüstü + dagitim/ → verisiz Halley_Kurulum.exe (147 MB) + halley_veri_2026-11-09.zip
+  (8,6 MB, güncel). Önceki veri dahil kurulum dosyası bunlarla değiştirildi. GitHub sürümü v2026.11.09'daki dosya
+  yeni (veri aktarmalı) verisiz paketle değiştirildi; sürüm notu güncellendi. Paket içinde içe aktarma denendi:
+  verisiz kurulum → paketin Python'uyla içe aktarma → panel 50/43, anahtar isteği görünüyor, hata yok.
