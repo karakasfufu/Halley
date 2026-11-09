@@ -186,6 +186,15 @@ def main():
     csc(["/target:winexe", f"/win32icon:{ico}", f"/out:{stage / 'Halley.exe'}", "/r:System.Windows.Forms.dll",
          "/r:System.Drawing.dll", f"/r:{wv / 'Microsoft.Web.WebView2.Core.dll'}",
          f"/r:{wv / 'Microsoft.Web.WebView2.WinForms.dll'}", str(ROOT / "paket" / "Halley.cs")])
+    # Sürüm bilgisi (kurulum programı kurulu sürümle karşılaştırır: aynıysa yeniden kurmaz, farklıysa günceller)
+    try:
+        rev = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"], capture_output=True,
+                             text=True, check=True).stdout.strip()
+    except Exception:
+        rev = "?"
+    from datetime import datetime as _dt
+    (stage / "surum.txt").write_text(f"{_dt.now():%Y-%m-%d} ({rev})", encoding="utf-8")
+    log("Sürüm: " + (stage / "surum.txt").read_text(encoding="utf-8"))
     log("Paket sıkıştırılıyor…")
     payload = out / "payload.zip"
     with zipfile.ZipFile(payload, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z:
