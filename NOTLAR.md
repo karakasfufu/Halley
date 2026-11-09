@@ -1252,3 +1252,9 @@ nadiren değişir, gerekirse aynı yolla yenilenir.
   (8,6 MB, güncel). Önceki veri dahil kurulum dosyası bunlarla değiştirildi. GitHub sürümü v2026.11.09'daki dosya
   yeni (veri aktarmalı) verisiz paketle değiştirildi; sürüm notu güncellendi. Paket içinde içe aktarma denendi:
   verisiz kurulum → paketin Python'uyla içe aktarma → panel 50/43, anahtar isteği görünüyor, hata yok.
+
+## 2026-11-09 — baslat.bat: Halley zaten açıksa ikinci kopya başlatılmaz
+- Kullanıcı "Port 8501 is already in use" gördü: asıl Halley açıkken (ve bir kez de geliştirme klasöründeki eski veriyle
+  çalışan kopyadan) ikinci başlatma denendi. Artık baslat.bat önce 8501 sağlık adresine bakar; açıksa paneli tarayıcıda
+  açar ve çıkar. (Kontrol denendi: açık panelde 0, kapalı portta 1.) Asıl veriler etkilenmedi (7.717 haber, 151 analiz
+  sonucu, 23 işlem günlüğü doğrulandı).
