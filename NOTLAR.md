@@ -1089,3 +1089,16 @@ döngüsü olmasın); bitince bir kez. Not: B analizi panel dışından eski kod
 + "ile başlar" aramaları aralık olarak + `INDEXED BY` + teknik olay uyarısında iki adımlı arama: 126 hissede 33 → 5 sn,
 panel açılışı 32 → 7 sn. Çıktılar eski kodla birebir aynı (126 hissenin plan/risk/bilanço/takvimi karşılaştırıldı).
 396 test, ağsız 0 bağlantı; uçtan uca kontrol temiz.
+
+## 2026-11-09 — Vade profili testleri (kullanıcı vadesi: en fazla 1–2 hafta) → kurallar DEĞİŞMEDİ
+Önbellekteki 44 hisse × ~3 yıl, haber yok, journal.evaluate kuralları + %0,30 maliyet, 5 günde bir kesim (örtüşen
+pencereler → belirsizlik gösterilenden büyük). Ort. R (95% aralık):
+- 1–2 ay denemesi (kullanıcı önce "uzun vade" dedi, sonra 1–2 hafta olarak netleştirdi): A mevcut +0,02 (±0,08) · B orta
+  (stop 1,5×, hedef 14 ATR, 40 gün) +0,06 · **D geniş (stop 2×, hedef 20 ATR, 40 gün) +0,11 (±0,08)** · E = B + TP1
+  sonrası iz süren stop (en yüksek kapanış − 2 ATR) +0,05 · C = B + haftalık trend (fiyat > ~30 hafta EMA) −0,05.
+  Haftalık trend ve iz süren stop işe yaramadı. D uygulanmadı (vade 1–2 hafta).
+- 1–2 hafta: A mevcut (30 gün, hedef 10 ATR) **+0,02, ort. süre 10 gün** · K1 (10 gün, hedef 6 ATR, geçerlilik 5/5/3)
+  −0,02 · K2 (K1 + stop 0,8×) −0,03 · K3 (yalnız 10 gün sınırı) −0,03. Kısaltma kazanma oranını %38 → %40–42 artırıyor
+  ama kazançları kestiği için ortalama biraz düşüyor; işlemlerin %27–35'i süre dolarak kapanıyor; farklar belirsizlik
+  içinde. **Sonuç: mevcut kurallar 1–2 haftalık vadeye zaten uygun (ortalama 10 işlem günü); değiştirilmedi.**
+  Uzun fiyat geçmişine (2–3 yıl) gerek yok; 1 yıl yeterli (EMA200 yalnız genel trend bilgisi).
