@@ -36,7 +36,7 @@ header[data-testid="stHeader"] {background: transparent;}
 [data-testid="stWidgetLabel"] p {color: var(--h-ink); font-weight: 600;}
 .stMarkdown p, .stMarkdown li {color: var(--h-sub);}
 /* üst bant */
-.hero {background: linear-gradient(118deg, #0F172A 0%, #1E1B4B 52%, #3730A3 100%); border-radius: 18px;
+.hero {background: linear-gradient(118deg, #0F172A 0%, #1E1B4B 52%, #3730A3 100%); border-radius: 18px; margin-bottom: 18px;
   padding: 20px 26px 18px; position: relative; overflow: hidden; box-shadow: 0 14px 34px -16px rgba(30,27,75,.55);}
 .hero::before {content: ""; position: absolute; right: 70px; top: 34px; width: 210px; height: 3px; transform: rotate(-16deg);
   background: linear-gradient(90deg, rgba(251,191,36,0), rgba(251,191,36,.85)); border-radius: 3px;}

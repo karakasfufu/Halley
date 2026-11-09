@@ -1133,5 +1133,6 @@ nadiren değişir, gerekirse aynı yolla yenilenir.
 - Hisse ayrıntısındaki kutularda sayılar artık "4.48…" diye kesilmiyor.
 - Akşam analizi uyarısı "(kapanış 18" diye yarım kalıyordu (saatteki iki nokta yüzünden) → düzeltildi.
 - İşlem günlüğünde her portföy uyarısı ayrı sarı kutuydu (7 kutu) → tek kutuda madde listesi.
+- Kullanıcı geri bildirimi: üst bant ile Ayarlar bitişikti → bant altına 18 px boşluk (ölçüldü: 0 → 18 px).
 - Doğrulama: panelin kopyası API anahtarsız ve çevrimdışı kipte (HALLEY_OFFLINE=1, yalnız 127.0.0.1) ayrı portta
   açılıp ekran görüntüleriyle kontrol edildi; 402 test geçti.
