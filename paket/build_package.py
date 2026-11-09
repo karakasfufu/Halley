@@ -125,6 +125,26 @@ def make_icon(path: Path) -> None:
     img.save(path, sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
 
 
+def assembly_info(out: Path, title: str, desc: str, rev: str) -> Path:
+    """Dosya özellikleri (Ayrıntılar sekmesi): ad, açıklama, yayıncı, sürüm. 2026-11-09: imzasız ve bilgisiz exe'ler
+    virüs taramalarında daha sık yanlış alarm veriyordu (kullanıcının bilgisayarında "tehdit bulundu")."""
+    from datetime import date as _d
+    t = _d.today()
+    ver = f"{t.year}.{t.month}.{t.day}.0"
+    f = out / f"_info_{title.replace(' ', '_')}.cs"
+    lines = ["using System.Reflection;",
+             f'[assembly: AssemblyTitle("{title}")]',
+             f'[assembly: AssemblyDescription("{desc}")]',
+             '[assembly: AssemblyCompany("Halley")]',
+             '[assembly: AssemblyProduct("Halley")]',
+             f'[assembly: AssemblyCopyright("Copyright (c) {t.year} Halley")]',
+             f'[assembly: AssemblyVersion("{ver}")]',
+             f'[assembly: AssemblyFileVersion("{ver}")]',
+             f'[assembly: AssemblyInformationalVersion("{t.isoformat()} ({rev})")]']
+    f.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return f
+
+
 def csc(args) -> None:
     cmd = [str(CSC), "/nologo", "/optimize+", "/codepage:65001"] + args
     r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
@@ -183,15 +203,18 @@ def main():
     for f in ("Microsoft.Web.WebView2.Core.dll", "Microsoft.Web.WebView2.WinForms.dll", "WebView2Loader.dll"):
         shutil.copy2(wv / f, stage / f)
     shutil.copy2(wv / "LICENSE.txt", stage / "WebView2_LICENSE.txt")
-    csc(["/target:winexe", f"/win32icon:{ico}", f"/out:{stage / 'Halley.exe'}", "/r:System.Windows.Forms.dll",
-         "/r:System.Drawing.dll", f"/r:{wv / 'Microsoft.Web.WebView2.Core.dll'}",
-         f"/r:{wv / 'Microsoft.Web.WebView2.WinForms.dll'}", str(ROOT / "paket" / "Halley.cs")])
-    # Sürüm bilgisi (kurulum programı kurulu sürümle karşılaştırır: aynıysa yeniden kurmaz, farklıysa günceller)
     try:
         rev = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"], capture_output=True,
                              text=True, check=True).stdout.strip()
     except Exception:
         rev = "?"
+    manifest = ROOT / "paket" / "halley.manifest"
+    info_app = assembly_info(out, "Halley", "Halley - BIST haber ve senaryo paneli (emir vermez)", rev)
+    csc(["/target:winexe", f"/win32icon:{ico}", f"/win32manifest:{manifest}", f"/out:{stage / 'Halley.exe'}",
+         "/r:System.Windows.Forms.dll",
+         "/r:System.Drawing.dll", f"/r:{wv / 'Microsoft.Web.WebView2.Core.dll'}",
+         f"/r:{wv / 'Microsoft.Web.WebView2.WinForms.dll'}", str(ROOT / "paket" / "Halley.cs"), str(info_app)])
+    # Sürüm bilgisi (kurulum programı kurulu sürümle karşılaştırır: aynıysa yeniden kurmaz, farklıysa günceller)
     from datetime import datetime as _dt
     (stage / "surum.txt").write_text(f"{_dt.now():%Y-%m-%d} ({rev})", encoding="utf-8")
     log("Sürüm: " + (stage / "surum.txt").read_text(encoding="utf-8"))
@@ -201,10 +224,13 @@ def main():
         for f in sorted(stage.rglob("*")):
             if f.is_file():
                 z.write(f, f.relative_to(stage).as_posix())
-    csc(["/target:winexe", f"/win32icon:{ico}", f"/out:{out / 'Halley_Kurulum.exe'}",
+    info_setup = assembly_info(out, "Halley Kurulum", "Halley kurulum ve guncelleme programi (verileri korur)", rev)
+    csc(["/target:winexe", f"/win32icon:{ico}", f"/win32manifest:{manifest}", f"/out:{out / 'Halley_Kurulum.exe'}",
          f"/resource:{payload},payload.zip", "/r:System.IO.Compression.dll", "/r:System.IO.Compression.FileSystem.dll",
-         "/r:System.Windows.Forms.dll", "/r:System.Drawing.dll", str(ROOT / "paket" / "Kurulum.cs")])
+         "/r:System.Windows.Forms.dll", "/r:System.Drawing.dll", str(ROOT / "paket" / "Kurulum.cs"), str(info_setup)])
     payload.unlink()
+    info_app.unlink()
+    info_setup.unlink()
     mb = (out / "Halley_Kurulum.exe").stat().st_size / 1e6
     log(f"HAZIR: {out / 'Halley_Kurulum.exe'} ({mb:.0f} MB)")
 
