@@ -1411,3 +1411,15 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   güncellenen Halley açıldı (sağlık ok) ve "--kapat" ile kapandı. Kurulum penceresi (görsel) bu bilgisayarda
   açılıp gözle denenmedi; mantığı sessiz kiple aynı işlevden geçiyor.
 - Dağıtım: yeni verisiz Halley_Kurulum.exe (2026-11-09, e579cc6) masaüstüne, dagitim/ klasörüne ve GitHub sürümüne.
+
+## 2026-11-09 — Yanlış alarm (kullanıcının bilgisayarında Windows "tehdit bulundu")
+- Bu bilgisayarda Defender kayıtlarında Halley tespiti yok; kurulum dosyası ve Halley.exe MpCmdRun ile tarandı: temiz.
+  Uyarı yalnız diğer kullanıcının bilgisayarında (imzasız, az indirilen, içinde büyük paket taşıyan ve süreç kapatan
+  exe → sezgisel/bulut yanlış alarmı olası). Windows güvenlik ayarlarına DOKUNULMADI (istisna/kapatma önerilmedi).
+- Yapılan: iki exe'ye dosya özellikleri (ad, açıklama, yayıncı "Halley", ürün, telif, sürüm 2026.11.9.0, bilgi sürümü
+  "tarih (git)") ve uygulama bildirimi (paket/halley.manifest: asInvoker — yönetici izni istemez, Windows 10/11,
+  ekran ölçekleme). Kesin çözüm DEĞİL; olasılığı azaltır.
+- Doğrulandı: dosya özellikleri okunuyor; Defender taraması temiz; önceki sürüm (fda858b) üstüne güncelleme veriyi
+  korudu; yeni Halley.exe açıldı ve kapandı. Diğer bilgisayarda yeniden denenmedi (erişim yok).
+- Kalıcı çözümler (kullanıcının kararı/işi): Microsoft'a yanlış pozitif bildirimi (microsoft.com/wdsi/filesubmission,
+  kullanıcının hesabıyla); kod imzalama sertifikası (ücretli).
