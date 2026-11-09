@@ -15,7 +15,7 @@ import streamlit as st
 
 from bist_haber import (analyzer, calendar_sync, config, corp_events, db, earnings, entries, journal, kap_history,
                         kap_worker, macro_calendar, pipeline, report, signals, technical, timeline, tradeplan,
-                        trends, watchdog, ai_comment)
+                        trends, watchdog, ai_comment, sectors)
 
 st.set_page_config(page_title="Halley", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
 _RENDER_T0 = time.time()   # sayfa çizim süresi (otomatik yenileme aralığı buna göre)
@@ -666,6 +666,8 @@ def stock_details(r: dict) -> None:
                f"{r['news_count']} haber. Emir vermeden önce haberin kendisini okuyun.")
     scenario_block(scenario(r))
     technical_block(tech(r["ticker"]))
+    # D (2026-11-09): sektörüyle birlikte mi, ayrışıyor mu? (KAP sektör listesi; yalnız bilgi)
+    st.caption("🏭 Sektör: " + sectors.compare_text(sectors.compare(conn, r["ticker"])))
     news_move_block(r["ticker"])
     st.caption("📑 Bilanço takvimi: " + earnings.describe(earning(r["ticker"])) +
                " (Yasal süreler: SPK II-14.1 Md. 10–11; garanti değil, SPK ek süre verebilir.)")
@@ -843,6 +845,11 @@ def metrics_block(title: str, m: dict) -> None:
 
 with tab_journal:
     st.markdown("#### 📒 İşlem günlüğü")
+    _pf = sectors.portfolio(conn)
+    if _pf["hisse"]:
+        st.caption("🧺 Açık/bekleyen işlemlerin sektörleri: " + " · ".join(f"{k}: {', '.join(v)}" for k, v in _pf["ana"].items()))
+        for w_ in _pf["uyarilar"]:
+            st.warning("Portföy riski: " + w_)
     st.caption("Panelde 'uygun' görünen her hissenin en uygun giriş senaryosu kendiliğinden SANAL işlem olarak kaydedilir "
                "ve sonraki günlerin fiyatlarıyla izlenir: giriş gerçekleşti mi, önce TP mi SL mi? Kural: TP1'de yarısı "
                "satılır, stop girişe çekilir, kalan TP2'ye izlenir; en fazla 30 işlem günü. Net getiri komisyon ve "

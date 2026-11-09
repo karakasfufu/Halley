@@ -326,6 +326,10 @@ def morning_report(conn, ctx, out) -> tuple:
         ("Girişe uzaklık %", lambda r: _fmt(r["giris_uzaklik_%"], "{:+.1f}"))]) + "\n"
     md += ("_Stopa uzaklık: açık işlemde son kapanışın stopun ne kadar üstünde olduğu. Girişe uzaklık: bekleyen "
            "senaryoda giriş için fiyatın ne kadar değişmesi gerektiği._\n\n")
+    from . import sectors
+    pf = sectors.portfolio(conn, ctx.today)
+    if pf["uyarilar"]:
+        md += "**🧺 Portföy riski:**\n" + "".join(f"- {w}\n" for w in pf["uyarilar"]) + "\n"
     md += "## 5. Riskli ve süresi dolan senaryolar\n"
     md += ("".join(f"- ⚠️ #{r['no']} {r['hisse']}: son kapanış stopun yalnız %{r['stop_uzaklik_%']:.1f} üstünde "
                    f"(eşik %{RISKY_STOP_PCT:g})\n" if r['stop_uzaklik_%'] >= 0 else
@@ -474,6 +478,12 @@ def evening_report(conn, ctx, out) -> tuple:
         md += (f"En çok yükselen / düşen likit hisseler ({ms['likit_hisse']} hisse; 20 günlük ortalama işlem hacmi ≥ 2 "
                "milyon TL):\n\n**En çok yükselen**\n\n" + _md_table(ms["en_cok_yukselen"], cols)
                + "\n**En çok düşen**\n\n" + _md_table(ms["en_cok_dusen"], cols) + "\n")
+        from . import sectors
+        ds = sectors.day_sectors(conn, ctx.today)
+        if ds["sektorler"]:
+            fmt_ = lambda xs: ", ".join(f"{x['sektor'].title()} %{x['degisim_%']:+.1f}" for x in xs)
+            md += ("**Günün sektörleri** (KAP ana sektörleri; likit hisselerin günlük değişim ortancası): en iyi — "
+                   + fmt_(ds["sektorler"][:3]) + " · en zayıf — " + fmt_(ds["sektorler"][-3:][::-1]) + "\n\n")
 
     # 2 — botun önerileri (bugünkü çalıştırmalar)
     rec = _recommended(conn, run_id)

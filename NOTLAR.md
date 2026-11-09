@@ -1102,3 +1102,18 @@ pencereler → belirsizlik gösterilenden büyük). Ort. R (95% aralık):
   ama kazançları kestiği için ortalama biraz düşüyor; işlemlerin %27–35'i süre dolarak kapanıyor; farklar belirsizlik
   içinde. **Sonuç: mevcut kurallar 1–2 haftalık vadeye zaten uygun (ortalama 10 işlem günü); değiştirilmedi.**
   Uzun fiyat geçmişine (2–3 yıl) gerek yok; 1 yıl yeterli (EMA200 yalnız genel trend bilgisi).
+
+## 2026-11-09 — D aşaması 2: sektör karşılaştırması ve portföy riski (`bist_haber/sectors.py`) — yalnız bilgi
+**Kaynak:** KAP Sektörler sayfası (JavaScript ile yükleniyor; uygulamanın tarayıcısında okundu, hiçbir şey
+gönderilmedi) → `bist_haber/sektorler.json`: 15 ana sektör, alt sektörler, 631 pay kodu (çok pay gruplu şirkette her
+kod ayrı; 3 harfli borçlanma kodları atıldı). Aktarım doğrulaması: tarayıcıda ve Python'da SHA-256 aynı (testte de
+kontrol edilir). Kapsam: fiyatı olan 631/631, likit 580/580 hisse. Alındığı tarih dosyada (2026-11-09); KAP sınıflaması
+nadiren değişir, gerekirse aynı yolla yenilenir.
+- **Hisse ↔ sektör** (hisse ayrıntısında "🏭 Sektör"): 5 ve 20 günlük getiri ↔ karşılaştırma grubunun ortancası ve
+  gruptaki SIRA (eşik/etiket uydurulmaz). Grup: alt sektör; kendisi hariç 3'ten az likit hisse varsa ana sektör.
+  Gerçek veri (06.11): SOKM 5 gün %−6,6, perakende ortancası %+8,5 (18 hisse içinde 17.) → düşüş hisseye özgü.
+- **Akşam raporu bölüm 1:** günün en iyi / en zayıf 3 ana sektörü (likit hisselerin günlük değişim ortancası).
+- **Kaçırılan fırsatlar:** "Sektör %" sütunu — aynı pencerede sektörün ortanca getirisi (yükseliş sektör geneli mi?).
+- **Portföy riski** (İşlem günlüğü sekmesi + sabah raporu): açık/bekleyen işlemlerin sektörleri; aynı alt sektörde ≥ 2
+  işlem, tek ana sektörde ≥ %50 (≥ 3 işlem), 60 günlük günlük getiri korelasyonu ≥ 0,7 olan çiftler için uyarı.
+- Hız: fiyatlar bağlantı+gün başına bir kez okunur (126 hisse 0,5 sn; panel açılışı 7,5 sn). 402 test, ağsız 0 bağlantı.

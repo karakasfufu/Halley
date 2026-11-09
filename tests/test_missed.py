@@ -129,7 +129,7 @@ class MissedTests(unittest.TestCase):
         md = missed.report_md(self.scan())
         self.assertIn("**5 kaçırılan fırsat**", md["md_liste"])
         self.assertIn("1 veri şüphesi nedeniyle dışarıda", md["md_liste"])
-        self.assertIn("| X | 2026-11-02 | 2026-11-05 | +9.0 | +0.0 | 4.5 | sürüyor | HABER_YOK |", md["md_liste"])
+        self.assertIn("| X | 2026-11-02 | 2026-11-05 | +9.0 | +0.0 | — | 4.5 | sürüyor | HABER_YOK |", md["md_liste"])
         self.assertIn("karar anından SONRA gelen haberle", md["md_neden"])
         self.assertIn("onayınız olmadan hiçbir ayar değişmez", md["md_neden"])
         self.assertIn("2026-11-03", md["md_liste"])          # 3–6 Kasım bekçi kaydı yok → yazılır

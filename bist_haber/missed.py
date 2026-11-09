@@ -173,6 +173,22 @@ def analyze_day(conn, b_day: str, run_id: int, today: date) -> Dict:
         if detay.get("fiyatlanmis"):
             tags.append("FIYATLANMIS")
         mod, text = EXPLAIN.get(code, ("?", code))
+        # D (2026-11-09): aynı pencerede sektör ortancası — yükseliş sektör geneli mi, hisseye özgü mü (yalnız bilgi)
+        sec_gain = None
+        try:
+            from . import sectors
+            grp_name, grp = sectors.peers(conn, t, b_day)
+            vals = []
+            for p_ in grp:
+                b0 = conn.execute("SELECT close FROM prices WHERE ticker=? AND date=?", (p_, b_day)).fetchone()
+                b1 = conn.execute("SELECT close FROM prices WHERE ticker=? AND date=?", (p_, peak["date"])).fetchone()
+                if b0 and b1 and b0[0]:
+                    vals.append((b1[0] / b0[0] - 1) * 100)
+            if len(vals) >= 3:
+                vals.sort()
+                sec_gain = vals[len(vals) // 2]
+        except Exception:
+            sec_gain = None
         out["kacirilan"].append({
             "hisse": t, "baz_gun": b_day, "run_id": run_id, "baz_kapanis": c0, "zirve_gunu": peak["date"], "zirve_kapanis": peak["close"],
             "kazanc_%": (peak["close"] / c0 - 1) * 100,
@@ -181,7 +197,7 @@ def analyze_day(conn, b_day: str, run_id: int, today: date) -> Dict:
             "haber_skoru": s["haber_skoru"], "sonradan_haber": later, "baslikta_kod": mention,
             "senaryolar": detay.get("senaryolar"), "neden_yok": detay.get("neden_yok"),
             "oneri": [SUGGEST[k] for k in tags + [code] if k in SUGGEST][:2],
-            "pencere_tamam": len(post) >= WINDOW_DAYS})
+            "pencere_tamam": len(post) >= WINDOW_DAYS, "sektor_%": sec_gain})
     out["kacirilan"].sort(key=lambda x: -x["endekse_gore_atr"])
     return out
 
@@ -262,11 +278,15 @@ def report_md(res: Dict) -> Dict[str, str]:
     lst = head + (f"{len(res['gunler'])} karar gününde {ev} hisse-gün değerlendirildi"
                   + (f" ({sus} veri şüphesi nedeniyle dışarıda)" if sus else "") + f"; **{len(items)} kaçırılan fırsat**.\n\n")
     if items:
-        lst += "| Hisse | Karar (baz) günü | Zirve günü | Kazanç % | Endeks % | Endekse göre ATR | Pencere | Karar |\n" \
-               "|---|---|---|---|---|---|---|---|\n"
+        lst += ("| Hisse | Karar (baz) günü | Zirve günü | Kazanç % | Endeks % | Sektör % | Endekse göre ATR | Pencere | "
+                "Karar |\n|---|---|---|---|---|---|---|---|---|\n")
         for x in items[:15]:
+            sp = "—" if x.get("sektor_%") is None else f"{x['sektor_%']:+.1f}"
             lst += (f"| {x['hisse']} | {x['baz_gun']} | {x['zirve_gunu']} | {x['kazanc_%']:+.1f} | {x['endeks_%']:+.1f} | "
-                    f"{x['endekse_gore_atr']:.1f} | {'tamam' if x['pencere_tamam'] else 'sürüyor'} | {x['neden_kodu']} |\n")
+                    f"{sp} | {x['endekse_gore_atr']:.1f} | {'tamam' if x['pencere_tamam'] else 'sürüyor'} | "
+                    f"{x['neden_kodu']} |\n")
+        lst += ("\n_Sektör %: aynı pencerede hissenin KAP sektöründeki likit hisselerin ortanca getirisi — hisseninkine "
+                "yakınsa yükseliş sektör geneli, çok düşükse hisseye özgü._\n")
         if len(items) > 15:
             lst += f"\n_… ve {len(items) - 15} hisse daha (tamamı raporun .json dosyasında)._\n"
     if not items:
