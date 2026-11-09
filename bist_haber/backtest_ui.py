@@ -120,7 +120,7 @@ def render():
             summary = exported["summary"]
             if not summary.empty:
                 st.write("**Pozitif olaylar · betimleyici sonuçlar (%)**")
-                st.dataframe(summary, hide_index=True, use_container_width=True)
+                st.dataframe(summary, hide_index=True, width="stretch")
             else:
                 st.info("Fiyat sonucu tam pozitif olay bulunmadığından pozitif özet boş.")
             if ready:
@@ -134,7 +134,7 @@ def render():
                            "(çoğunlukla tavan/taban kilidi). O gün alım/satım fiilen yapılamamış olabilir.")
             st.caption("Buradaki 'eksik' yalnızca fiyat sonuçlarını gösterir. Belgesi eksik veya henüz denetlenmemiş "
                        "bildirimler aşağıdaki ayrı listededir; 'eksik: 0' bütün belgelerin tam olduğu anlamına gelmez.")
-            st.dataframe(frame, hide_index=True, use_container_width=True)
+            st.dataframe(frame, hide_index=True, width="stretch")
             if ready:
                 st.download_button("Tüm olay sonuçlarını indir (CSV)", files["halley_pilot.csv"],
                                    file_name="halley_pilot.csv", mime="text/csv", key="bt_download")
@@ -148,7 +148,7 @@ def render():
             tested = [r for r in scen if r["sonuç"] not in ("senaryo yok",)]
             if tested:
                 st.dataframe(pd.DataFrame(tested, columns=scenario_test.COLUMNS), hide_index=True,
-                             use_container_width=True)
+                             width="stretch")
         with st.expander("📐 Skor eşiği ayarı (Faz 3) — ön kayıtlı test"):
             calib = exported["calibration"]
             st.write(f"**Durum:** {calib['durum']}")
@@ -160,7 +160,7 @@ def render():
         with st.expander("Belge eksikleri ve yöntem"):
             details = exported["gaps"]
             if not details.empty:
-                st.dataframe(details, hide_index=True, use_container_width=True)
+                st.dataframe(details, hide_index=True, width="stretch")
             else:
                 st.info("Seçili örnekte belge eksiği görünmüyor.")
             if ready:

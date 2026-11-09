@@ -45,15 +45,7 @@ FLAG_TR = {"teyitli": "✅ İki analiz aynı sonuca vardı", "çelişkili": "⚠
            "etki belirsiz": "⚠️ Etki büyüklüğü belirsiz", "tek görüş": "⚠️ Tek analiz gördü",
            "yorumsuz": "⚠️ Yapay zekâ yorum yapmadı, haberi okuyun"}
 DIR_TR = {1: ("pos", "Olumlu"), -1: ("neg", "Olumsuz"), 0: ("neu", "Nötr")}
-EVENT_TR = {
-    "finansal_sonuc": "Finansal sonuç", "temettu": "Temettü", "bedelli_sermaye_artirimi": "Bedelli sermaye artırımı",
-    "bedelsiz_sermaye_artirimi": "Bedelsiz sermaye artırımı", "pay_geri_alim": "Pay geri alımı",
-    "yeni_is_sozlesme_ihale": "Yeni iş / ihale", "yatirim_kapasite": "Yatırım", "birlesme_satin_alma": "Birleşme / satın alma",
-    "ortaklik_yapisi_degisikligi": "Ortaklık yapısı", "iceriden_pay_alim_satim": "Yönetici/ortak alım-satımı",
-    "yonetim_degisikligi": "Yönetim değişikliği", "hukuki_ceza_sorusturma": "Hukuki / ceza",
-    "kredi_derecelendirme": "Derecelendirme", "borclanma_finansman": "Finansman", "sektorel_makro": "Sektörel / makro",
-    "diger": "Diğer",
-}
+from bist_haber.labels import EVENT_TR  # noqa: E402  (panel + gelişim takibi ortak)
 PERSIST_TR = {"kisa": "birkaç gün", "orta": "birkaç hafta", "uzun": "aylar"}
 
 
@@ -114,7 +106,7 @@ if not pipeline.has_api_key():
     st.warning("Başlamak için OpenAI API anahtarınızı bir kez girin. Anahtar yalnızca bu bilgisayarda saklanır.")
     k1, k2 = st.columns([3, 1])
     key = k1.text_input("OpenAI API anahtarı", type="password", placeholder="sk-...", label_visibility="collapsed")
-    if k2.button("Anahtarı kaydet", use_container_width=True) and key.strip():
+    if k2.button("Anahtarı kaydet", width="stretch") and key.strip():
         pipeline.save_api_key(key)
         conn.close()  # sayfa yenilenmeden önce bağlantıyı bırak (aksi hâlde açık kalıyordu)
         st.rerun()
@@ -166,7 +158,7 @@ with st.expander("⚙️ Ayarlar"):
     st.caption("Kaynaklar: KAP + " + ", ".join(config.RSS_SOURCE_LABELS.get(n, n) for n in config.RSS_FEEDS)
                + ". KAP hızlı isteklere sınır koyduğu için ilk güncelleme birkaç dakika sürebilir.")
 
-if h2.button("🔄 Haberleri güncelle", type="primary", use_container_width=True):
+if h2.button("🔄 Haberleri güncelle", type="primary", width="stretch"):
     bar = st.progress(0.0, text="Başlıyor...")
     try:
         res = pipeline.update_all(conn, days=days, analysis_limit=analysis_limit, quality=quality,
@@ -180,7 +172,7 @@ if h2.button("🔄 Haberleri güncelle", type="primary", use_container_width=Tru
     conn.close()  # sayfa yenilenmeden önce bağlantıyı bırak (aksi hâlde açık kalıyordu)
     st.rerun()
 
-if h2.button("🧪 Ücretsiz dene", use_container_width=True, key="free_check",
+if h2.button("🧪 Ücretsiz dene", width="stretch", key="free_check",
              help="Haberleri ve fiyatları toplar ama yapay zekâyı çağırmaz; OpenAI kredisi harcanmaz. "
                   "Bir sonraki gerçek güncellemenin yaklaşık maliyetini gösterir."):
     bar = st.progress(0.0, text="Başlıyor (yapay zekâ kullanılmayacak)...")
@@ -248,7 +240,7 @@ def watch_box() -> None:
             st.caption("API anahtarı yok: yapay zekâ yorumu yapılamaz; rapor kodla hazırlanır.")
     for kind, col, label in (("sabah", w1, "🌅 Sabah analizi"), ("aksam", w2, "🌙 Akşam analizi")):
         tm = watchdog.timing(kind)
-        if col.button(label, use_container_width=True, key=f"watch_{kind}",
+        if col.button(label, width="stretch", key=f"watch_{kind}",
                       help=("Borsa açılmadan önce: gece gelen haberler, tüm hisselerin fiyatı, açık işlemler, günün "
                             "fırsatları ve takvim." if kind == "sabah" else
                             "Kapanıştan sonra: günün fiyatları, işlem günlüğü (TP/SL), botun kararları.")):
@@ -395,7 +387,7 @@ def technical_block(t) -> None:
         ("Performans 1 / 5 / 20 gün", f"{pct(t['perf_1g_%'])} / {pct(t['perf_5g_%'])} / {pct(t['perf_20g_%'])}", ""),
     ]
     st.dataframe(pd.DataFrame(rows_, columns=["Gösterge", "Değer", "Açıklama"]), hide_index=True,
-                 use_container_width=True)
+                 width="stretch")
     if t["notlar"]:
         st.caption("Notlar: " + " · ".join(t["notlar"]) + f" · {t['gun_sayisi']} işlem günü veriyle hesaplandı.")
     for w in t.get("veri_uyarilari", []):
@@ -461,7 +453,7 @@ def timeline_block(ticker: str) -> None:
                                     # hep metin: sayı ve "—" karışınca tablo dönüştürme hatası veriyordu (09.11)
                                     "Kaç işlem günü sonra": str(x["is_gunu_sonra"]) if x["is_gunu_sonra"] else "—",
                                     "Kapsam": x["kapsam"], "Olay": x["olay"], "Ayrıntı": x["ayrinti"]}
-                                   for x in tl["olaylar"]]), hide_index=True, use_container_width=True)
+                                   for x in tl["olaylar"]]), hide_index=True, width="stretch")
     notes = [n for n in ([("Takvimi henüz bilinmeyen: " + ", ".join(tl["bilinmeyen"])) if tl["bilinmeyen"] else None,
                           tl.get("tatil_notu"), tl.get("kap_boslugu")]) if n]
     if tl.get("okunmamis_notu"):
@@ -540,7 +532,7 @@ def entry_block(g: dict) -> None:
                   "TP2": s.get("tp2"), "Risk/getiri (TP1)": s.get("rr1"), "Risk": s.get("risk_seviyesi", "")}
                  for s in items]
         st.dataframe(dash_cells(pd.DataFrame(table), ["Giriş", "SL", "TP1", "TP2", "Risk/getiri (TP1)"]),
-                     hide_index=True, use_container_width=True)
+                     hide_index=True, width="stretch")
     st.caption("📏 " + entries.BACKTEST_NOTE)
 
 
@@ -783,7 +775,7 @@ with tab_journal:
                         "Durum": jr["durum"], "Sonuç": res.get("sonuc", ""), "Alış günü": res.get("giris_gunu", ""),
                         "Net %": res.get("net_getiri_pct", res.get("acik_getiri_%")), "R": res.get("r")})
         st.dataframe(dash_cells(pd.DataFrame(tbl), ["Giriş", "SL", "TP1", "TP2", "Net %", "R"]),
-                     hide_index=True, use_container_width=True)
+                     hide_index=True, width="stretch")
         open_auto = [jr for jr in rows_j if jr["kaynak"] == "otomatik" and jr["durum"] in journal.OPEN_STATES]
         if open_auto:
             with st.expander("✍️ Bu işleme girdim (gerçek işleminizi kaydedin)"):
@@ -842,7 +834,7 @@ with tab_adv:
     a1, a2 = st.columns(2)
     with a1:
         st.dataframe(pd.DataFrame([{"Durum": labels.get(k, k), "Adet": v} for k, v in counts.items()]),
-                     hide_index=True, use_container_width=True)
+                     hide_index=True, width="stretch")
     tok = conn.execute("SELECT COALESCE(SUM(input_tokens),0), COALESCE(SUM(output_tokens),0) FROM analyses").fetchone()
     a2.markdown(f"**OpenAI kullanımı:** girdi {tok[0]:,} · çıktı {tok[1]:,} token  \n"
                 f"Model: `{config.MODEL_ANALYSIS}` · Tutarı OpenAI hesabınızdan takip edin.  \n"
@@ -855,7 +847,7 @@ with tab_adv:
                                    "Durum": state_labels.get(s["state"], s["state"]),
                                    "Görülen": s["seen"], "Yeni": s["new"], "Tarih eksiği": s["undated"],
                                    "Açıklama": s["error"]} for name, s in sources.items()]),
-                     hide_index=True, use_container_width=True)
+                     hide_index=True, width="stretch")
     if last:
         with st.expander("Son güncellemenin teknik ayrıntıları"):
             st.json(last)
@@ -890,7 +882,7 @@ with tab_adv:
         for item in cal_rep.get("elle", []):
             rows_cal.append({"Kaynak": item.split(" (")[0], "Durum": "elle kontrol gerekir",
                              "Ayrıntı": item.split(" (", 1)[1].rstrip(")") if " (" in item else ""})
-        st.dataframe(pd.DataFrame(rows_cal), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(rows_cal), hide_index=True, width="stretch")
 
     st.divider()
     st.markdown("#### 📥 Takvim için KAP geçmişi")
@@ -989,10 +981,10 @@ with tab_trend:
         if not _t["yeterli"]:
             st.warning(f"Örnek az ({_t['n']} < {trends.MIN_TRADES}): bu oranlar henüz güvenilir değil.")
         if _perf["haftalik"]:
-            st.dataframe([{"Hafta": w["hafta"], "İşlem": w["n"], "Kazanma %": round(w["kazanma_%"], 1),
-                           "Ort. R": None if w["ort_R"] is None else round(w["ort_R"], 2),
-                           "Toplam R": None if w["toplam_R"] is None else round(w["toplam_R"], 2)}
-                          for w in _perf["haftalik"]], hide_index=True, use_container_width=True)
+            st.dataframe(dash_cells(pd.DataFrame([{"Hafta": w["hafta"], "İşlem": w["n"], "Kazanma %": w["kazanma_%"],
+                                                   "Ort. R": w["ort_R"], "Toplam R": w["toplam_R"]}
+                                                  for w in _perf["haftalik"]]), ["Kazanma %", "Ort. R", "Toplam R"]),
+                         hide_index=True, width="stretch")
         if "karsilastirma" in _perf:
             a_, b_ = _perf["karsilastirma"]["son"], _perf["karsilastirma"]["onceki"]
             st.caption(f"Son {trends.MIN_TRADES} işlem: {a_['ort_R']:+.2f} R · önceki {trends.MIN_TRADES}: {b_['ort_R']:+.2f} R")
@@ -1000,23 +992,25 @@ with tab_trend:
         st.info("Henüz kapanmış sanal işlem yok.")
     _ss = trends.strategy_stats(conn)
     for key_, title_ in (("senaryo", "🎯 Stratejiye göre"), ("kaynak_haber", "📰 Haber kaynağına göre"),
-                         ("risk", "⚠️ Risk seviyesine göre")):
+                         ("olay_turu", "🗂️ Haberin olay türüne göre"), ("risk", "⚠️ Risk seviyesine göre")):
         if _ss[key_]:
             st.markdown(f"##### {title_}")
-            st.dataframe([{"Grup": r["grup"], "İşlem": r["n"], "Kazanma %": round(r["kazanma_%"], 1),
-                           "Ort. R": None if r["ort_R"] is None else round(r["ort_R"], 2),
-                           "Ort. net %": round(r["ort_net_%"], 2),
-                           "Yeterli örnek": "evet" if r["yeterli"] else f"hayır (< {trends.MIN_TRADES})"}
-                          for r in _ss[key_]], hide_index=True, use_container_width=True)
+            st.dataframe(dash_cells(pd.DataFrame([{"Grup": r["grup"], "İşlem": r["n"], "Kazanma %": r["kazanma_%"],
+                                                   "Ort. R": r["ort_R"], "Ort. net %": r["ort_net_%"],
+                                                   "Yeterli örnek": "evet" if r["yeterli"] else
+                                                   f"hayır (< {trends.MIN_TRADES})"} for r in _ss[key_]]),
+                                    ["Kazanma %", "Ort. R", "Ort. net %"]),
+                         hide_index=True, width="stretch")
     st.markdown("##### 🧹 Hangi neden/filtre sonradan yükselen hisseleri eledi?")
     _fr = trends.filter_rates(conn, (_today - timedelta(days=180)).isoformat())
     if _fr["toplam_n"]:
         st.caption(f"{_fr['gun']} karar günü, {_fr['toplam_n']} hisse-gün; genel kaçırılan oranı %{_fr['genel_%']:.1f}. "
                    "Bir nedenin oranı diğerlerinden anlamlı yüksekse o filtre fazla fırsat eliyor olabilir.")
-        st.dataframe([{"Neden": r["neden"], "Değerlendirilen": r["degerlendirilen"], "Kaçırılan": r["kacirilan"],
-                       "Oran %": round(r["oran_%"], 2), "Güven aralığı %": f"{r['alt_%']:.1f}–{r['ust_%']:.1f}",
-                       "Diğerleri %": None if r["digerleri_%"] is None else round(r["digerleri_%"], 2)}
-                      for r in _fr["satirlar"]], hide_index=True, use_container_width=True)
+        st.dataframe(dash_cells(pd.DataFrame([{"Neden": r["neden"], "Değerlendirilen": r["degerlendirilen"],
+                                               "Kaçırılan": r["kacirilan"], "Oran %": r["oran_%"],
+                                               "Güven aralığı %": f"{r['alt_%']:.1f}–{r['ust_%']:.1f}",
+                                               "Diğerleri %": r["digerleri_%"]} for r in _fr["satirlar"]]),
+                                ["Oran %", "Diğerleri %"]), hide_index=True, width="stretch")
     else:
         st.info("Henüz penceresi tamamlanmış karar günü yok (bekçi en az bir akşam çalışmalı ve 5 işlem günü geçmeli).")
     _rep = trends.repeated(conn, _today)
@@ -1024,13 +1018,13 @@ with tab_trend:
         st.markdown(f"##### 🔁 Tekrar eden nedenler (son {trends.RECENT_DAYS} gün / önceki {trends.RECENT_DAYS} gün)")
         codes_ = sorted(set(_rep["son_neden"]) | set(_rep["onceki_neden"]))
         st.dataframe([{"Neden": c_, "Son": _rep["son_neden"].get(c_, 0), "Önceki": _rep["onceki_neden"].get(c_, 0)}
-                      for c_ in codes_], hide_index=True, use_container_width=True)
+                      for c_ in codes_], hide_index=True, width="stretch")
     _done = trends.decided(conn)
     if _done:
         with st.expander(f"Karar verilmiş öneriler ({len(_done)})"):
             st.dataframe([{"Tarih": (r["karar_ani"] or "")[:16].replace("T", " "), "Öneri": r["baslik"],
                            "Karar": r["durum"], "Not": r["karar_notu"] or ""} for r in _done],
-                         hide_index=True, use_container_width=True)
+                         hide_index=True, width="stretch")
 
 conn.close()
 

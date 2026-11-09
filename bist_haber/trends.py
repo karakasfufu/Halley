@@ -15,6 +15,7 @@ from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional
 
 from . import config
+from .labels import EVENT_TR
 
 MIN_TRADES = 30            # strateji/kaynak karşılaştırması için en az kapanmış işlem (journal.MIN_TRADES_FOR_STATS)
 MIN_FILTER_N = 200         # filtre kaçırma oranı için en az değerlendirilen hisse-gün
@@ -95,11 +96,14 @@ def _closed(conn, kaynak="otomatik") -> List[Dict]:
         res = json.loads(r["sonuc_json"]) if r["sonuc_json"] else {}
         if res.get("net_getiri_pct") is None:
             continue
-        src = conn.execute("SELECT n.source FROM impacts i JOIN news n ON n.id=i.news_id WHERE i.ticker=? AND "
-                           "i.direction>0 AND i.effective_date<=? ORDER BY i.published_at DESC LIMIT 1",
+        src = conn.execute("SELECT n.source, i.event_type FROM impacts i JOIN news n ON n.id=i.news_id WHERE "
+                           "i.ticker=? AND i.direction>0 AND i.effective_date<=? ORDER BY i.published_at DESC LIMIT 1",
                            (r["ticker"], r["signal_day"])).fetchone()
         out.append({"id": r["id"], "hisse": r["ticker"], "senaryo": r["senaryo"], "risk": r["risk_seviyesi"] or "—",
-                    "kaynak_haber": _source_label(src["source"] if src else None), "cikis": res.get("cikis_gunu") or "",
+                    "kaynak_haber": _source_label(src["source"] if src else None),
+                    # W5 (2026-11-09): sinyali üreten son olumlu haberin olay türü (bilanço, yeni iş, geri alım…)
+                    "olay_turu": EVENT_TR.get(src["event_type"], src["event_type"]) if src else "bilinmiyor",
+                    "cikis": res.get("cikis_gunu") or "",
                     "net": res["net_getiri_pct"], "r": res.get("r"), "sonuc": res.get("sonuc")})
     return sorted(out, key=lambda x: (x["cikis"], x["id"]))
 
@@ -117,7 +121,8 @@ def _stats(xs: List[Dict]) -> Dict:
 def strategy_stats(conn) -> Dict[str, List[Dict]]:
     xs = _closed(conn)
     out = {}
-    for key, label in (("senaryo", "Senaryo"), ("risk", "Risk seviyesi"), ("kaynak_haber", "Haber kaynağı")):
+    for key, label in (("senaryo", "Senaryo"), ("risk", "Risk seviyesi"), ("kaynak_haber", "Haber kaynağı"),
+                       ("olay_turu", "Olay türü")):
         g = defaultdict(list)
         for x in xs:
             g[x[key]].append(x)
@@ -185,7 +190,7 @@ def generate(conn, today: date) -> List[Dict]:
                                   "değişmez."),
                         "nerede": where, "kanit": r})
     st = strategy_stats(conn)
-    for key, what in (("senaryo", "Senaryo"), ("kaynak_haber", "Haber kaynağı")):
+    for key, what in (("senaryo", "Senaryo"), ("kaynak_haber", "Haber kaynağı"), ("olay_turu", "Olay türü")):
         rows = st[key]
         for r in rows:
             if r["n"] < MIN_TRADES or r["ort_R"] is None or not r["sd_R"]:
@@ -197,7 +202,9 @@ def generate(conn, today: date) -> List[Dict]:
                             "metin": (f"{r['n']} kapanmış sanal işlemde ortalama {r['ort_R']:+.2f} R (güven aralığının üstü "
                                       f"de sıfırın altında: {hi:+.2f} R); kazanma oranı %{r['kazanma_%']:.0f}. Öneri: bu "
                                       f"{what.lower()} için sinyaller durdurulsun ya da kuralı gözden geçirilsin."),
-                            "nerede": "entries.py / tradeplan.py" if key == "senaryo" else "haber kaynağı ağırlığı (report.py)",
+                            "nerede": {"senaryo": "entries.py / tradeplan.py",
+                                       "kaynak_haber": "haber kaynağı ağırlığı (report.py)",
+                                       "olay_turu": "bu olay türünün yorum kuralı (analyzer.py) ya da puan ağırlığı"}[key],
                             "kanit": r})
     cov = coverage(conn)
     hits = sum(1 for c in cov if c["pay"] >= COVERAGE_SHARE)

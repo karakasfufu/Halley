@@ -1018,3 +1018,11 @@ aynı hissede çift açık sanal kayıt yok.
 **Eşzamanlı yazım:** ayrı süreçte 1.168 okuyucu-benzeri yazım sürerken sabah + akşam analizi: kilit hatası 0.
 **Kalıcı testler:** `tests/test_panel_flows.py` (4; eski kodda 3 başarısız + 1 hata), `test_journal` kayıt korumaları.
 379 test, ağsız 0 bağlantı. Not: fiyatın tek kaynağı Yahoo (gecikmeli); bağımsız ikinci kaynakla karşılaştırma yok.
+
+## 2026-11-09 — Öncelikli plan: W5 olay türü eksiği + 1.2 Streamlit uyumluluğu
+**W5 eksiği tamamlandı:** Gelişim sekmesinde "Haberin olay türüne göre" (bilanço, yeni iş, geri alım…) başarı tablosu
+ve öneri kuralı (≥ 30 kapanmış işlem ve ort. R'nin %95 üst sınırı < 0). Olay türü = sinyal günündeki son olumlu haber
+etkisinin türü. Etiketler ortak `bist_haber/labels.py` (panel + gelişim). Gelişim tablolarında boş değer "—".
+**1.2:** `use_container_width=True` (20 yer; Streamlit'te kaldırılıyor) → `width="stretch"`; kurulumda
+`streamlit>=1.50,<2` (eski sınır 1.38 yeni parametreyi desteklemiyordu). Test çıktısında kullanımdan kalkma uyarısı 0;
+uçtan uca kontrol temiz. 380 test, ağsız 0 bağlantı.

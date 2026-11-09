@@ -105,6 +105,17 @@ class StrategyRuleTests(Base):
             self.trade(i, "kirilim", -0.5 + (0.1 if i % 2 else -0.1), -1.0)
         self.assertEqual(trends.generate(self.conn, TODAY), [])
 
+    def test_event_type_grouping_and_rule(self):
+        # W5 eksiği (2026-11-09): olay türüne göre başarı
+        for i in range(30):
+            self.trade(i, "destek", -0.5 + (0.1 if i % 2 else -0.1), -1.0, source="kap")
+        self.conn.execute("UPDATE impacts SET event_type='pay_geri_alim'")
+        g = {r["grup"]: r for r in trends.strategy_stats(self.conn)["olay_turu"]}
+        self.assertEqual(list(g), ["Pay geri alımı"])
+        self.assertEqual(g["Pay geri alımı"]["n"], 30)
+        keys = [s["anahtar"] for s in trends.generate(self.conn, TODAY)]
+        self.assertIn("olay_turu:Pay geri alımı:zayif", keys)
+
     def test_source_grouping(self):
         self.trade(1, "destek", 1.0, 2.0, source="kap")
         self.trade(2, "destek", -1.0, -1.0, source="rss:bloomberght")
