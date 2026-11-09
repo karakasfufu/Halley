@@ -17,21 +17,121 @@ from bist_haber import (analyzer, calendar_sync, config, corp_events, db, earnin
                         kap_worker, macro_calendar, pipeline, report, signals, technical, timeline, tradeplan,
                         trends, watchdog, ai_comment, sectors)
 
-st.set_page_config(page_title="Halley", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Halley", page_icon="☄️", layout="wide", initial_sidebar_state="collapsed")
 _RENDER_T0 = time.time()   # sayfa çizim süresi (otomatik yenileme aralığı buna göre)
 
+# Görünüm (2026-11-09 kullanıcı isteği: "dağınık, önemli bilgiler silik"): koyu ve okunur yazı, kart düzeni, renkli
+# bölüm başlıkları. Yalnız sunum; hiçbir hesap değişmez.
 st.markdown("""
 <style>
-.block-container {padding-top: 3.5rem; max-width: 1100px;}
-div[data-testid="stMetric"] {background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 12px 16px;}
-.news-card {background:#fff; border:1px solid #E5E7EB; border-radius:12px; padding:12px 16px; margin-bottom:8px;}
-.news-meta {color:#6B7280; font-size:0.82rem;}
-.chip {display:inline-block; padding:2px 10px; border-radius:999px; font-size:0.78rem; font-weight:600; margin-right:6px;}
+:root {--h-ink:#0F172A; --h-sub:#1E293B; --h-muted:#334155; --h-line:#D5DBE8; --h-pos:#16A34A; --h-neg:#DC2626;
+       --h-acc:#4F46E5; --h-amber:#D97706; --h-card:#FFFFFF;}
+.stApp {background: radial-gradient(1100px 380px at 8% -8%, #E0E7FF 0%, rgba(224,231,255,0) 62%),
+        radial-gradient(800px 300px at 100% -4%, #FEF3C7 0%, rgba(254,243,199,0) 58%), #F3F5FA;}
+.block-container {padding-top: 3.4rem; max-width: 1180px;}
+header[data-testid="stHeader"] {background: transparent;}
+/* silik yazılar → okunur */
+[data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p {color: var(--h-muted) !important;
+  font-size: 0.9rem; line-height: 1.55; opacity: 1 !important;}
+[data-testid="stWidgetLabel"] p {color: var(--h-ink); font-weight: 600;}
+.stMarkdown p, .stMarkdown li {color: var(--h-sub);}
+/* üst bant */
+.hero {background: linear-gradient(118deg, #0F172A 0%, #1E1B4B 52%, #3730A3 100%); border-radius: 18px;
+  padding: 20px 26px 18px; position: relative; overflow: hidden; box-shadow: 0 14px 34px -16px rgba(30,27,75,.55);}
+.hero::before {content: ""; position: absolute; right: 70px; top: 34px; width: 210px; height: 3px; transform: rotate(-16deg);
+  background: linear-gradient(90deg, rgba(251,191,36,0), rgba(251,191,36,.85)); border-radius: 3px;}
+.hero::after {content: ""; position: absolute; right: 52px; top: 12px; width: 18px; height: 18px; border-radius: 50%;
+  background: #FDE68A; box-shadow: 0 0 22px 8px rgba(251,191,36,.55);}
+.hero .t {color: #FFFFFF; font-size: 2.05rem; font-weight: 800; letter-spacing: -.02em; line-height: 1.1;}
+.hero .s {color: #C7D2FE; font-size: .96rem; margin-top: 6px;}
+.hero .pills {margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px;}
+.hero .pill {background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.22); color: #F1F5F9;
+  border-radius: 999px; padding: 3px 12px; font-size: .84rem;}
+/* bilgi şeridi (piyasa durumu) */
+.strip {background: var(--h-card); border: 1px solid var(--h-line); border-left: 5px solid var(--h-acc); border-radius: 12px;
+  padding: 10px 16px; color: var(--h-sub); font-size: .93rem; line-height: 1.55; margin: 6px 0 12px;}
+.strip.down {border-left-color: var(--h-neg);} .strip.up {border-left-color: var(--h-pos);}
+.strip .lbl {font-weight: 800; color: var(--h-ink); margin-right: 6px;}
+/* bölüm başlıkları */
+.sec {display: flex; align-items: center; gap: 10px; font-size: 1.22rem; font-weight: 800; color: var(--h-ink);
+  margin: 20px 0 10px; padding: 2px 0 2px 12px; border-left: 5px solid var(--h-acc);}
+.sec.t-pos {border-left-color: var(--h-pos);} .sec.t-neg {border-left-color: var(--h-neg);} .sec.t-neu {border-left-color: #94A3B8;}
+.sec .cnt {font-size: .8rem; font-weight: 700; padding: 2px 10px; border-radius: 999px; background: #EEF2FF; color: #3730A3;}
+.sec.t-pos .cnt {background: #DCFCE7; color: #166534;} .sec.t-neg .cnt {background: #FEE2E2; color: #991B1B;}
+.sec .note {font-size: .86rem; font-weight: 500; color: var(--h-muted);}
+.opt {font-weight: 700; color: var(--h-ink); margin: 8px 0 2px;} .opt span {font-weight: 500; color: var(--h-muted);}
+/* kartlar */
+.st-key-watch, .st-key-macro {background: var(--h-card); border-radius: 16px; box-shadow: 0 1px 3px rgba(15,23,42,.06);}
+.st-key-macro {border: 1px solid var(--h-line); border-left: 5px solid var(--h-amber); padding: 12px 16px;}
+div[data-testid="stMetric"] {background: var(--h-card); border: 1px solid var(--h-line); border-radius: 14px; padding: 12px 16px;
+  box-shadow: 0 1px 3px rgba(15,23,42,.05);}
+[data-testid="stMetricLabel"] p {color: var(--h-muted) !important; font-weight: 700; font-size: .88rem;}
+[data-testid="stMetricValue"] {color: var(--h-ink); font-weight: 750;}
+[data-testid="stMetricValue"] > div, [data-testid="stMetricDelta"] div {overflow: visible !important; text-overflow: clip !important;}
+[data-testid="stMetricDelta"] div {white-space: normal !important;}
+[data-testid="stExpander"] [data-testid="stMetricValue"] {font-size: 1.45rem;}
+.st-key-kpi div[data-testid="stColumn"]:nth-of-type(1) div[data-testid="stMetric"] {border-top: 5px solid var(--h-pos);}
+.st-key-kpi div[data-testid="stColumn"]:nth-of-type(2) div[data-testid="stMetric"] {border-top: 5px solid var(--h-neg);}
+.st-key-kpi div[data-testid="stColumn"]:nth-of-type(3) div[data-testid="stMetric"] {border-top: 5px solid var(--h-acc);}
+.st-key-kpi div[data-testid="stColumn"]:nth-of-type(1) [data-testid="stMetricValue"] {color: #15803D;}
+.st-key-kpi div[data-testid="stColumn"]:nth-of-type(2) [data-testid="stMetricValue"] {color: #B91C1C;}
+/* açılır kutular */
+[data-testid="stExpander"] details {background: var(--h-card); border: 1px solid var(--h-line); border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(15,23,42,.05); transition: box-shadow .15s, border-color .15s;}
+[data-testid="stExpander"] details:hover {border-color: #A5B4FC; box-shadow: 0 8px 20px -12px rgba(79,70,229,.5);}
+[data-testid="stExpander"] summary p {color: var(--h-ink); font-size: .98rem;}
+.st-key-list_pos [data-testid="stExpander"] details {border-left: 5px solid var(--h-pos);}
+.st-key-list_neg [data-testid="stExpander"] details {border-left: 5px solid var(--h-neg);}
+.st-key-list_neu [data-testid="stExpander"] details {border-left: 5px solid #94A3B8;}
+/* sekmeler */
+[data-baseweb="tab-list"] {gap: 6px; background: var(--h-card); padding: 6px; border-radius: 14px; border: 1px solid var(--h-line);
+  box-shadow: 0 1px 3px rgba(15,23,42,.05); flex-wrap: wrap;}
+button[data-baseweb="tab"] {border-radius: 10px; padding: 8px 14px; height: auto;}
+button[data-baseweb="tab"] p {font-weight: 700; color: var(--h-muted); font-size: .95rem;}
+button[data-baseweb="tab"]:hover {background: #EEF2FF;}
+button[data-baseweb="tab"][aria-selected="true"] {background: linear-gradient(118deg, #4F46E5, #7C3AED);}
+button[data-baseweb="tab"][aria-selected="true"] p {color: #FFFFFF;}
+[data-baseweb="tab-highlight"], [data-baseweb="tab-border"] {display: none;}
+/* düğmeler ve uyarılar */
+.stButton button, .stDownloadButton button {font-weight: 700; border-radius: 10px;}
+.stButton button[kind="primary"] {background: linear-gradient(118deg, #4F46E5, #7C3AED); border: none;
+  box-shadow: 0 8px 18px -10px rgba(79,70,229,.8);}
+[data-testid="stAlertContainer"] {border-radius: 12px;}
+[data-testid="stAlertContainer"] p {font-weight: 500;}
+/* fırsat özeti */
+.opp {background: linear-gradient(135deg, #ECFDF5, #FFFFFF 70%); border: 1px solid #A7F3D0; border-radius: 16px;
+  padding: 14px 18px; margin: 4px 0 8px;}
+.opp .h {font-size: 1.05rem; font-weight: 800; color: #065F46;}
+.opp .chips {display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 8px;}
+.opp .tk {background: #FFFFFF; border: 1px solid var(--h-line); border-radius: 10px; padding: 5px 10px; font-size: .86rem;
+  color: var(--h-sub); border-left: 4px solid #94A3B8;}
+.opp .tk b {color: var(--h-ink); margin-right: 4px;}
+.opp .tk.r-düşük {border-left-color: var(--h-pos);} .opp .tk.r-orta {border-left-color: var(--h-amber);}
+.opp .tk.r-yüksek {border-left-color: var(--h-neg);}
+.opp .f {font-size: .85rem; color: var(--h-muted);}
+/* haber kartları */
+.news-card {background: var(--h-card); border: 1px solid var(--h-line); border-radius: 12px; padding: 12px 16px; margin-bottom: 8px;}
+.news-meta {color: var(--h-muted); font-size: 0.86rem;}
+.chip {display:inline-block; padding:2px 10px; border-radius:999px; font-size:0.8rem; font-weight:700; margin-right:6px;}
 .warn {background:#FEF3C7; color:#92400E;} .pos {background:#DCFCE7; color:#166534;}
-.neg {background:#FEE2E2; color:#991B1B;} .neu {background:#F3F4F6; color:#374151;}
-.disclaimer {color:#6B7280; font-size:0.8rem; margin-top:2rem;}
+.neg {background:#FEE2E2; color:#991B1B;} .neu {background:#E2E8F0; color:#1E293B;}
+.disclaimer {color: var(--h-muted); font-size:0.84rem; margin-top:2rem; border-top: 1px solid var(--h-line); padding-top: 12px;}
 </style>
 """, unsafe_allow_html=True)
+
+GUNLER = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
+
+
+def section_title(icon: str, text: str, tone: str = "", count=None, note: str = "") -> None:
+    """Renkli bölüm başlığı (yalnız görünüm)."""
+    st.markdown(f"<div class='sec {'t-' + tone if tone else ''}'><span>{icon}</span>{esc(text)}"
+                + (f"<span class='cnt'>{count}</span>" if count is not None else "")
+                + (f"<span class='note'>{esc(note)}</span>" if note else "") + "</div>", unsafe_allow_html=True)
+
+
+def bold_html(text: str) -> str:
+    """Metni güvenli hâle getirir; **kalın** işaretlerini <b> yapar."""
+    return re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", esc(text))
 
 conn = db.connect()
 try:
@@ -100,9 +200,15 @@ def flash(kind: str, text: str) -> None:
 for _kind, _text in st.session_state.pop("_flash", []):
     {"error": st.error, "warning": st.warning, "success": st.success}.get(_kind, st.info)(_text)
 
-h1, h2 = st.columns([3, 1])
-h1.markdown("## 📡 Halley")
-h1.caption("Bugün haberi çıkan hisseler · KAP ve ekonomi haberleri yapay zekâ ile okunur")
+h1, h2 = st.columns([3, 1], vertical_alignment="center")
+_today = datetime.now(config.TR_TZ)
+h1.markdown(
+    "<div class='hero'><div class='t'>Halley</div>"
+    "<div class='s'>Bugün haberi çıkan hisseler · KAP ve ekonomi haberleri yapay zekâ ile okunur</div>"
+    f"<div class='pills'><span class='pill'>📅 {_today.day} {['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'][_today.month - 1]} "
+    f"{_today.year}, {GUNLER[_today.weekday()]}</span><span class='pill'>🕒 Son güncelleme: {esc(last_update_text())}</span>"
+    "<span class='pill'>🔒 Emir vermez · işlemi siz Midas'tan yaparsınız</span></div></div>",
+    unsafe_allow_html=True)
 
 if not pipeline.has_api_key():
     st.warning("Başlamak için OpenAI API anahtarınızı bir kez girin. Anahtar yalnızca bu bilgisayarda saklanır.")
@@ -229,20 +335,22 @@ with st.expander("❓ Nasıl kullanılır"):
 
 # ---------------- Piyasa bekçisi (W2): sabah / akşam analizi — kullanıcı elle başlatır ----------------
 def watch_box() -> None:
-    st.markdown("#### 🛡️ Piyasa bekçisi")
-    w1, w2, w3 = st.columns([1, 1, 2])
+    section_title("🛡️", "Piyasa bekçisi", note="sabah borsa açılmadan, akşam kapanıştan sonra bir kez basın")
+    w1, w2 = st.columns(2)
+    st.markdown("<div class='opt'>✨ Yapay zekâ seçenekleri <span>(isteğe bağlı; işaretlemezseniz ücretsiz)</span></div>",
+                unsafe_allow_html=True)
+    w3, a1, a2 = st.columns(3)
     use_ai = w3.checkbox("Sabah analizinde yeni haberleri yapay zekâ ile de analiz et", value=False, key="watch_ai",
                          help="Kapalıysa ücretsizdir: haberler toplanır, fiyatlar güncellenir, kayıtlı analizlerle "
                               "rapor hazırlanır. Açıksa Ayarlar'daki sınır kadar haber analiz edilir.")
     if use_ai:
         if pipeline.has_api_key():
             est = pipeline.estimate_next_run(conn, analysis_limit=analysis_limit, quality=quality)
-            w3.caption(f"Şu an sırada {est['waiting']} haber; bu çalıştırmada en fazla {analysis_limit} haber analiz "
+            st.caption(f"Şu an sırada {est['waiting']} haber; bu çalıştırmada en fazla {analysis_limit} haber analiz "
                        f"edilir. Sıradakiler için tahmini maliyet {est['low_usd']:.3f}–{est['high_usd']:.3f} $ "
                        "(gece gelen yeni haberler toplanınca sıra değişebilir; üst sınır analiz adedidir).")
         else:
-            w3.caption("API anahtarı yok: yapay zekâ analizi yapılamaz, rapor ücretsiz kısımla hazırlanır.")
-    a1, a2 = st.columns(2)
+            st.caption("API anahtarı yok: yapay zekâ analizi yapılamaz, rapor ücretsiz kısımla hazırlanır.")
     ai_report = a1.checkbox("🤖 Raporu yapay zekâ ile yorumla (sabah/akşam)", value=False, key="watch_ai_report")
     ai_missed = a2.checkbox("🤖 Kaçırılan fırsatları yapay zekâ ile açıkla (akşam, en fazla 5 hisse)", value=False,
                             key="watch_ai_missed")
@@ -287,7 +395,7 @@ def watch_box() -> None:
             conn.close()
             st.rerun()
         if tm["uyari"]:
-            col.caption("⚠️ " + tm["uyari"].split(":")[0])
+            col.caption("⚠️ " + re.split(r":\s", tm["uyari"], maxsplit=1)[0])
     name = st.session_state.get("watch_last")
     if name:
         path = watchdog.report_dir() / f"{name}.md"
@@ -298,7 +406,8 @@ def watch_box() -> None:
                                    key="watch_dl")
 
 
-watch_box()
+with st.container(border=True, key="watch"):
+    watch_box()
 
 # ---------------- Özet ----------------
 _pd_key = conn.execute("SELECT MAX(date) FROM prices WHERE ticker='XU100'").fetchone()[0]
@@ -307,12 +416,15 @@ if st.session_state.get("_regime_key") != _pd_key:      # fiyat günü değişin
     st.session_state["_regime"] = _regime.regime(conn).get("ozet")
     st.session_state["_regime_key"] = _pd_key
 if st.session_state.get("_regime"):
-    st.caption("📊 Piyasa durumu (bilgi; kararları değiştirmez): " + st.session_state["_regime"].replace("**", ""))
+    _rg = st.session_state["_regime"]
+    _tone = "down" if "trendi **düşüş" in _rg or "trendi düşüş" in _rg else "up" if "trendi **yükseliş" in _rg or "trendi yükseliş" in _rg else ""
+    st.markdown(f"<div class='strip {_tone}'><span class='lbl'>📊 Piyasa durumu</span>{bold_html(_rg)} "
+                "<span class='news-meta'>(bilgi; kararları değiştirmez)</span></div>", unsafe_allow_html=True)
 rows = report.build(conn, uni, days=window)
 positives = [r for r in rows if r["score"] >= 1.5]
 negatives = [r for r in rows if r["score"] <= -1.5]
 neutrals = [r for r in rows if -1.5 < r["score"] < 1.5]
-m1, m2, m3 = st.columns(3)
+m1, m2, m3 = st.container(key="kpi").columns(3)
 m1.metric("Olumlu haber", f"{len(positives)} hisse")
 m2.metric("Olumsuz haber", f"{len(negatives)} hisse")
 m3.metric("Son güncelleme", last_update_text())
@@ -692,10 +804,15 @@ def stock_details(r: dict) -> None:
             unsafe_allow_html=True)
 
 
-def stock_list(items: list, empty_text: str) -> None:
+def stock_list(items: list, empty_text: str, tone: str = "neu") -> None:
     if not items:
         st.caption(empty_text)
         return
+    with st.container(key=f"list_{tone}"):
+        _stock_rows(items)
+
+
+def _stock_rows(items: list) -> None:
     for r in items:
         reason = (r["last_news"] or "").strip()
         reason = reason if len(reason) <= 80 else reason[:78].rstrip() + "…"
@@ -742,7 +859,8 @@ AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağu
 
 # ---------------- Bugünün listesi ----------------
 with tab_list:
-    macro_block()
+    with st.container(key="macro"):
+        macro_block()
     if not rows:
         st.info("Henüz liste yok. Yukarıdaki **Haberleri güncelle** düğmesine basın.")
     else:
@@ -754,20 +872,25 @@ with tab_list:
                 journal.record_auto(conn, r["ticker"], scenario(r), t_rec["tarih"], r["score"])
         journal.update_all(conn, commission, slippage)
         if summary_["uygun"]:
-            st.success(f"Bugün {len(summary_['uygun'])} hissede uygun görünen giriş senaryosu var: "
-                       + ", ".join(f"{tk} ({name.split(' (')[0].lower()}, risk {risk})" for tk, name, risk in summary_["uygun"])
-                       + ". Ayrıntı için hisseye tıklayın. Bu bir senaryodur, yatırım tavsiyesi değildir.")
+            st.markdown(
+                f"<div class='opp'><div class='h'>🎯 Bugün {len(summary_['uygun'])} hissede uygun görünen giriş senaryosu var</div>"
+                "<div class='chips'>" + "".join(
+                    f"<span class='tk r-{esc(str(risk))}'><b>{esc(tk)}</b>{esc(name.split(' (')[0].lower())} · risk {esc(str(risk))}</span>"
+                    for tk, name, risk in summary_["uygun"])
+                + "</div><div class='f'>Kenar rengi risk seviyesini gösterir (yeşil düşük, turuncu orta, kırmızı yüksek). "
+                "Ayrıntı için aşağıdan hisseye tıklayın. Bu bir senaryodur, yatırım tavsiyesi değildir.</div></div>",
+                unsafe_allow_html=True)
         else:
             st.info("**Bugün uygun işlem fırsatı bulunamadı.** Her gün işlem yapmak gerekmez. "
                     + ("Nedenler: " + "; ".join(f"{k} ({v} hisse)" for k, v in summary_["nedenler"].items()) + "."
                        if summary_["nedenler"] else "Olumlu haber alan hisse yok."))
-        st.markdown("#### 🟢 Olumlu haber alanlar")
-        stock_list(positives, "Bu dönemde olumlu haber alan hisse yok.")
-        st.markdown("#### 🔴 Olumsuz haber alanlar")
-        stock_list(negatives, "Bu dönemde olumsuz haber alan hisse yok.")
+        section_title("📈", "Olumlu haber alanlar", "pos", len(positives))
+        stock_list(positives, "Bu dönemde olumlu haber alan hisse yok.", "pos")
+        section_title("📉", "Olumsuz haber alanlar", "neg", len(negatives))
+        stock_list(negatives, "Bu dönemde olumsuz haber alan hisse yok.", "neg")
         if neutrals and st.toggle(f"Etkisi zayıf/nötr haberleri de göster ({len(neutrals)} hisse)", key="show_neutral"):
-            st.markdown("#### ⚪ İzlenecekler")
-            stock_list(neutrals, "")
+            section_title("👁️", "İzlenecekler", "neu", len(neutrals))
+            stock_list(neutrals, "", "neu")
         st.caption("Bir hisseye tıklayınca haberin özeti, nedeni ve kaynağı açılır. "
                    "✅ Teyitli: iki ayrı analiz aynı sonuca vardı · ⚠️ Kontrol et: analizler çelişti ya da emin değil.")
         if st.session_state.get("signals_export_ready"):
@@ -848,8 +971,9 @@ with tab_journal:
     _pf = sectors.portfolio(conn)
     if _pf["hisse"]:
         st.caption("🧺 Açık/bekleyen işlemlerin sektörleri: " + " · ".join(f"{k}: {', '.join(v)}" for k, v in _pf["ana"].items()))
-        for w_ in _pf["uyarilar"]:
-            st.warning("Portföy riski: " + w_)
+        if _pf["uyarilar"]:      # görünüm: tek kutuda maddeler (eskiden her uyarı ayrı kutuydu)
+            st.warning(f"**🧺 Portföy riski ({len(_pf['uyarilar'])} uyarı)**\n\n"
+                       + "\n".join("- " + w_.replace("*", "\\*") for w_ in _pf["uyarilar"]))
     st.caption("Panelde 'uygun' görünen her hissenin en uygun giriş senaryosu kendiliğinden SANAL işlem olarak kaydedilir "
                "ve sonraki günlerin fiyatlarıyla izlenir: giriş gerçekleşti mi, önce TP mi SL mi? Kural: TP1'de yarısı "
                "satılır, stop girişe çekilir, kalan TP2'ye izlenir; en fazla 30 işlem günü. Net getiri komisyon ve "

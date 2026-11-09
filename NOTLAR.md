@@ -1117,3 +1117,21 @@ nadiren değişir, gerekirse aynı yolla yenilenir.
 - **Portföy riski** (İşlem günlüğü sekmesi + sabah raporu): açık/bekleyen işlemlerin sektörleri; aynı alt sektörde ≥ 2
   işlem, tek ana sektörde ≥ %50 (≥ 3 işlem), 60 günlük günlük getiri korelasyonu ≥ 0,7 olan çiftler için uyarı.
 - Hız: fiyatlar bağlantı+gün başına bir kez okunur (126 hisse 0,5 sn; panel açılışı 7,5 sn). 402 test, ağsız 0 bağlantı.
+
+## 2026-11-09 — Görünüm düzenlemesi (kullanıcı: "dağınık, önemli bilgiler beyaz üstüne açık gri gibi silik")
+- Yalnız sunum değişti; hesap, karar, metin içerikleri ve düğme adları aynı (kılavuz testi düğme adlarını doğruluyor).
+- Silikliğin asıl nedeni: Streamlit açıklama yazılarını (`st.caption`) %60 saydam çiziyor → `opacity: 1`, koyu
+  renk (#334155), biraz daha büyük yazı. `.news-meta` da koyulaştırıldı.
+- Tema (`.streamlit/config.toml`): indigo ana renk, kenar/yuvarlaklık, tablo başlığı rengi.
+- Üst bant: koyu lacivert, kuyruklu yıldız (Halley) süsü, tarih / son güncelleme / "emir vermez" etiketleri.
+- Piyasa bekçisi tek kartta: iki düğme yan yana, yapay zekâ seçenekleri tek satırda üç kutu.
+- Piyasa durumu gri yazı yerine renkli şerit (trend düşüş → kırmızı kenar, yükseliş → yeşil).
+- Özet kutuları: olumlu yeşil, olumsuz kırmızı üst çizgi ve sayı rengi.
+- Fırsat özeti uzun paragraf yerine hisse etiketleri; kenar rengi = risk (yeşil düşük, turuncu orta, kırmızı yüksek).
+- Olumlu/olumsuz/izlenecek listeleri: renkli kenarlı kartlar, başlıkta hisse sayısı.
+- Sekmeler hap düğme görünümünde; seçili sekme renkli.
+- Hisse ayrıntısındaki kutularda sayılar artık "4.48…" diye kesilmiyor.
+- Akşam analizi uyarısı "(kapanış 18" diye yarım kalıyordu (saatteki iki nokta yüzünden) → düzeltildi.
+- İşlem günlüğünde her portföy uyarısı ayrı sarı kutuydu (7 kutu) → tek kutuda madde listesi.
+- Doğrulama: panelin kopyası API anahtarsız ve çevrimdışı kipte (HALLEY_OFFLINE=1, yalnız 127.0.0.1) ayrı portta
+  açılıp ekran görüntüleriyle kontrol edildi; 402 test geçti.
