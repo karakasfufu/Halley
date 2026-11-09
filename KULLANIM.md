@@ -67,6 +67,16 @@ tavsiyesi değildir.
   karşılıkları görünür. 0 bırakılırsa bu hesaplar gösterilmez.
 - **Bekçi yapay zekâ yorumu aylık bütçesi ($).**
 
+## Başka bilgisayara taşımak (🔧 Gelişmiş → 💾 Veri aktarma)
+
+1. **Eski bilgisayarda:** **📦 Veri dosyasını hazırla** → **⬇️ Veri dosyasını indir**. `halley_veri_….zip` dosyası
+   İndirilenler klasörüne kaydedilir (haberler, analizler, fiyatlar, işlem günlüğü, raporlar, pilot, ayarlar).
+2. Dosyayı USB ile yeni bilgisayara taşıyın. Yeni bilgisayara Halley'i **Halley_Kurulum.exe** ile kurun.
+3. **Yeni bilgisayarda:** Halley'i açın, OpenAI API anahtarını girin → **🔧 Gelişmiş → 💾 Veri aktarma → İçe aktar**:
+   dosyayı seçin, özeti kontrol edin, **Anladım** kutusunu işaretleyip **📥 İçe aktar** deyin.
+- API anahtarı dosyaya girmez; her bilgisayarda ayrı girilir. İçe aktarmadan önce o bilgisayardaki veriler
+  `data\yedek` klasörüne otomatik yedeklenir. Bozuk ya da değiştirilmiş dosya içe aktarılmaz.
+
 ## Bilinmesi gerekenler
 
 - Fiyatlar Yahoo'dan gelir ve gecikmelidir; gün içinde son mum yarım olabilir (panel "yarım veri" uyarısı verir).

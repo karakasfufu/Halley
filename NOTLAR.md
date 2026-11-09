@@ -1229,3 +1229,22 @@ nadiren değişir, gerekirse aynı yolla yenilenir.
   ayarlar.json yok (tarandı; "sk-" yalnız örnek yazılar). Kurulup açıldı (sağlık ok), sonra kapatıldı.
 - Gizli depoya sürüm: `v2026.11.09` (yalnız bu dosya; veriler USB ile taşınır). Veri dahil kurulum dosyası GitHub'a
   YÜKLENMEDİ (kullanıcı kuralı: veritabanı GitHub'a yüklenmez).
+
+## 2026-11-09 — Veri aktarma (dışa / içe aktar) — kullanıcı: "sıfırdan kurdurup verileri içe aktarma olarak vermek"
+- `bist_haber/transfer.py`: tek zip dosyası (manifest + SHA-256). İçerik: ana veritabanı ve pilot (SQLite yedekleme
+  API'siyle tutarlı kopya), ayarlar.json, aliases, universe, takvim, kap_okuyucu.json, fiyat_yok.json, raporlar/.
+  ASLA girmeyen: .env (API anahtarı), günlükler, pencere profili, yedekler (izinli ad listesi).
+- İçe aktarma: denetim (Halley dosyası mı, sürüm, her parçanın SHA-256'sı, güvenli dosya adı — "../" engelli,
+  integrity_check, gerekli tablolar) → mevcut veri data/yedek/ice_aktarma_oncesi_<zaman>/ altına → veritabanları
+  yedekleme API'siyle yazılır (panel/okuyucu açıkken güvenli; açık bağlantı yeni veriyi görür) → db.connect ile
+  şema güncellenir. Reddedilen dosyada hiçbir şey değişmez. .env'e dokunulmaz.
+- Panel: 🔧 Gelişmiş → 💾 Veri aktarma (Hazırla/İndir; dosya seç → özet → "Anladım" → İçe aktar). Haber yoksa üstte
+  "Halley yeni kurulmuş görünüyor…" yönlendirmesi. KULLANIM.md'ye adımlar eklendi.
+- Testler: tests/test_transfer.py (gidiş-dönüş, anahtar taşınmaz, yedek, değiştirilmiş/yabancı dosya reddi, güvenli
+  olmayan yol) + panel testi (bölüm görünür, dosya hazırlanır). 410 test geçti.
+- Gerçek veriyle: canlı veri (salt okuma) 8,6 MB dosyaya aktarıldı (7.717 haber, 151 analiz sonucu, 23 işlem günlüğü,
+  pilot); anahtar dosyada yok. Boş kopyada (yalnız şirket listesi, KAP'a gidilmedi) panelden dosya yüklenip içe
+  aktarıldı: olumlu/olumsuz 50/43 (canlıyla aynı), ana veritabanındaki 15 ve pilottaki 20 tablonun satır sayıları
+  canlıyla birebir; yeni bilgisayarın .env'i değişmedi; önceki veri yedeklendi.
+- Bilinen sınır: yeni bilgisayarda Halley ilk açılışta KAP şirket listesini indirir (internet gerekir); KAP o an
+  sınır uygularsa panel açılmaz ve içe aktarma bölümüne ulaşılamaz (birkaç dakika sonra yeniden açmak yeterli).

@@ -62,6 +62,14 @@ class PanelFlowTests(unittest.TestCase):
         self.assertEqual(st_config.get_option("theme.base"), "light")
         self.assertTrue(any("--h-bg:#F3F5FA" in m.value for m in at.markdown))
 
+    def test_transfer_section_export_prepares_file(self):
+        at = self.app()
+        self.assertTrue(any("💾 Veri aktarma" in m.value for m in at.markdown))
+        self.assertFalse(any("Halley yeni kurulmuş" in str(i.value) for i in at.info))     # verisi olan kurulum
+        at.button(key="export_prepare").click().run()
+        self.assertEqual(len(at.exception), 0, str(at.exception))
+        self.assertTrue(any("Hazır:" in c.value and "1 haber" in c.value for c in at.caption))
+
     def test_settings_file_with_bom_is_not_lost(self):
         # Not Defteri dosyayı BOM ile kaydederse ayarlar okunamayıp sıfırlanıyordu (2026-11-09 önizlemede görüldü)
         pipeline.SETTINGS_FILE.write_bytes(b'\xef\xbb\xbf{"karanlik_mod": true, "komisyon_pct": 0.3}')

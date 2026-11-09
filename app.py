@@ -15,7 +15,7 @@ import streamlit as st
 
 from bist_haber import (analyzer, calendar_sync, config, corp_events, db, earnings, entries, journal, kap_history,
                         kap_worker, macro_calendar, pipeline, report, signals, technical, timeline, tradeplan,
-                        trends, watchdog, ai_comment, sectors)
+                        trends, watchdog, ai_comment, sectors, transfer)
 
 st.set_page_config(page_title="Halley", page_icon="☄️", layout="wide", initial_sidebar_state="collapsed")
 _RENDER_T0 = time.time()   # sayfa çizim süresi (otomatik yenileme aralığı buna göre)
@@ -269,6 +269,10 @@ if not pipeline.has_api_key():
         pipeline.save_api_key(key)
         conn.close()  # sayfa yenilenmeden önce bağlantıyı bırak (aksi hâlde açık kalıyordu)
         st.rerun()
+
+if not conn.execute("SELECT 1 FROM news LIMIT 1").fetchone():
+    st.info("🆕 Halley yeni kurulmuş görünüyor. Başka bilgisayardan veri taşıyorsanız: **🔧 Gelişmiş → 💾 Veri aktarma → "
+            "İçe aktar**.")
 
 with st.expander("⚙️ Ayarlar"):
     s1, s2, s3 = st.columns(3)
@@ -1246,6 +1250,60 @@ with tab_news:
 
 # ---------------- Gelişmiş ----------------
 with tab_adv:
+    # 2026-11-09 (kullanıcı isteği): başka bilgisayara taşıma. API anahtarı dosyaya girmez (bkz. bist_haber/transfer.py).
+    st.markdown("#### 💾 Veri aktarma (başka bilgisayara taşıma)")
+    st.caption("Haberler, analizler, fiyatlar, işlem günlüğü, bekçi raporları, geçmiş veri pilotu ve ayarlar tek dosyada "
+               "taşınır. API anahtarı dosyaya girmez; her bilgisayarda ayrı girilir.")
+    x1, x2 = st.columns(2)
+    with x1:
+        st.markdown("**Dışa aktar** (bu bilgisayardan)")
+        if st.button("📦 Veri dosyasını hazırla", key="export_prepare"):
+            try:
+                _ex = transfer.export_bytes()
+                st.session_state["export_file"] = (_ex["bytes"], _ex["manifest"])
+            except Exception as e:
+                st.error(f"Veri dosyası hazırlanamadı: {nice_err(e)}")
+        if st.session_state.get("export_file"):
+            _b, _man = st.session_state["export_file"]
+            _oz = _man["ozet"]
+            st.caption(f"Hazır: {len(_b) / 1e6:.1f} MB · {_oz.get('haber', 0):,} haber · {_oz.get('etki', 0):,} analiz "
+                       f"sonucu · {_oz.get('islem_gunlugu', 0)} işlem günlüğü kaydı · {_oz.get('rapor', 0)} rapor")
+            st.download_button("⬇️ Veri dosyasını indir", _b, file_name=f"halley_veri_{date.today().isoformat()}.zip",
+                               mime="application/zip", key="export_download")
+    with x2:
+        st.markdown("**İçe aktar** (başka bilgisayardan gelen dosya)")
+        _up = st.file_uploader("halley_veri_….zip dosyasını seçin", type=["zip"],
+                               key=f"import_file_{st.session_state.get('import_n', 0)}")
+        if _up is not None:
+            _data = _up.getvalue()
+            _chk = transfer.inspect(_data)
+            if not _chk["ok"]:
+                st.error("Bu dosya içe aktarılamaz: " + "; ".join(_chk["hatalar"]))
+            else:
+                _oz = _chk["ozet"]
+                st.info(f"Dosya sağlam ({_chk['manifest']['olusturma'][:16].replace('T', ' ')} tarihinde hazırlanmış): "
+                        f"{_oz.get('haber', 0):,} haber, {_oz.get('etki', 0):,} analiz sonucu, "
+                        f"{_oz.get('islem_gunlugu', 0)} işlem günlüğü kaydı, {_oz.get('rapor', 0)} rapor; son fiyat günü "
+                        f"{_oz.get('son_fiyat_gunu') or '—'}.")
+                st.warning("İçe aktarınca bu bilgisayardaki mevcut veriler bu dosyadakilerle DEĞİŞTİRİLİR. Önce mevcut "
+                           "veriler otomatik olarak yedeklenir (data/yedek klasörü). API anahtarınız değişmez.")
+                _sure = st.checkbox("Anladım, içe aktar", key=f"import_sure_{st.session_state.get('import_n', 0)}")
+                if st.button("📥 İçe aktar", key="import_go", disabled=not _sure, type="primary"):
+                    try:
+                        conn.commit()
+                        _res = transfer.import_bytes(_data)
+                        sectors.clear_cache()
+                        st.cache_data.clear()
+                        for _k in ("_regime", "_regime_key", "export_file", "last_result"):
+                            st.session_state.pop(_k, None)
+                        flash("success", f"Veriler içe aktarıldı ({_res['dosya']} dosya). Önceki veriler şuraya "
+                                         f"yedeklendi: {_res['yedek']}")
+                    except Exception as e:
+                        flash("error", f"İçe aktarma tamamlanamadı: {nice_err(e)}")
+                    st.session_state["import_n"] = st.session_state.get("import_n", 0) + 1
+                    conn.close()
+                    st.rerun()
+    st.divider()
     st.markdown("#### Durum")
     counts = dict(conn.execute("SELECT status, COUNT(*) FROM news GROUP BY status").fetchall())
     labels = {"new": "Analiz bekliyor", "analyzed": "Analiz edildi", "filtered_out": "Önemsiz bulundu (ön eleme)",
