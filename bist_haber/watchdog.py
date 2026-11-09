@@ -241,6 +241,10 @@ def run_session(conn, universe: Dict[str, str], kind: str, settings: Dict, ai: b
     md, data = (morning_report if kind == "sabah" else evening_report)(conn, ctx, out)
     md, data = _ai_sections(conn, kind, now, md, data, out, settings, steps.get("llm"), say)
     out["rapor"] = archive(now.date().isoformat(), kind, md, data)
+    if settings.get("telegram"):  # 2026-11-09: rapor arşive yazıldıktan SONRA; hata analizi bozmaz
+        from . import notify
+        say("Telegram bildirimi gönderiliyor...", 0.99)
+        out["bildirim"] = notify.send(notify.session_message(kind, out, data))
     say("Tamamlandı.", 1.0)
     return out
 

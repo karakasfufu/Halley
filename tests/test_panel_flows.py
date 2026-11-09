@@ -70,6 +70,30 @@ class PanelFlowTests(unittest.TestCase):
         self.assertEqual(len(at.exception), 0, str(at.exception))
         self.assertTrue(any("Hazır:" in c.value and "1 haber" in c.value for c in at.caption))
 
+    def test_telegram_setup_and_test_message(self):
+        from bist_haber import notify
+        sent = []
+        root = Path(self.tmp.name)
+        with patch.object(config, "ROOT", root), \
+                patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "", "TELEGRAM_CHAT_ID": ""}), \
+                patch.object(notify, "find_chats", lambda: [{"id": "11", "ad": "Ali", "tur": "private"}]), \
+                patch.object(notify, "send", lambda t: sent.append(t) or {"ok": True, "gonderilen": 1, "hatalar": []}):
+            at = self.app()
+            self.assertTrue(at.toggle(key="tg_on").disabled)                   # ayarlanmadan açılamaz
+            at.text_input(key="tg_token").input("123:ABC").run()
+            at.button(key="tg_save_token").click().run()
+            self.assertIn("TELEGRAM_BOT_TOKEN=123:ABC", (root / ".env").read_text(encoding="utf-8"))
+            at.button(key="tg_find").click().run()
+            self.assertEqual(at.multiselect(key="tg_pick").value, ["11"])
+            at.button(key="tg_save_chats").click().run()
+            self.assertEqual(len(at.exception), 0, str(at.exception))
+            self.assertTrue(notify.configured())
+            self.assertTrue(pipeline.load_settings()["telegram_acik"])         # alıcı kaydedilince açılır
+            self.assertTrue(at.toggle(key="tg_on").value)
+            at.button(key="tg_test").click().run()
+            self.assertEqual(len(sent), 1)
+            self.assertTrue(any("1 alıcıya gönderildi" in str(s.value) for s in at.success))
+
     def test_settings_file_with_bom_is_not_lost(self):
         # Not Defteri dosyayı BOM ile kaydederse ayarlar okunamayıp sıfırlanıyordu (2026-11-09 önizlemede görüldü)
         pipeline.SETTINGS_FILE.write_bytes(b'\xef\xbb\xbf{"karanlik_mod": true, "komisyon_pct": 0.3}')

@@ -15,7 +15,7 @@ import streamlit as st
 
 from bist_haber import (analyzer, calendar_sync, config, corp_events, db, earnings, entries, journal, kap_history,
                         kap_worker, macro_calendar, pipeline, report, signals, technical, timeline, tradeplan,
-                        trends, watchdog, ai_comment, sectors, transfer)
+                        trends, watchdog, ai_comment, sectors, transfer, notify)
 
 st.set_page_config(page_title="Halley", page_icon="☄️", layout="wide", initial_sidebar_state="collapsed")
 _RENDER_T0 = time.time()   # sayfa çizim süresi (otomatik yenileme aralığı buna göre)
@@ -329,6 +329,60 @@ with st.expander("⚙️ Ayarlar"):
         pipeline.save_settings(haber_butce_usd=news_budget)
     if quality != config.DEFAULT_QUALITY:
         st.caption("⚠️ Bu ayarda maliyet düşer ama analizler daha az ayrıntılı ve hata payı daha yüksek olabilir.")
+    # 2026-11-09: Telegram bildirimi (ücretsiz, yapay zekâ yok). Anahtar .env'de; veri aktarma dosyasına girmez.
+    st.markdown("**📨 Telegram bildirimi**")
+    if "_tg_on_set" in st.session_state:       # alıcı kaydedilince düğmeyi de aç (yoksa eski konumu ayarı geri kapatır)
+        st.session_state["tg_on"] = st.session_state.pop("_tg_on_set")
+    tg_on =st.toggle("Sabah ve akşam analizi bitince özetini Telegram'a gönder", key="tg_on",
+                      value=bool(saved.get("telegram_acik", False)), disabled=not notify.configured(),
+                      help="Önerilen senaryolar, takip listesi, stopa yaklaşan işlemler, TP/SL olan işlemler. "
+                           "Ücretsizdir; emir vermez.")
+    if notify.configured() and tg_on != bool(saved.get("telegram_acik", False)):
+        pipeline.save_settings(telegram_acik=tg_on)
+    with st.container(border=True, key="tg_box"):
+        st.caption("**Telegram kurulumu**" + (f" — {len(notify.chat_ids())} alıcı ayarlı ✅" if notify.configured()
+                                              else " — henüz ayarlanmadı"))
+        st.caption("1) Telegram'da **@BotFather**'a `/newbot` yazın, bota bir ad verin; size bir **bot anahtarı** "
+                   "verir. 2) Anahtarı aşağıya yapıştırıp kaydedin. 3) Bildirim alacak herkes Telegram'da kendi botunuzu "
+                   "bulup **/start** yazsın (ya da botu bir gruba ekleyin). 4) **🔍 Alıcıları bul** → seçin → kaydedin. "
+                   "5) **📨 Deneme mesajı gönder**.")
+        tg_tok = st.text_input("Bot anahtarı", type="password", key="tg_token",
+                               placeholder="kayıtlı (değiştirmek için yenisini yapıştırın)" if notify.token() else
+                               "123456789:ABC...")
+        if st.button("💾 Bot anahtarını kaydet", key="tg_save_token", disabled=not tg_tok.strip()):
+            notify.save(tok=tg_tok)
+            flash("success", "Bot anahtarı bu bilgisayara kaydedildi (.env). Şimdi alıcıları bulun.")
+            st.rerun()
+        if notify.token():
+            if st.button("🔍 Alıcıları bul (bota /start yazanlar)", key="tg_find"):
+                try:
+                    st.session_state["tg_found"] = notify.find_chats()
+                except Exception as e:
+                    flash("error", f"Alıcılar alınamadı: {e}")
+                    st.rerun()
+            found = st.session_state.get("tg_found")
+            known = {c["id"]: c for c in (found or [])}
+            for cid in notify.chat_ids():
+                known.setdefault(cid, {"id": cid, "ad": "kayıtlı alıcı", "tur": ""})
+            if found is not None and not found:
+                st.warning("Bota henüz kimse yazmamış. Telegram'da botu açıp **/start** yazın, sonra yeniden deneyin.")
+            if known:
+                pick = st.multiselect("Bildirim alacaklar", list(known), default=notify.chat_ids() or list(known),
+                                      format_func=lambda c: f"{known[c]['ad']} ({c})", key="tg_pick")
+                if st.button("💾 Alıcıları kaydet", key="tg_save_chats"):
+                    notify.save(chats=pick)
+                    if pick and not saved.get("telegram_acik"):
+                        pipeline.save_settings(telegram_acik=True)
+                        st.session_state["_tg_on_set"] = True
+                    flash("success", f"{len(pick)} alıcı kaydedildi." + (" Bildirimler açıldı." if pick else ""))
+                    st.rerun()
+        if notify.configured() and st.button("📨 Deneme mesajı gönder", key="tg_test"):
+            r = notify.send("✅ Halley bağlandı. Sabah ve akşam analizi özetleri buraya gelecek." + notify.FOOT)
+            if r["ok"]:
+                flash("success", f"Deneme mesajı {r['gonderilen']} alıcıya gönderildi.")
+            else:
+                flash("error", "Gönderilemedi: " + "; ".join(r["hatalar"]))
+            st.rerun()
     st.caption("Kaynaklar: KAP + " + ", ".join(config.RSS_SOURCE_LABELS.get(n, n) for n in config.RSS_FEEDS)
                + ". KAP hızlı isteklere sınır koyduğu için ilk güncelleme birkaç dakika sürebilir.")
 
@@ -441,11 +495,15 @@ def watch_box() -> None:
                                       "komisyon_pct": commission, "kayma_pct": slippage, "pencere": window,
                                       "sermaye": capital, "risk_pct": risk_pct, "yz_butce_usd": ai_budget,
                                       "yz_rapor": bool(ai_report and pipeline.has_api_key()),
-                                      "yz_kacirilan": bool(ai_missed and pipeline.has_api_key())},
+                                      "yz_kacirilan": bool(ai_missed and pipeline.has_api_key()),
+                                      "telegram": bool(notify.configured() and pipeline.load_settings().get("telegram_acik"))},
                     ai=bool(use_ai and pipeline.has_api_key()),
                     progress=lambda m, p_: bar.progress(min(max(p_, 0.0), 1.0), text=m))
                 st.session_state["watch_last"] = out["rapor"]
                 flash("success", f"{label} tamamlandı; rapor arşive kaydedildi ({out['rapor']}).")
+                bd = out.get("bildirim")
+                if bd and not bd["ok"]:
+                    flash("warning", "Telegram bildirimi gönderilemedi: " + "; ".join(bd["hatalar"]))
                 if kind == "sabah":
                     st.session_state["last_update"] = datetime.now(config.TR_TZ).strftime("%H:%M")
                     res = out.get("guncelleme") or {}

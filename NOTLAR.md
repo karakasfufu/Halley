@@ -1258,3 +1258,25 @@ nadiren değişir, gerekirse aynı yolla yenilenir.
   çalışan kopyadan) ikinci başlatma denendi. Artık baslat.bat önce 8501 sağlık adresine bakar; açıksa paneli tarayıcıda
   açar ve çıkar. (Kontrol denendi: açık panelde 0, kapalı portta 1.) Asıl veriler etkilenmedi (7.717 haber, 151 analiz
   sonucu, 23 işlem günlüğü doğrulandı).
+
+## 2026-11-09 — Telegram bildirimi (kullanıcı: "telegram üzerinden bildirim göndersin bize")
+- `bist_haber/notify.py`: Telegram Bot API (ücretsiz, yapay zekâ yok, emir yok). Bot anahtarı ve alıcılar .env'de
+  (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID virgülle birden çok alıcı/grup); kodda, GitHub'da ve veri aktarma dosyasında
+  YOK. HALLEY_OFFLINE'da ağa çıkılmaz. Her alıcıya ayrı gönderim; biri başarısız olsa diğerleri gider; hata metninde
+  anahtar *** ile gizlenir; 4096 karakter sınırında kesilir.
+- `watchdog.run_session`: rapor arşive yazıldıktan SONRA, ayarlar["telegram"] açıksa özet gönderilir
+  (out["bildirim"]). Gönderim hatası analizi/raporu bozmaz; panelde sarı uyarı.
+- Mesaj (yalnız kayıtlı veri): önerilen senaryolar (giriş/SL/TP1/TP2/risk, en çok 10), sabahta takip listesi ve
+  stopa yaklaşanlar, işlem günlüğü durum değişiklikleri (giriş, TP1, kapanış sonucu ve net %, süresi dolan), akşamda
+  BIST 100, sanal toplam (örnek az uyarısıyla), kaçırılan fırsat sayısı, rapor adı, "yatırım tavsiyesi değildir".
+- Panel: ⚙️ Ayarlar → 📨 Telegram bildirimi: aç/kapa düğmesi (ayarlanmadan kapalı), kurulum adımları, anahtar kaydet,
+  🔍 Alıcıları bul (getUpdates: bota /start yazanlar ve botun eklendiği gruplar), alıcı seç/kaydet (ilk kayıtta
+  bildirim açılır), 📨 Deneme mesajı. Ayar ayarlar.json'da `telegram_acik`.
+- Bulunan ve düzeltilen hata (panel testiyle): alıcı kaydedilince ayar açılıyor ama düğmenin eski konumu ayarı hemen
+  geri kapatıyordu → düğme durumu da güncelleniyor.
+- Testler: tests/test_notify.py (8: çoklu alıcı ve hata sürekliliği, anahtar sızmaz, geçersiz anahtar, ayarsız,
+  çevrimdışı, uzun mesaj, alıcı bulma, .env'de OpenAI anahtarı korunur, mesaj metni, analize bağlantı, ağ hatasında
+  rapor yine kaydedilir) + panel akışı (anahtar → alıcı bul → kaydet → açık → deneme). 419 test geçti.
+- Gerçek Telegram sunucusuna sahte anahtarla deneme: "bot anahtarı geçersiz" Türkçe mesajı geldi (bağlantı çalışıyor).
+  Gerçek bir bota gönderim DENENMEDİ: bot anahtarı kullanıcıda (BotFather'da bot açmak kullanıcının işi).
+- Sınır: bildirim yalnız sabah/akşam analizi düğmeye basılınca gider; Halley kendiliğinden zamanlı analiz yapmaz.

@@ -67,6 +67,26 @@ tavsiyesi değildir.
   karşılıkları görünür. 0 bırakılırsa bu hesaplar gösterilmez.
 - **Bekçi yapay zekâ yorumu aylık bütçesi ($).**
 
+## Telegram bildirimi (⚙️ Ayarlar → 📨 Telegram bildirimi)
+
+Sabah ve akşam analizi bitince özet Telegram'a gelir: önerilen senaryolar (giriş, SL, TP1, TP2, risk), takip
+listesi, stopa yaklaşan işlemler, girişi gerçekleşen / TP1'e ulaşan / kapanan işlemler, akşam BIST 100 ve kaçırılan
+fırsat sayısı. **Ücretsizdir**, yapay zekâ kullanmaz, emir vermez.
+
+1. Telegram'da **@BotFather**'ı açın, `/newbot` yazın, bota bir ad ve sonu `bot` ile biten bir kullanıcı adı verin.
+   Size uzun bir **bot anahtarı** verir (`123456789:ABC...`). Bu anahtarı kimseyle paylaşmayın.
+2. Halley'de **⚙️ Ayarlar → Telegram kurulumu**: anahtarı yapıştırın → **💾 Bot anahtarını kaydet**.
+3. Bildirim alacak **herkes** Telegram'da yeni botunuzu arayıp açsın ve **/start** yazsın. Birlikte almak için
+   botu bir Telegram grubuna da ekleyebilirsiniz (sonra grupta bir mesaj yazın).
+4. **🔍 Alıcıları bul** → listeden kişileri/grubu seçin → **💾 Alıcıları kaydet**. Bildirim kendiliğinden açılır.
+5. **📨 Deneme mesajı gönder** ile kontrol edin.
+
+- Bildirim yalnız **🌅 Sabah analizi** ve **🌙 Akşam analizi** düğmesine basıldığında gider (Halley kapalıyken
+  kendiliğinden analiz yapmaz). Açıp kapatmak: "Sabah ve akşam analizi bitince özetini Telegram'a gönder" düğmesi.
+- Gönderilemezse analiz yine tamamlanır, rapor kaydedilir; panelde sarı uyarı çıkar.
+- Bot anahtarı yalnız bu bilgisayarda (.env) durur; **veri aktarma dosyasına girmez**. Yeni bilgisayarda aynı anahtarı
+  yeniden girip alıcıları bulun (aynı botu iki bilgisayar da kullanabilir).
+
 ## Başka bilgisayara taşımak (🔧 Gelişmiş → 💾 Veri aktarma)
 
 1. **Eski bilgisayarda:** **📦 Veri dosyasını hazırla** → **⬇️ Veri dosyasını indir**. `halley_veri_….zip` dosyası
