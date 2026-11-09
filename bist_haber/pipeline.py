@@ -119,7 +119,7 @@ def load_settings() -> dict:
     """Paneldeki seçimler (ör. analiz kalitesi). Dosya yoksa/bozuksa varsayılanlar."""
     import json
     try:
-        data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+        data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8-sig"))   # Not Defteri BOM eklese de okunur
         return data if isinstance(data, dict) else {}
     except (OSError, ValueError):
         return {}

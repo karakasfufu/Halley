@@ -20,14 +20,37 @@ from bist_haber import (analyzer, calendar_sync, config, corp_events, db, earnin
 st.set_page_config(page_title="Halley", page_icon="☄️", layout="wide", initial_sidebar_state="collapsed")
 _RENDER_T0 = time.time()   # sayfa çizim süresi (otomatik yenileme aralığı buna göre)
 
+# Karanlık mod (2026-11-09 kullanıcı isteği: "beyaz ekran göz yoruyor"). config.toml'daki özel tema Streamlit menüsünde
+# koyu temaya geçişi kilitliyor; bu yüzden seçim panelde (üst bantta) yapılır, data/ayarlar.json'da saklanır ve tema
+# her çalıştırmada buradan uygulanır. Tek kullanıcılı yerel uygulama: tema ayarı tüm sekmeler için ortaktır.
+from streamlit import config as _st_config  # noqa: E402
+
+DARK = bool(pipeline.load_settings().get("karanlik_mod", False))
+_THEME = ({"base": "dark", "primaryColor": "#818CF8", "backgroundColor": "#0B1120", "secondaryBackgroundColor": "#162033",
+           "textColor": "#E2E8F0", "linkColor": "#A5B4FC", "borderColor": "#2A3850",
+           "dataframeHeaderBackgroundColor": "#1E293B"} if DARK else
+          {"base": "light", "primaryColor": "#4F46E5", "backgroundColor": "#F3F5FA", "secondaryBackgroundColor": "#FFFFFF",
+           "textColor": "#0F172A", "linkColor": "#4338CA", "borderColor": "#D5DBE8",
+           "dataframeHeaderBackgroundColor": "#EEF2FF"})
+_theme_changed = False
+for _k, _v in _THEME.items():
+    if _st_config.get_option(f"theme.{_k}") != _v:
+        _st_config.set_option(f"theme.{_k}", _v, where_defined="Halley karanlık mod")
+        _theme_changed = True
+if _theme_changed and st.session_state.get("_theme_applied") != DARK:
+    st.session_state["_theme_applied"] = DARK      # tek sefer: tema tarayıcıya bir sonraki çizimde gider
+    st.rerun()
+st.session_state["_theme_applied"] = DARK
+_CSS_VARS = ('--h-ink:#F1F5F9; --h-sub:#E2E8F0; --h-muted:#B6C2D4; --h-line:#2A3850; --h-pos:#22C55E; --h-neg:#F87171; --h-acc:#818CF8; --h-amber:#F59E0B; --h-card:#121A2B; --h-card2:#0F1726; --h-hover:#1E2A44; --h-cnt-bg:#1E2A4A; --h-cnt-fg:#C7D2FE; --h-pos-bg:rgba(34,197,94,.16); --h-pos-fg:#86EFAC; --h-neg-bg:rgba(248,113,113,.16); --h-neg-fg:#FCA5A5; --h-warn-bg:rgba(245,158,11,.16); --h-warn-fg:#FCD34D; --h-neu-bg:#243049; --h-neu-fg:#E2E8F0; --h-pos-txt:#4ADE80; --h-neg-txt:#F87171; --h-opp-a:#0B2A20; --h-opp-line:#1F5F3F; --h-opp-h:#6EE7B7; --h-bg:#0B1120; --h-glow1:rgba(79,70,229,.24); --h-glow2:rgba(245,158,11,.07);' if DARK else
+             '--h-ink:#0F172A; --h-sub:#1E293B; --h-muted:#334155; --h-line:#D5DBE8; --h-pos:#16A34A; --h-neg:#DC2626; --h-acc:#4F46E5; --h-amber:#D97706; --h-card:#FFFFFF; --h-card2:#FFFFFF; --h-hover:#EEF2FF; --h-cnt-bg:#EEF2FF; --h-cnt-fg:#3730A3; --h-pos-bg:#DCFCE7; --h-pos-fg:#166534; --h-neg-bg:#FEE2E2; --h-neg-fg:#991B1B; --h-warn-bg:#FEF3C7; --h-warn-fg:#92400E; --h-neu-bg:#E2E8F0; --h-neu-fg:#1E293B; --h-pos-txt:#15803D; --h-neg-txt:#B91C1C; --h-opp-a:#ECFDF5; --h-opp-line:#A7F3D0; --h-opp-h:#065F46; --h-bg:#F3F5FA; --h-glow1:#E0E7FF; --h-glow2:#FEF3C7;')
+
 # Görünüm (2026-11-09 kullanıcı isteği: "dağınık, önemli bilgiler silik"): koyu ve okunur yazı, kart düzeni, renkli
 # bölüm başlıkları. Yalnız sunum; hiçbir hesap değişmez.
 st.markdown("""
 <style>
-:root {--h-ink:#0F172A; --h-sub:#1E293B; --h-muted:#334155; --h-line:#D5DBE8; --h-pos:#16A34A; --h-neg:#DC2626;
-       --h-acc:#4F46E5; --h-amber:#D97706; --h-card:#FFFFFF;}
-.stApp {background: radial-gradient(1100px 380px at 8% -8%, #E0E7FF 0%, rgba(224,231,255,0) 62%),
-        radial-gradient(800px 300px at 100% -4%, #FEF3C7 0%, rgba(254,243,199,0) 58%), #F3F5FA;}
+:root {/*VARS*/}
+.stApp {background: radial-gradient(1100px 380px at 8% -8%, var(--h-glow1) 0%, transparent 62%),
+        radial-gradient(800px 300px at 100% -4%, var(--h-glow2) 0%, transparent 58%), var(--h-bg);}
 .block-container {padding-top: 3.4rem; max-width: 1180px;}
 header[data-testid="stHeader"] {background: transparent;}
 /* silik yazılar → okunur */
@@ -37,7 +60,7 @@ header[data-testid="stHeader"] {background: transparent;}
 .stMarkdown p, .stMarkdown li {color: var(--h-sub);}
 /* üst bant */
 .hero {background: linear-gradient(118deg, #0F172A 0%, #1E1B4B 52%, #3730A3 100%); border-radius: 18px; margin-bottom: 18px;
-  padding: 20px 26px 18px; position: relative; overflow: hidden; box-shadow: 0 14px 34px -16px rgba(30,27,75,.55);}
+  padding: 20px 26px 18px; position: relative; overflow: hidden; border: 1px solid rgba(129,140,248,.25); box-shadow: 0 14px 34px -16px rgba(30,27,75,.55);}
 .hero::before {content: ""; position: absolute; right: 70px; top: 34px; width: 210px; height: 3px; transform: rotate(-16deg);
   background: linear-gradient(90deg, rgba(251,191,36,0), rgba(251,191,36,.85)); border-radius: 3px;}
 .hero::after {content: ""; position: absolute; right: 52px; top: 12px; width: 18px; height: 18px; border-radius: 50%;
@@ -56,8 +79,8 @@ header[data-testid="stHeader"] {background: transparent;}
 .sec {display: flex; align-items: center; gap: 10px; font-size: 1.22rem; font-weight: 800; color: var(--h-ink);
   margin: 20px 0 10px; padding: 2px 0 2px 12px; border-left: 5px solid var(--h-acc);}
 .sec.t-pos {border-left-color: var(--h-pos);} .sec.t-neg {border-left-color: var(--h-neg);} .sec.t-neu {border-left-color: #94A3B8;}
-.sec .cnt {font-size: .8rem; font-weight: 700; padding: 2px 10px; border-radius: 999px; background: #EEF2FF; color: #3730A3;}
-.sec.t-pos .cnt {background: #DCFCE7; color: #166534;} .sec.t-neg .cnt {background: #FEE2E2; color: #991B1B;}
+.sec .cnt {font-size: .8rem; font-weight: 700; padding: 2px 10px; border-radius: 999px; background: var(--h-cnt-bg); color: var(--h-cnt-fg);}
+.sec.t-pos .cnt {background: var(--h-pos-bg); color: var(--h-pos-fg);} .sec.t-neg .cnt {background: var(--h-neg-bg); color: var(--h-neg-fg);}
 .sec .note {font-size: .86rem; font-weight: 500; color: var(--h-muted);}
 .opt {font-weight: 700; color: var(--h-ink); margin: 8px 0 2px;} .opt span {font-weight: 500; color: var(--h-muted);}
 /* kartlar */
@@ -73,8 +96,8 @@ div[data-testid="stMetric"] {background: var(--h-card); border: 1px solid var(--
 .st-key-kpi div[data-testid="stColumn"]:nth-of-type(1) div[data-testid="stMetric"] {border-top: 5px solid var(--h-pos);}
 .st-key-kpi div[data-testid="stColumn"]:nth-of-type(2) div[data-testid="stMetric"] {border-top: 5px solid var(--h-neg);}
 .st-key-kpi div[data-testid="stColumn"]:nth-of-type(3) div[data-testid="stMetric"] {border-top: 5px solid var(--h-acc);}
-.st-key-kpi div[data-testid="stColumn"]:nth-of-type(1) [data-testid="stMetricValue"] {color: #15803D;}
-.st-key-kpi div[data-testid="stColumn"]:nth-of-type(2) [data-testid="stMetricValue"] {color: #B91C1C;}
+.st-key-kpi div[data-testid="stColumn"]:nth-of-type(1) [data-testid="stMetricValue"] {color: var(--h-pos-txt);}
+.st-key-kpi div[data-testid="stColumn"]:nth-of-type(2) [data-testid="stMetricValue"] {color: var(--h-neg-txt);}
 /* açılır kutular */
 [data-testid="stExpander"] details {background: var(--h-card); border: 1px solid var(--h-line); border-radius: 14px;
   box-shadow: 0 1px 3px rgba(15,23,42,.05); transition: box-shadow .15s, border-color .15s;}
@@ -88,7 +111,7 @@ div[data-testid="stMetric"] {background: var(--h-card); border: 1px solid var(--
   box-shadow: 0 1px 3px rgba(15,23,42,.05); flex-wrap: wrap;}
 button[data-baseweb="tab"] {border-radius: 10px; padding: 8px 14px; height: auto;}
 button[data-baseweb="tab"] p {font-weight: 700; color: var(--h-muted); font-size: .95rem;}
-button[data-baseweb="tab"]:hover {background: #EEF2FF;}
+button[data-baseweb="tab"]:hover {background: var(--h-hover);}
 button[data-baseweb="tab"][aria-selected="true"] {background: linear-gradient(118deg, #4F46E5, #7C3AED);}
 button[data-baseweb="tab"][aria-selected="true"] p {color: #FFFFFF;}
 [data-baseweb="tab-highlight"], [data-baseweb="tab-border"] {display: none;}
@@ -99,11 +122,11 @@ button[data-baseweb="tab"][aria-selected="true"] p {color: #FFFFFF;}
 [data-testid="stAlertContainer"] {border-radius: 12px;}
 [data-testid="stAlertContainer"] p {font-weight: 500;}
 /* fırsat özeti */
-.opp {background: linear-gradient(135deg, #ECFDF5, #FFFFFF 70%); border: 1px solid #A7F3D0; border-radius: 16px;
+.opp {background: linear-gradient(135deg, var(--h-opp-a), var(--h-card) 70%); border: 1px solid var(--h-opp-line); border-radius: 16px;
   padding: 14px 18px; margin: 4px 0 8px;}
-.opp .h {font-size: 1.05rem; font-weight: 800; color: #065F46;}
+.opp .h {font-size: 1.05rem; font-weight: 800; color: var(--h-opp-h);}
 .opp .chips {display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 8px;}
-.opp .tk {background: #FFFFFF; border: 1px solid var(--h-line); border-radius: 10px; padding: 5px 10px; font-size: .86rem;
+.opp .tk {background: var(--h-card2); border: 1px solid var(--h-line); border-radius: 10px; padding: 5px 10px; font-size: .86rem;
   color: var(--h-sub); border-left: 4px solid #94A3B8;}
 .opp .tk b {color: var(--h-ink); margin-right: 4px;}
 .opp .tk.r-düşük {border-left-color: var(--h-pos);} .opp .tk.r-orta {border-left-color: var(--h-amber);}
@@ -113,11 +136,11 @@ button[data-baseweb="tab"][aria-selected="true"] p {color: #FFFFFF;}
 .news-card {background: var(--h-card); border: 1px solid var(--h-line); border-radius: 12px; padding: 12px 16px; margin-bottom: 8px;}
 .news-meta {color: var(--h-muted); font-size: 0.86rem;}
 .chip {display:inline-block; padding:2px 10px; border-radius:999px; font-size:0.8rem; font-weight:700; margin-right:6px;}
-.warn {background:#FEF3C7; color:#92400E;} .pos {background:#DCFCE7; color:#166534;}
-.neg {background:#FEE2E2; color:#991B1B;} .neu {background:#E2E8F0; color:#1E293B;}
+.warn {background:var(--h-warn-bg); color:var(--h-warn-fg);} .pos {background:var(--h-pos-bg); color:var(--h-pos-fg);}
+.neg {background:var(--h-neg-bg); color:var(--h-neg-fg);} .neu {background:var(--h-neu-bg); color:var(--h-neu-fg);}
 .disclaimer {color: var(--h-muted); font-size:0.84rem; margin-top:2rem; border-top: 1px solid var(--h-line); padding-top: 12px;}
 </style>
-""", unsafe_allow_html=True)
+""".replace("/*VARS*/", _CSS_VARS), unsafe_allow_html=True)
 
 GUNLER = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
 
@@ -289,6 +312,13 @@ if h2.button("🔄 Haberleri güncelle", type="primary", width="stretch"):
     except Exception as e:
         flash("error", f"Güncelleme tamamlanamadı: {nice_err(e)}")
     conn.close()  # sayfa yenilenmeden önce bağlantıyı bırak (aksi hâlde açık kalıyordu)
+    st.rerun()
+
+_dark_new = h2.toggle("🌙 Karanlık mod", value=DARK, key="dark_mode",
+                      help="Koyu renkli görünüm (göz yormaz). Seçim bu bilgisayarda saklanır.")
+if _dark_new != DARK:
+    pipeline.save_settings(karanlik_mod=bool(_dark_new))
+    conn.close()
     st.rerun()
 
 if h2.button("🧪 Ücretsiz dene", width="stretch", key="free_check",

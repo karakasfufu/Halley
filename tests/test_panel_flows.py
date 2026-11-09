@@ -48,6 +48,27 @@ class PanelFlowTests(unittest.TestCase):
         self.assertEqual(len(at.exception), 0, str(at.exception))
         return at
 
+    def test_dark_mode_toggle_is_saved_and_applies_theme(self):
+        from streamlit import config as st_config
+        at = self.app()
+        self.assertFalse(at.toggle(key="dark_mode").value)
+        at.toggle(key="dark_mode").set_value(True).run()
+        self.assertEqual(len(at.exception), 0, str(at.exception))
+        self.assertTrue(pipeline.load_settings()["karanlik_mod"])          # seçim saklandı
+        self.assertEqual(st_config.get_option("theme.base"), "dark")
+        self.assertTrue(any("--h-bg:#0B1120" in m.value for m in at.markdown))   # koyu renk takımı çizildi
+        at.toggle(key="dark_mode").set_value(False).run()
+        self.assertFalse(pipeline.load_settings()["karanlik_mod"])
+        self.assertEqual(st_config.get_option("theme.base"), "light")
+        self.assertTrue(any("--h-bg:#F3F5FA" in m.value for m in at.markdown))
+
+    def test_settings_file_with_bom_is_not_lost(self):
+        # Not Defteri dosyayı BOM ile kaydederse ayarlar okunamayıp sıfırlanıyordu (2026-11-09 önizlemede görüldü)
+        pipeline.SETTINGS_FILE.write_bytes(b'\xef\xbb\xbf{"karanlik_mod": true, "komisyon_pct": 0.3}')
+        self.assertEqual(pipeline.load_settings(), {"karanlik_mod": True, "komisyon_pct": 0.3})
+        pipeline.save_settings(kayma_pct=0.1)
+        self.assertEqual(pipeline.load_settings(), {"karanlik_mod": True, "komisyon_pct": 0.3, "kayma_pct": 0.1})
+
     def test_button_error_survives_rerun_in_plain_turkish(self):
         def boom(*a, **k):
             raise OSError("HTTPSConnectionPool(host='www.kap.org.tr', port=443): Max retries exceeded")

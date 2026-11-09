@@ -1136,3 +1136,18 @@ nadiren değişir, gerekirse aynı yolla yenilenir.
 - Kullanıcı geri bildirimi: üst bant ile Ayarlar bitişikti → bant altına 18 px boşluk (ölçüldü: 0 → 18 px).
 - Doğrulama: panelin kopyası API anahtarsız ve çevrimdışı kipte (HALLEY_OFFLINE=1, yalnız 127.0.0.1) ayrı portta
   açılıp ekran görüntüleriyle kontrol edildi; 402 test geçti.
+
+## 2026-11-09 — Karanlık mod (kullanıcı: "karanlık mod çalışmıyor, beyaz ekran göz yoruyor")
+- Neden çalışmıyordu: `.streamlit/config.toml`'daki özel tema, Streamlit'in Ayarlar menüsünde temayı "Custom Theme"e
+  kilitliyor (koyu seçilemiyor); ayrıca eklediğimiz CSS renkleri açık temaya sabitti.
+- Çözüm: üst bantta "🌙 Karanlık mod" düğmesi. Seçim `data/ayarlar.json` → `karanlik_mod`. Tema her çalıştırmada
+  `streamlit.config.set_option("theme.*")` ile uygulanır (Streamlit 1.50'de oturum başına tema API'si yok; tek kullanıcılı
+  yerel uygulama olduğu için genel ayar sorun değil). Tema değişince sayfa bir kez yenilenir (oturum başına tek sefer
+  korumalı, sonsuz döngü yok). Tüm özel renkler CSS değişkenine çevrildi; iki renk takımı var (açık / koyu).
+- Not: `streamlit.config.set_option` resmi ama "scriptable" olmayan seçenekler için belgelenmemiş kullanım; Streamlit
+  sürümü yükseltilirse karanlık mod düğmesi yeniden denenmeli (test: `test_dark_mode_toggle_is_saved_and_applies_theme`).
+- Ayrıca bulunan gerçek risk: `ayarlar.json` başına BOM eklenirse (Not Defteri ile kaydetme) dosya okunamıyor ve bir
+  sonraki kayıtta TÜM ayarlar (bütçeler, kalite, komisyon) sıfırlanıyordu → `load_settings` artık `utf-8-sig` ile
+  okuyor (test: `test_settings_file_with_bom_is_not_lost`).
+- Doğrulama: önizleme kopyasında (çevrimdışı, yalnız 127.0.0.1) açık→koyu→açık geçişi, koyu kayıtlıyken yeniden
+  başlatmada ilk açılışın koyu gelmesi, hisse ayrıntısı ve tablolar ekran görüntüsüyle kontrol edildi; 404 test geçti.
