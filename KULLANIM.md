@@ -11,6 +11,11 @@ tavsiyesi değildir.
   **F5**. Haber kaynağı bağlantıları varsayılan tarayıcıda açılır. Kaldırmak: Başlat menüsü → Halley →
   **Halley'i kaldır** (verileri saklamayı sorar). Windows ilk açılışta "Windows bilgisayarınızı korudu" derse:
   **Ek bilgi → Yine de çalıştır** (program imzasız olduğu için çıkan olağan uyarı).
+- **Yeni sürüme güncellemek:** yeni **Halley_Kurulum.exe**'yi çalıştırın. Halley kuruluysa program bunu görür ve
+  **Güncelle** der (yeniden kurmaz, aynı klasörün üstüne yazar, kısayollar çoğalmaz). Açık Halley kendiliğinden
+  kapatılır. **Verileriniz silinmez:** haberler, analizler, işlem günlüğü, takip listesi, ayarlar ve API/Telegram
+  anahtarları korunur; güncellemeden önce ayrıca `app\data\yedek\guncelleme_oncesi_…` klasörüne yedeklenir (son 3
+  yedek tutulur) ve güncellemeden sonra denetlenir. Aynı sürüm zaten kuruluysa "zaten güncel" der.
 - **Geliştirici klasöründen:** **`baslat.bat`** dosyasına çift tıklayın. Kapatmak için siyah pencereyi kapatın.
 - **Ekranlar:** üstteki sabit menüden seçilir — **📊 Dashboard · 🎯 Fırsatlar · 🔍 Hisse Analizi · ⭐ Takip Listem · 🛡️ Bekçi · 📰 Haberler · 📒 İşlem Günlüğü · 🏁 Performans · ⚙️ Ayarlar**. Her ekran ayrıdır; uzun kaydırma yok.
 - Sağ üstteki **🌙 Koyu tema** düğmesi koyu/açık görünümü değiştirir (varsayılan koyu); seçim saklanır.

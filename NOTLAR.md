@@ -1391,3 +1391,23 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   Takip Listem'de "Ara" kutusu (Streamlit'in kendi araması "aksigorta" ile "AKSİGORTA"yı eşleştirmiyordu).
 - Testler: kaçırılmamış $ ve liste işaretiyle başlayan düğme yazısı hiçbir ekranda yok; kart renkleri anahtara bağlı;
   fırsat yeniden kontrol + değişim kaydı; Türkçe arama; tema değişince ekran korunur, hisse seçimi korunur. 447 test geçti.
+
+## 2026-11-09 — Kurulum: kuruluysa güncelle, veriler korunur (kullanıcı: "üstüne yazsın, tekrar tekrar kurulmasın; eski veriler kaybolmasın")
+- paket/Kurulum.cs: kurulu Halley algılanır (Halley.exe) → pencere "GÜNCELLENECEK (yeniden kurulmaz)", kurulu/yeni
+  sürüm ve "Güncelle" düğmesi; aynı sürüm kuruluysa "zaten kurulu ve güncel" + "Halley'i aç" / "Yeniden kur";
+  sessiz kipte aynı sürüm atlanır (ZATEN GUNCEL), /zorla ile yeniden kurulur. Hep aynı klasör; kısayollar aynı adla
+  üstüne yazılır.
+- Açık Halley "--kapat" ile, bu klasörden çalışan arta kalan python/Halley işlemleri ayrıca kapatılır (başka
+  programlara dokunulmaz).
+- Güncellemeden ÖNCE: app\data kökündeki .db/.json/.csv/.txt + app\.env + raporlar → app\data\yedek\
+  guncelleme_oncesi_<zaman>\ (son 3 yedek). Kurulum app\data\ altındaki mevcut dosyalara ve app\.env'e dokunmaz
+  (verisiz pakette veri dosyası zaten yok). Güncellemeden SONRA: önceki her veri dosyası yerinde ve aynı boyutta mı
+  denetlenir; değilse yedekten geri konur. Hata olursa "Verileriniz silinmedi" uyarısı.
+- build_package.py pakete surum.txt yazar ("tarih (git kısa kimlik)"), kurulum bunu karşılaştırır.
+- Deneme (geçici klasör, gerçek kuruluma dokunulmadı): masaüstündeki ESKİ verisiz paket kuruldu → sahte veri
+  (5.000 satırlı veritabanı, pilot.db, ayarlar.json, OpenAI+Telegram anahtarlı .env, rapor) → Halley AÇIKKEN (3 işlem)
+  yeni paketle güncelleme: işlemler kapandı (0 kaldı), 5 veri dosyasının SHA-256'sı birebir aynı, 5.000 satır
+  duruyor, yedek alındı, yeni kod ve sürüm kuruldu; ikinci çalıştırma "ZATEN GUNCEL"; 5 kurulumdan sonra 3 yedek;
+  güncellenen Halley açıldı (sağlık ok) ve "--kapat" ile kapandı. Kurulum penceresi (görsel) bu bilgisayarda
+  açılıp gözle denenmedi; mantığı sessiz kiple aynı işlevden geçiyor.
+- Dağıtım: yeni verisiz Halley_Kurulum.exe (2026-11-09, e579cc6) masaüstüne, dagitim/ klasörüne ve GitHub sürümüne.
