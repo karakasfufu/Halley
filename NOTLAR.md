@@ -1151,3 +1151,25 @@ nadiren değişir, gerekirse aynı yolla yenilenir.
   okuyor (test: `test_settings_file_with_bom_is_not_lost`).
 - Doğrulama: önizleme kopyasında (çevrimdışı, yalnız 127.0.0.1) açık→koyu→açık geçişi, koyu kayıtlıyken yeniden
   başlatmada ilk açılışın koyu gelmesi, hisse ayrıntısı ve tablolar ekran görüntüsüyle kontrol edildi; 404 test geçti.
+
+## 2026-11-09 — 2.2 adım 1: pilotun kalan bildirimleri analiz edildi (haber sinyalinin katkısı, küçük örnek)
+- Önce yedek: `data/yedek/pilot_oncesi_2026-11-09.db`. Analiz: 68 bildirim (8'i önceden yapılmıştı) → toplam 76 analizli;
+  19 belge eksik/taranmış PDF (analiz edilmedi), 13 bildirimin fiyatı yok (ölçüme katılmadı, uydurma fiyat yok).
+- Maliyet: bu çalıştırma 0,726 $; pilot toplamı 0,807 $ (onaylanan üst sınır 1,5 $).
+- Ölçüm (`backtest.evaluate`, giriş = bildirimden sonraki ilk seans açılışı, çıkış = n. seans kapanışı, XU100'e göre,
+  0,20 % maliyet düşülmüş; eksik gün kaydırılmadı):
+  - Olumsuz (9 etki): 3 gün ort. −5,95 %, 5 gün −6,32 % (ortanca −4,33 %), doğru yön 7/9.
+  - Olumlu (38): 5 gün ort. −1,66 % / ortanca +1,09 %, 10 gün ort. −0,50 % / ortanca +1,75 %; doğru yön 20–21/38 (~%55,
+    yazı-tura düzeyine yakın).
+  - Güçlü olumlu (etki ≥3 ve güven ≥0,7; 9 etki): 10 gün ort. +10,35 %, ortanca +4,90 %, 7/9 pozitif.
+  - Nötr (29): 10 gün ort. −5,88 % — dönemin bu küçük/orta hisseler için genel olarak zayıf olduğunu gösteriyor (örnek seçimi
+    etkisi olabilir).
+  - 40 ölçümde giriş/çıkış günü tek fiyat (tavan/taban kilidi olabilir) notu var: bu işlemlerin bir kısmı gerçekte
+    yapılamayabilirdi.
+- Uydurma sayı denetimi: gerekçelerdeki 258 sayının 245'i modele verilen belge metninde birebir var; kalan 13'ün tamamı
+  elle kontrol edildi: tarih yazım farkı veya belgedeki sayılardan yapılmış doğru hesap (ör. 750.000 × 6,58 = 4.935.000;
+  92,6 mn × 158,90 ≈ 14,7 mlr). Uydurma sayı bulunmadı.
+- Yorum: örnek çok küçük (olumsuz 9, güçlü olumlu 9) → hiçbir eşik DEĞİŞTİRİLMEDİ (kullanıcı kuralı). Sinyal en çok
+  "güçlü olumlu" ve "olumsuz" gruplarında umut verici; genel "olumlu" grubu tek başına ayırt edici görünmüyor.
+  Doğrulamak için 2. adım (≈600 bildirim, 6–10 $) gerekir — kullanıcı kararı bekliyor.
+- Betikler: scratchpad `run_pilot_step1.py`, `pilot_eval.py` (repo dışında; salt okuma kopya üzerinde).
