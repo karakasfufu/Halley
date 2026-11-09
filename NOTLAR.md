@@ -1360,3 +1360,34 @@ motor (Aşama 1–2), sonra arayüz (Aşama 3); haber bildirimi bütçe tavanı 
   edilenlerde metni bekleyen yoktu; kopyada takip tarihi 3 gün geriye alınınca AKGRT'nin analiz edilmiş etki 3/5
   haberi doğru şekilde olay oldu. Gerçek yapay zekâ çağrısıyla haber bildirimi DENENMEDİ (maliyet; canlıda bütçe
   içinde kendiliğinden olacak). Gerçek Telegram gönderimi DENENMEDİ (bot anahtarı kullanıcıda).
+
+## 2026-11-09 — Görünüm kontrolü ve düzeltmeler (kullanıcı: "olumlu haber kırmızı, olumsuz beyaz; uyumsuzluklar var")
+Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + açık tema) tek tek gözle tarandı.
+- Kart renkleri sıraya bağlıydı (nth-of-type); başa BIST 100 eklenince kaydı → renkler kartın anahtarına bağlandı
+  (kpi_pos yeşil, kpi_neg kırmızı, kpi_opp turuncu, kpi_upd mor; BIST 100 günün yönüne göre yeşil/kırmızı/mor).
+- Üst menü kaydırınca kayboluyordu (menü kendi kabında sabitleniyordu) → sabitleme menünün kabına taşındı.
+- "+ Takibe Al" düğmesinde + kayboluyordu (Markdown liste işareti) → "➕ Takibe Al".
+- İki "$" arası formül sayılıyordu ("2.285 $ · bütçe 10 $" eğik/bozuk) → paneldeki tüm $ kaçırıldı; rapor ve kılavuz
+  metinleri dollar() ile gösteriliyor (yapay zekâ maliyet satırları rapor dosyalarında $ içeriyor).
+- Tema değişince menü "Fırsatlar" gösterirken Dashboard açılıyordu (Streamlit yenilemede menü seçimini unutuyordu) →
+  seçili ekran ayrıca saklanıyor; Hisse Analizi'nde seçilen hisse ekran değişince kaybolmuyor.
+- Takip Listem: tekrarlanan giriş cümlesi kaldırıldı; bildirim türü adları kısaldı (açıklamalar ? işaretinde);
+  başlıklar diğer ekranlarla aynı stil. İşlem Günlüğü başlığı diğer ekranlarla aynı. Fırsatlar'daki tekrar eden piyasa
+  takvimi kaldırıldı (Dashboard'da). "Koyu tema" yazısı taşmasın diye "🌙 Koyu".
+- Hisse Analizi: takipteki hissede "⭐ Takipteki senaryolar" kutusu ve açıklama (takip senaryosu hesap günündeki
+  fiyatla izlenir; aşağıdaki analiz bugünkü fiyatla — AKGRT'de "destekten tepki" takipte beklerken bugünkü analizde
+  uygulanamaz görünmesinin nedeni).
+
+## 2026-11-09 — Fırsat sayısı değişim kaydı ve elle kontrol (kullanıcı: "20'den 19'a düştü, neye göre?")
+- `bist_haber/firsat_log.py`: uygun liste her değiştiğinde data/firsat_gecmisi.json'a zaman, eklenen, çıkan ve NEDEN
+  (signals.decide — panel/bekçiyle aynı karar kodu; skor eşiği altına inen için skor ve "haber eskidikçe azalır")
+  yazılır (son 60 kayıt). Yalnız kayıt; hiçbir eşik/karar değişmez. Kayıt 9 Kasım akşamından itibaren tutuluyor
+  (20 → 19 değişikliğinin nedeni geriye dönük bilinemez; büyük olasılıkla bir hissenin haber skoru eşiğin altına indi
+  ya da fiyat güncellemesiyle senaryosu uygun olmaktan çıktı).
+- Fırsatlar ekranı üst kutu: şu anki sayı + son değişiklik, "🔄 Fırsatları şimdi yeniden kontrol et" (isteğe bağlı
+  ücretsiz fiyat güncellemesiyle), "📋 Tüm adaylar — elle kontrol" (her olumlu haberli hisse: ✅/❌ neden, en uygun
+  senaryo ve seviyeler; eşiğe yakınlar; değişiklik tablosu).
+- Türkçe arama: textutil.tr_fold (Türkçe küçük harf + ş/ğ/ü/ö/ç/ı katlama, kelime kelime eşleşme); Hisse Analizi ve
+  Takip Listem'de "Ara" kutusu (Streamlit'in kendi araması "aksigorta" ile "AKSİGORTA"yı eşleştirmiyordu).
+- Testler: kaçırılmamış $ ve liste işaretiyle başlayan düğme yazısı hiçbir ekranda yok; kart renkleri anahtara bağlı;
+  fırsat yeniden kontrol + değişim kaydı; Türkçe arama; tema değişince ekran korunur, hisse seçimi korunur. 447 test geçti.

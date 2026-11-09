@@ -18,3 +18,6 @@ data/analiz_durumu.json
 paket_cikti/
 *.exe
 data/gunluk/
+
+data/firsat_gecmisi.json
+data/takip_durum.json

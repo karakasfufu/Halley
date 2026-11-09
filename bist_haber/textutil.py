@@ -11,6 +11,11 @@ def tr_lower(s: str) -> str:
     return s.replace("I", "ı").replace("İ", "i").lower()
 
 
+def tr_fold(s: str) -> str:
+    """Arama için: Türkçe küçük harf + şapkasız/noktasız (\"AKSİGORTA\", \"aksigorta\", \"Akşigorta\" eşleşsin)."""
+    return tr_lower(s or "").translate(str.maketrans("ığüşöçâîû", "igusocaiu"))
+
+
 def html_to_text(s: str) -> str:
     s = re.sub(r"<(script|style)\b.*?</\1>", " ", s, flags=re.S | re.I)
     s = re.sub(r"<br\s*/?>|</p>|</tr>|</div>", "\n", s, flags=re.I)

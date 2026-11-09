@@ -68,6 +68,82 @@ class PanelFlowTests(unittest.TestCase):
         self.assertEqual(at.selectbox(key="hisse_pick").value, "POS")
         self.assertTrue(any("Trend gücü (ADX 14)" in d.value.to_string() for d in at.dataframe))
 
+    def test_visual_text_has_no_broken_dollar_or_plus(self):
+        """2026-11-09 görünüm kontrolü: iki "$" arası formül gibi bozuluyordu; "+ Takibe Al" düğmesinde + kayboluyordu."""
+        import re
+        from bist_haber import ai_comment
+        watchdog.archive(date.today().isoformat(), "aksam", "# akşam\nYorum maliyeti 0.002 $ · bütçe 10 $\n", {})
+        at = self.app()
+        for p in at.radio(key="nav").options:
+            self.go(at, p)
+            texts = [str(e.value) for kind in ("markdown", "caption", "info", "success", "warning", "error")
+                     for e in getattr(at, kind)]
+            for t in texts:
+                self.assertEqual(re.findall(r"(?<!\\)\$", t), [], f"{p}: kaçırılmamış $ → {t[:120]}")
+            for b in at.button:
+                self.assertFalse(re.match(r"^[+\-*] ", str(b.label)), f"{p}: düğme yazısı liste işaretiyle başlıyor: {b.label}")
+
+    def test_kpi_colors_follow_card_not_position(self):
+        src = Path(APP).read_text(encoding="utf-8")
+        self.assertNotIn('.st-key-kpi div[data-testid="stColumn"]:nth-of-type', src)    # sıraya bağlı renk yok
+        for key, var in (("kpi_pos", "--h-pos"), ("kpi_neg", "--h-neg"), ("kpi_bist_up", "--h-pos"),
+                         ("kpi_bist_down", "--h-neg")):
+            self.assertRegex(src, rf"\.st-key-{key} div\[data-testid=\"stMetric\"\][^{{]*\{{border-top: 5px solid var\({var}\)")
+        for key, label in (("kpi_pos", "Olumlu haber"), ("kpi_neg", "Olumsuz haber")):
+            self.assertRegex(src, rf'\(m[12], "{key}", "{label}"')                     # kart doğru anahtarda
+        at = self.app()
+        self.assertEqual([m.label for m in at.metric][:5],
+                         ["BIST 100", "Olumlu haber", "Olumsuz haber", "Uygun fırsat", "Son güncelleme"])
+
+    def test_opportunity_recheck_and_change_log(self):
+        from bist_haber import firsat_log
+        at = self.app("🎯 Fırsatlar")
+        at.button(key="opp_recheck").click().run()
+        self.assertEqual(len(at.exception), 0, str(at.exception))
+        self.assertTrue(any("yeniden kontrol edildi" in str(s.value) for s in at.success))
+        self.assertTrue(firsat_log.path().exists())                         # o anki liste kaydedildi
+        cand = next(d.value for d in at.dataframe if "Durum" in d.value.columns)
+        self.assertIn("POS", list(cand["Hisse"]))
+        # Liste değişince hangi hisse neden çıktı kaydedilir
+        firsat_log.record(["POS", "XYZ"], lambda t: "-")
+        firsat_log.record(["POS"], lambda t: "haber skoru 1,20'ye indi")
+        ch = firsat_log.changes(1)[0]
+        self.assertEqual((ch["onceki_sayi"], ch["sayi"], ch["cikan"]), (2, 1, [{"hisse": "XYZ", "neden": "haber skoru 1,20'ye indi"}]))
+        self.assertFalse(firsat_log.record(["POS"], lambda t: "-")["degisti"])        # değişiklik yoksa yazmaz
+        at.run()
+        self.assertTrue(any("2 → 1" in str(m.value) and "çıkan: XYZ" in str(m.value) for m in at.markdown))
+
+    def test_turkish_search_finds_dotted_names(self):
+        conn = db.connect()
+        conn.execute("INSERT INTO companies VALUES('SISE','TÜRKİYE ŞİŞE VE CAM FABRİKALARI A.Ş.',NULL)")
+        conn.commit()
+        conn.close()
+        at = self.app("🔍 Hisse Analizi")
+        at.text_input(key="hisse_q").input("şişe cam").run()
+        self.assertEqual(at.selectbox(key="hisse_pick").value, "SISE")
+        at.text_input(key="hisse_q").input("turkiye sise").run()             # Türkçe karakter yazmadan da bulur
+        self.assertEqual(at.selectbox(key="hisse_pick").value, "SISE")
+        self.assertEqual(len(at.exception), 0, str(at.exception))
+        self.go(at, "⭐ Takip Listem")
+        at.text_input(key="tk_add_q").input("şişe").run()
+        self.assertEqual(at.selectbox(key="tk_add_pick").options[1:], ["SISE — TÜRKİYE ŞİŞE VE CAM FABRİKALARI A.Ş."])
+
+    def test_theme_change_keeps_page_and_stock_selection_survives_page_switch(self):
+        conn = db.connect()
+        conn.execute("INSERT INTO companies VALUES('ZZZ','Zeta A.Ş.',NULL)")
+        conn.commit()
+        conn.close()
+        at = self.app("🎯 Fırsatlar")
+        at.toggle(key="dark_mode").set_value(False).run()          # tema yenilemesi menü seçimini unutmamalı
+        self.assertEqual(len(at.exception), 0, str(at.exception))
+        self.assertEqual(at.radio(key="nav").value, "🎯 Fırsatlar")
+        self.assertTrue(any(b.key == "opp_recheck" for b in at.button))   # gerçekten Fırsatlar ekranı çizildi
+        self.go(at, "🔍 Hisse Analizi")
+        at.selectbox(key="hisse_pick").set_value("ZZZ").run()
+        self.go(at, "📊 Dashboard")
+        self.go(at, "🔍 Hisse Analizi")
+        self.assertEqual(at.selectbox(key="hisse_pick").value, "ZZZ")     # seçilen hisse kaybolmadı
+
     def test_settings_saved_across_pages(self):
         at = self.app("⚙️ Ayarlar")
         at.slider(key="set_window").set_value(12).run()
@@ -192,11 +268,11 @@ class PanelFlowTests(unittest.TestCase):
         at = self.app("⚙️ Ayarlar")
         guide = next((m.value for m in at.markdown if "Kullanım kılavuzu" in m.value), "")
         self.assertTrue(guide, "kılavuz panelde yok")
-        src = Path(APP).read_text(encoding="utf-8")
+        src = Path(APP).read_text(encoding="utf-8") + (Path(APP).parent / "bist_haber" / "takip_ui.py").read_text(encoding="utf-8")
         for name in ("🌅 Sabah analizi", "🌙 Akşam analizi", "🔄 Haberleri güncelle", "🧪 Ücretsiz dene",
                      "✍️ Bu işleme girdim", "📊 Dashboard", "🎯 Fırsatlar", "🔍 Hisse Analizi", "⭐ Takip Listem",
                      "🛡️ Bekçi", "📰 Haberler", "📒 İşlem Günlüğü", "🏁 Performans", "⚙️ Ayarlar",
-                     "💾 Veri ve gelişmiş", "+ Takibe Al", "🔍 Analiz", "🤖 Raporu yapay zekâ ile yorumla",
+                     "💾 Veri ve gelişmiş", "➕ Takibe Al", "🔍 Analiz", "🤖 Raporu yapay zekâ ile yorumla",
                      "🤖 Kaçırılan fırsatları yapay zekâ ile açıkla"):
             self.assertIn(name, guide)
             self.assertIn(name, src)        # kılavuzdaki ad panelde gerçekten var
@@ -241,7 +317,7 @@ class PanelFlowTests(unittest.TestCase):
                                                     "biten": 142, "harcanan_usd": 2.1, "nabiz": now, "bitti": now,
                                                     "sonuc": {"analyzed": 130, "filtered_out": 12}}), encoding="utf-8")
         at = self.app()
-        self.assertTrue(any("130 haber analiz edildi" in str(x.value) and "2.100 $" in str(x.value) for x in at.success))
+        self.assertTrue(any("130 haber analiz edildi" in str(x.value) and r"2.100 \$" in str(x.value) for x in at.success))
 
     def test_double_save_real_trade_warns(self):
         at = self.app("📒 İşlem Günlüğü")

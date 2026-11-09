@@ -6,9 +6,15 @@ import pandas as pd
 import streamlit as st
 
 from . import config, notify, pipeline, tracker
+from .textutil import tr_fold
 
 STATE_TR = {"bekliyor": "⏳ giriş bekleniyor", "açık": "🟢 açık", "açık (TP1 görüldü)": "🟢 açık (TP1 görüldü)",
             "kapandı": "🏁 kapandı", "iptal": "⌛ süresi doldu", "geçersiz": "⛔ geçersiz"}
+
+
+def sec(icon: str, text: str) -> None:
+    """Panelin diğer ekranlarıyla aynı bölüm başlığı."""
+    st.markdown(f"<div class='sec'><span>{icon}</span>{text}</div>", unsafe_allow_html=True)
 
 
 def _flash(kind: str, text: str) -> None:
@@ -29,7 +35,7 @@ def follow_button(conn, ticker: str, key: str, compact: bool = False) -> None:
             tracker.remove(conn, ticker)
             _flash("info", f"{ticker} takipten çıkarıldı (geçmiş kayıtları duruyor).")
             _rerun(conn)
-    elif st.button("+ Takibe Al" if compact else f"+ Takibe Al ({ticker})", key=f"fol_{key}", type="primary",
+    elif st.button("➕ Takibe Al" if compact else f"➕ Takibe Al ({ticker})", key=f"fol_{key}", type="primary",
                    width="stretch",
                    help="Senaryoları bekçiye kaydedilir; bekçi koşulları kendisi izler ve Telegram'dan bildirir."):
         _add(conn, ticker)
@@ -95,18 +101,19 @@ def watcher_status(conn, compact: bool = False) -> None:
 
 
 def render(conn) -> None:
-    st.caption("Bot bütün BIST'i taramaya devam eder; Telegram'a yalnız takibe aldığınız hisselerin olayları gider. "
-               "Takibe alınan hissenin her uygun senaryosu ayrı izlenir. Emir verilmez.")
     watcher_status(conn)
     names = {r["ticker"]: r["name"] for r in conn.execute("SELECT ticker, name FROM companies ORDER BY ticker")}
-    c1, c2 = st.columns([3, 1], vertical_alignment="bottom")
-    pick = c1.selectbox("Hisse ekle", [""] + [t for t in names if not tracker.is_watched(conn, t)], key="tk_add_pick",
-                        format_func=lambda t: f"{t} — {names[t]}" if t else "Hisse seçin…")
-    if c2.button("+ Takibe Al", key="tk_add_btn", type="primary", disabled=not pick, width="stretch"):
+    c0, c1, c2 = st.columns([1.6, 3, 1.2], vertical_alignment="bottom")
+    q = tr_fold(c0.text_input("Ara", key="tk_add_q", placeholder="kod ya da şirket adı"))
+    cands = [t for t in names if not tracker.is_watched(conn, t) and all(w in tr_fold(f"{t} {names[t]}") for w in q.split())]
+    pick = c1.selectbox("Hisse ekle", [""] + cands, key="tk_add_pick",
+                        format_func=lambda t: f"{t} — {names[t]}" if t else f"Hisse seçin… ({len(cands)} sonuç)")
+    if c2.button("➕ Takibe Al", key="tk_add_btn", type="primary", disabled=not pick, width="stretch"):
         _add(conn, pick)
     items = tracker.watched(conn)
     if not items:
-        st.info("Takip listeniz boş. Bir hisse seçip **+ Takibe Al** deyin ya da hisse kartlarındaki düğmeyi kullanın.")
+        st.info("Takip listeniz boş. Bir hisse seçip **➕ Takibe Al** deyin ya da Fırsatlar / Hisse Analizi ekranındaki "
+                "düğmeyi kullanın.")
     for w in items:
         tk = w["ticker"]
         act = tracker.scenarios(conn, tk, active_only=True)
@@ -131,16 +138,17 @@ def render(conn) -> None:
             if not act:
                 st.caption("Şu an etkin senaryo yok; bekçi her kapanıştan sonra yeniden hesaplar.")
             types = st.multiselect("Bu hisse için bildirim türleri", list(tracker.TYPES), default=w["bildirimler"],
-                                   format_func=lambda k: tracker.TYPES[k], key=f"tk_types_{tk}")
+                                   format_func=lambda k: tracker.TYPES[k], key=f"tk_types_{tk}",
+                                   help=tracker.TYPES_HELP)
             if sorted(types) != sorted(w["bildirimler"]):
                 tracker.set_types(conn, tk, types)
             ev = tracker.events(conn, tk, 5)
             if ev:
                 st.caption("Son olaylar: " + " · ".join(f"{e['zaman'][5:16].replace('T', ' ')} {e['mesaj']}"
                                                         for e in ev))
-    st.markdown("#### 🛡️ Bekçi olayları")
+    sec("🛡️", "Bekçi olayları")
     events_table(conn)
-    st.markdown("#### 🏁 Takip senaryolarının sonuçları")
+    sec("🏁", "Takip senaryolarının sonuçları")
     performance_table(conn)
     old = [w for w in tracker.watched(conn, active_only=False) if not w["aktif"]]
     if old:

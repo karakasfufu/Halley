@@ -45,14 +45,26 @@ tavsiyesi değildir.
 | Ekran | İçerik |
 |---|---|
 | **📊 Dashboard** | Tek bakışta: BIST 100, olumlu/olumsuz haber sayısı, uygun fırsatlar, piyasa durumu, bekçi durumu ve son olaylar, takip listenizdeki aktif senaryolar, açık işlemler, önümüzdeki 15 işlem gününün piyasa takvimi. |
-| **🎯 Fırsatlar** | Haberi olan hisseler (olumlu / olumsuz / zayıf), haber skoru ve teknik durum. Her satırda **🔍 Analiz** (ayrıntı ekranı) ve **+ Takibe Al**. Detaylı listeyi CSV olarak indirme. |
-| **🔍 Hisse Analizi** | Seçilen hissenin tüm analizi: giriş senaryoları (kırılım, geri çekilme, destekten tepki), referans senaryo, teknik göstergeler, sektör, bilanço ve şirket takvimi, finansal özet, haberler. Haberi olmayan hissede senaryolar yalnız fiyattan hesaplanır. **+ Takibe Al** düğmesi burada da var. |
+| **🎯 Fırsatlar** | Haberi olan hisseler (olumlu / olumsuz / zayıf), haber skoru ve teknik durum. Her satırda **🔍 Analiz** (ayrıntı ekranı) ve **➕ Takibe Al**. Detaylı listeyi CSV olarak indirme. |
+| **🔍 Hisse Analizi** | Seçilen hissenin tüm analizi: giriş senaryoları (kırılım, geri çekilme, destekten tepki), referans senaryo, teknik göstergeler, sektör, bilanço ve şirket takvimi, finansal özet, haberler. Haberi olmayan hissede senaryolar yalnız fiyattan hesaplanır. **➕ Takibe Al** düğmesi burada da var. |
 | **⭐ Takip Listem** | Takibe aldığınız hisseler, senaryoları ve durumları, senaryo ve bildirim türü seçimleri, son olaylar, takip senaryolarının sonuçları. |
 | **🛡️ Bekçi** | **🌅 Sabah analizi** / **🌙 Akşam analizi** ve yapay zekâ seçenekleri, takip bekçisinin durumu ve tüm olayları (Telegram'a gidip gitmediği), sabah/akşam rapor arşivi (sonradan değişmez; .md ve .json indirilebilir). |
 | **📰 Haberler** | 🔬 Haber analizi (bekleyenleri seçerek analiz, derin yeniden inceleme, tahmini maliyet ve bütçe) ve son analiz edilen 50 haber. |
 | **📒 İşlem Günlüğü** | Önerilen senaryolar **sanal işlem** olarak izlenir. Gerçekten aldıysanız **✍️ Bu işleme girdim** ile alış günü ve fiyatını kaydedin. Portföy/sektör riski, kayma ölçümü. |
 | **🏁 Performans** | Takip senaryolarının strateji türüne göre TP1/TP2/SL oranları; sanal işlemlerin stratejiye, haber kaynağına, olay türüne ve riske göre başarısı; filtre analizi; **onayınızı bekleyen öneriler** (onay hiçbir ayarı kendiliğinden değiştirmez). |
 | **⚙️ Ayarlar** | Ayarlar ve 📨 Telegram; **💾 Veri ve gelişmiş** (veri aktarma, durum, 📅 takvim kontrolü, 📥 KAP geçmişi, 🧪 ucuz test, geçmiş veri pilotu); ❓ Kılavuz (bu metin). |
+
+## Fırsat sayısı neden değişir? (🎯 Fırsatlar → üstteki kutu)
+
+- Uygun fırsat listesi kayıtlı veriden **her açılışta yeniden hesaplanır**. Haber skoru haber eskidikçe azalır (1,50'nin
+  altına inen hisse listeden çıkar), fiyatlar ve yeni analizler geldikçe senaryolar değişir. Bu yüzden sayı gün içinde
+  kendiliğinden değişebilir (ör. 20 → 19).
+- Kutuda **son değişiklik** yazar: hangi hisse eklendi, hangisi çıktı.
+- **🔄 Fırsatları şimdi yeniden kontrol et**: listeyi elle yeniden hesaplar. "Fiyatları da güncelle" işaretlenirse önce
+  olumlu haberli hisselerin fiyatı indirilir (ücretsiz, birkaç saniye).
+- **📋 Tüm adaylar — elle kontrol**: olumlu haberli her hisse için ✅ uygun ya da ❌ neden uygun değil, en uygun senaryo
+  ve seviyeleri; eşiğin hemen altındaki hisseler; **liste değişiklikleri** tablosu (çıkan hisse ve nedeni).
+- Hisse aramaları Türkçe karakterleri tanır: "aksigorta", "sise cam", "şişe" yazmanız yeterli.
 
 ## Senaryo kartını okumak
 
@@ -75,8 +87,8 @@ tavsiyesi değildir.
 
 Halley bütün BIST'i taramaya devam eder; ama **Telegram'a yalnız takibe aldığınız hisselerin olayları gider.**
 
-- **Takibe almak:** 🎯 Fırsatlar satırındaki ya da 🔍 Hisse Analizi ekranındaki **+ Takibe Al** düğmesi ya da **⭐ Takip Listem** ekranında hisse seçip
-  **+ Takibe Al**. Halley o hissenin fiyatını tazeler ve uygun her senaryoyu (kırılım, geri çekilme, destekten
+- **Takibe almak:** 🎯 Fırsatlar satırındaki ya da 🔍 Hisse Analizi ekranındaki **➕ Takibe Al** düğmesi ya da **⭐ Takip Listem** ekranında hisse seçip
+  **➕ Takibe Al**. Halley o hissenin fiyatını tazeler ve uygun her senaryoyu (kırılım, geri çekilme, destekten
   tepki) **ayrı ayrı** kaydeder. Takip listesindeki hisse için haber şartı yoktur; fiyat verisi sorunluysa ya da
   likidite çok düşükse senaryo üretilmez (nedeni yazılır).
 - **Bekçi kendisi izler** (siz görev vermezsiniz). Halley açıkken arka planda çalışır:

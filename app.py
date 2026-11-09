@@ -16,7 +16,8 @@ import streamlit as st
 
 from bist_haber import (analyzer, calendar_sync, config, corp_events, db, earnings, entries, journal, kap_history,
                         kap_worker, macro_calendar, pipeline, report, signals, technical, timeline, tradeplan,
-                        trends, watchdog, ai_comment, sectors, transfer, notify, takip_ui, tracker)
+                        trends, watchdog, ai_comment, sectors, transfer, notify, takip_ui, tracker, firsat_log)
+from bist_haber.textutil import tr_fold  # noqa: E402
 
 st.set_page_config(page_title="Halley", page_icon="☄️", layout="wide", initial_sidebar_state="collapsed")
 _RENDER_T0 = time.time()   # sayfa çizim süresi (otomatik yenileme aralığı buna göre)
@@ -97,11 +98,14 @@ div[data-testid="stMetric"] {background: var(--h-card); border: 1px solid var(--
 [data-testid="stMetricValue"] > div, [data-testid="stMetricDelta"] div {overflow: visible !important; text-overflow: clip !important;}
 [data-testid="stMetricDelta"] div {white-space: normal !important;}
 [data-testid="stExpander"] [data-testid="stMetricValue"] {font-size: 1.45rem;}
-.st-key-kpi div[data-testid="stColumn"]:nth-of-type(1) div[data-testid="stMetric"] {border-top: 5px solid var(--h-pos);}
-.st-key-kpi div[data-testid="stColumn"]:nth-of-type(2) div[data-testid="stMetric"] {border-top: 5px solid var(--h-neg);}
-.st-key-kpi div[data-testid="stColumn"]:nth-of-type(3) div[data-testid="stMetric"] {border-top: 5px solid var(--h-acc);}
-.st-key-kpi div[data-testid="stColumn"]:nth-of-type(1) [data-testid="stMetricValue"] {color: var(--h-pos-txt);}
-.st-key-kpi div[data-testid="stColumn"]:nth-of-type(2) [data-testid="stMetricValue"] {color: var(--h-neg-txt);}
+/* özet kartları: renk kartın ANAHTARINA bağlı (sıraya değil; 2026-11-09 sırayla renk kayması düzeltildi) */
+.st-key-kpi_pos div[data-testid="stMetric"], .st-key-kpi_bist_up div[data-testid="stMetric"] {border-top: 5px solid var(--h-pos);}
+.st-key-kpi_neg div[data-testid="stMetric"], .st-key-kpi_bist_down div[data-testid="stMetric"] {border-top: 5px solid var(--h-neg);}
+.st-key-kpi_opp div[data-testid="stMetric"] {border-top: 5px solid var(--h-amber);}
+.st-key-kpi_upd div[data-testid="stMetric"], .st-key-kpi_bist_flat div[data-testid="stMetric"] {border-top: 5px solid var(--h-acc);}
+.st-key-kpi_pos [data-testid="stMetricValue"], .st-key-kpi_bist_up [data-testid="stMetricValue"] {color: var(--h-pos-txt);}
+.st-key-kpi_neg [data-testid="stMetricValue"], .st-key-kpi_bist_down [data-testid="stMetricValue"] {color: var(--h-neg-txt);}
+.st-key-kpi_opp [data-testid="stMetricValue"] {color: var(--h-amber);}
 /* açılır kutular */
 [data-testid="stExpander"] details {background: var(--h-card); border: 1px solid var(--h-line); border-radius: 14px;
   box-shadow: 0 1px 3px rgba(15,23,42,.05); transition: box-shadow .15s, border-color .15s;}
@@ -175,8 +179,9 @@ button[data-baseweb="tab"][aria-selected="true"] p {color: #FFFFFF;}
 .topbar .tag {font-size: .74rem; font-weight: 800; color: var(--h-acc); border: 1px solid var(--h-acc); border-radius: 999px;
   padding: 1px 9px; text-transform: uppercase; letter-spacing: .04em;}
 .topbar .meta {color: var(--h-muted); font-size: .86rem;}
-.st-key-navbar {position: sticky; top: 0; z-index: 990; background: var(--h-bg); padding: 6px 0 8px;
-  border-bottom: 1px solid var(--h-line); margin-bottom: 4px;}
+/* menü yapışkan: sabitleme menünün KABINDA (menü kendi kabında sabitlenince kaydırınca kayboluyordu) */
+div:has(> .st-key-navbar) {position: sticky; top: 0; z-index: 990; background: var(--h-bg); padding: 6px 0 8px;
+  border-bottom: 1px solid var(--h-line);}
 .st-key-navbar [role="radiogroup"] {gap: 5px; flex-wrap: wrap;}
 .st-key-navbar label[data-baseweb="radio"] {background: var(--h-card); border: 1px solid var(--h-line); border-radius: 10px;
   padding: 6px 13px; margin: 0 !important; cursor: pointer; transition: background .12s;}
@@ -206,6 +211,11 @@ def section_title(icon: str, text: str, tone: str = "", count=None, note: str = 
     st.markdown(f"<div class='sec {'t-' + tone if tone else ''}'><span>{icon}</span>{esc(text)}"
                 + (f"<span class='cnt'>{count}</span>" if count is not None else "")
                 + (f"<span class='note'>{esc(note)}</span>" if note else "") + "</div>", unsafe_allow_html=True)
+
+
+def dollar(text: str) -> str:
+    """Markdown'da iki "$" arası formül sayılıyor ("2.285 \\$ · bütçe 10 \\$" eğik ve bozuk görünüyordu): \\$'ları kaçır."""
+    return re.sub(r"(?<!\\)\$", r"\\$", str(text))
 
 
 def bold_html(text: str) -> str:
@@ -319,7 +329,7 @@ if tb2.button("🔄 Haberleri güncelle", type="primary", width="stretch"):
     conn.close()  # sayfa yenilenmeden önce bağlantıyı bırak (aksi hâlde açık kalıyordu)
     st.rerun()
 
-_dark_new = tb4.toggle("🌙 Koyu tema", value=DARK, key="dark_mode",
+_dark_new = tb4.toggle("🌙 Koyu", value=DARK, key="dark_mode",
                       help="Koyu renkli görünüm (göz yormaz). Seçim bu bilgisayarda saklanır.")
 if _dark_new != DARK:
     pipeline.save_settings(karanlik_mod=bool(_dark_new))
@@ -347,8 +357,13 @@ if "_goto" in st.session_state:          # başka ekrandan gelen yönlendirme (�
     st.session_state["nav"] = _pg
     if _tk:
         st.session_state["hisse_pick"] = _tk
+# Seçili ekran ayrıca saklanır: tema değişince yapılan yenilemede Streamlit menü seçimini unutuyordu (menüde
+# "Fırsatlar" seçili görünürken Dashboard açılıyordu; 2026-11-09 görünüm kontrolünde bulundu).
+if "nav" not in st.session_state and st.session_state.get("_page") in PAGES:
+    st.session_state["nav"] = st.session_state["_page"]
 with st.container(key="navbar"):
     PAGE = st.radio("Ekran", PAGES, horizontal=True, key="nav", label_visibility="collapsed")
+st.session_state["_page"] = PAGE
 
 
 def goto(page: str, ticker=None) -> None:
@@ -363,7 +378,7 @@ def go_button(label: str, page: str, key: str, ticker=None, **kw) -> None:
 
 
 for _kind, _text in st.session_state.pop("_flash", []):
-    {"error": st.error, "warning": st.warning, "success": st.success}.get(_kind, st.info)(_text)
+    {"error": st.error, "warning": st.warning, "success": st.success}.get(_kind, st.info)(dollar(_text))
 
 if not pipeline.has_api_key():
     st.warning("Başlamak için OpenAI API anahtarınızı bir kez girin. Anahtar yalnızca bu bilgisayarda saklanır.")
@@ -387,7 +402,7 @@ if last.get("free"):
             f"KAP'ta {new_kap}, haber sitelerinde {new_rss} yeni kayıt bulundu. "
             f"Sırada {est.get('waiting', 0)} haber var; bir sonraki **Haberleri güncelle** bunların "
             f"{est.get('next_count', 0)} tanesini analiz eder (tahmini maliyet "
-            f"{est.get('low_usd', 0):.3f}–{est.get('high_usd', 0):.3f} $).")
+            f"{est.get('low_usd', 0):.3f}–{est.get('high_usd', 0):.3f} \\$).")
 if last:
     if last.get("kap", {}).get("rate_limited"):
         st.warning("KAP geçici olarak istek sınırı uyguladı; kalan bildirimler arka planda, sınır kalkınca "
@@ -444,7 +459,7 @@ def analysis_status_box() -> None:
     if s_.get("durum") == "çalışıyor" and fresh:
         live = report.build(conn, uni, days=window)
         pos_, neg_ = sum(1 for r in live if r["score"] >= 1.5), sum(1 for r in live if r["score"] <= -1.5)
-        st.info(f"🔬 {tur.capitalize()} sürüyor: {k}/{n} haber · şu ana kadar ≈ {s_.get('harcanan_usd', 0):.3f} $ · "
+        st.info(f"🔬 {tur.capitalize()} sürüyor: {k}/{n} haber · şu ana kadar ≈ {s_.get('harcanan_usd', 0):.3f} \\$ · "
                 f"şu an **olumlu {pos_} · olumsuz {neg_} hisse** (canlı). Paneli kullanmaya devam edebilirsiniz; bu kutu "
                 "10 sn'de bir, liste ve sayılar yeni sonuç geldikçe en fazla 30 sn'de bir kendiliğinden yenilenir.")
         st.progress(min(1.0, k / max(n, 1)))
@@ -465,7 +480,7 @@ def analysis_status_box() -> None:
                      + (f", {r_['errors']} hata" if r_.get("errors") else "")
                      + (f", {r_['butce_disi']} haber bütçe nedeniyle bekliyor" if r_.get("butce_disi") else ""))
         (st.warning if s_.get("durum") == "durdu" else st.success)(
-            f"🔬 Son {tur} ({s_['bitti'][11:16]}): {text_} · gerçek maliyet ≈ {s_.get('harcanan_usd', 0):.3f} $"
+            f"🔬 Son {tur} ({s_['bitti'][11:16]}): {text_} · gerçek maliyet ≈ {s_.get('harcanan_usd', 0):.3f} \\$"
             + (f" · durdu: {s_['neden']}" if s_.get("neden") else ""))
 
 
@@ -882,6 +897,20 @@ for r in positives:
 if rows:
     journal.update_all(conn, commission, slippage)
 
+
+def _opp_why(tk: str) -> str:
+    """Listeden çıkan hissenin nedeni (panel ve bekçiyle aynı karar kodu)."""
+    r = next((x for x in rows if x["ticker"] == tk), None)
+    if r is None:
+        return f"son {window} günün haber listesinden çıktı (haber penceresi dışında kaldı)"
+    d = signals.decide(CTX, r)
+    if d["neden_kodu"] == "SKOR_ESIK_ALTI":
+        return f"haber skoru {r['score']:.2f}'e indi (en az 1,50 gerekir; haber eskidikçe skor azalır)"
+    return d["neden"] + (f" — {d['detay']['neden_yok']}" if d.get("detay", {}).get("neden_yok") else "")
+
+
+firsat_log.record([tk for tk, _, _ in SUMMARY["uygun"]], _opp_why)
+
 # ---------------- İşlem günlüğü ----------------
 def metrics_block(title: str, m: dict) -> None:
     st.markdown(f"**{title}** — kayıt {m['kayit']} · kapanan {m['kapanan']} · açık/bekleyen {m['acik_bekleyen']} · "
@@ -906,8 +935,8 @@ def news_analysis_box() -> None:
     derin yeniden inceleme. Her ikisi aylık haber analizi bütçesine tabidir."""
     st.markdown("#### 🔬 Haber analizi")
     spent = analyzer.month_spend(conn)
-    st.caption(f"Bu ay haber analizine harcanan ≈ {spent:.3f} $ · bütçe {news_budget:.2f} $ · kalan "
-               f"{max(0.0, news_budget - spent):.3f} $ (Ayarlar'dan değişir). Tahminler bu bilgisayardaki gerçek analiz "
+    st.caption(f"Bu ay haber analizine harcanan ≈ {spent:.3f} \\$ · bütçe {news_budget:.2f} \\$ · kalan "
+               f"{max(0.0, news_budget - spent):.3f} \\$ (Ayarlar'dan değişir). Tahminler bu bilgisayardaki gerçek analiz "
                "maliyetlerinden hesaplanır; gerçek tutar haberin uzunluğuna göre değişir.")
     if not pipeline.has_api_key():
         st.info("Analiz için OpenAI API anahtarı gerekir (sayfanın üstünden girin).")
@@ -957,7 +986,7 @@ def news_analysis_box() -> None:
             return
         est = analyzer.estimate_cost(conn, sel, quality)
         fit, over = analyzer.within_budget(conn, sel, news_budget, quality)
-        st.info(f"Seçilen {len(sel)} haber · tahmini maliyet {est['low_usd']:.3f}–{est['high_usd']:.3f} $"
+        st.info(f"Seçilen {len(sel)} haber · tahmini maliyet {est['low_usd']:.3f}–{est['high_usd']:.3f} \\$"
                 + (f" · bütçe nedeniyle yalnız ilk {len(fit)} haber analiz edilir ({over} haber kalır)" if over else ""))
         if st.button(f"🔬 {len(fit)} haberi analiz et", key="na_run", disabled=not (fit and pipeline.has_api_key())):
             bar = st.progress(0.0, text="Yapay zekâ haberleri analiz ediyor...")
@@ -968,7 +997,7 @@ def news_analysis_box() -> None:
                 cost = analyzer.month_spend(conn) - before
                 flash("success", f"{res.get('analyzed', 0)} haber analiz edildi, {res.get('filtered_out', 0)} haber ön "
                       f"elemede önemsiz bulundu" + (f", {res['errors']} haberde hata" if res.get("errors") else "")
-                      + f". Gerçek maliyet ≈ {cost:.3f} $." + (" OpenAI hesabı/kotası nedeniyle durdu: "
+                      + f". Gerçek maliyet ≈ {cost:.3f} \\$." + (" OpenAI hesabı/kotası nedeniyle durdu: "
                                                               + res["stopped"] if res.get("stopped") else ""))
             except Exception as e:
                 flash("error", f"Analiz tamamlanamadı: {nice_err(e)}")
@@ -1012,7 +1041,7 @@ def news_analysis_box() -> None:
     else:
         est = analyzer.estimate_reanalysis(conn, sel)
         left_ = news_budget - analyzer.month_spend(conn)
-        st.info(f"Seçilen {len(sel)} haber · tahmini maliyet {est['low_usd']:.3f}–{est['high_usd']:.3f} $"
+        st.info(f"Seçilen {len(sel)} haber · tahmini maliyet {est['low_usd']:.3f}–{est['high_usd']:.3f} \\$"
                 + (" · kalan bütçe yetmeyebilir; sığmayanlar atlanır" if est["high_usd"] > left_ else ""))
         if st.button(f"🔁 {len(sel)} haberi derin incele", key="ra_run", disabled=not pipeline.has_api_key()):
             bar = st.progress(0.0, text="Derin inceleme...")
@@ -1025,7 +1054,7 @@ def news_analysis_box() -> None:
                 flash("success", f"{res['incelenen']} haber yeniden incelendi; {res['degisen']} haberde sonuç değişti"
                       + (f", {res['hata']} haberde hata" if res["hata"] else "")
                       + (f", {res['butce_disi']} haber bütçe nedeniyle atlandı" if res["butce_disi"] else "")
-                      + f". Gerçek maliyet ≈ {cost:.3f} $.")
+                      + f". Gerçek maliyet ≈ {cost:.3f} \\$.")
             except Exception as e:
                 flash("error", f"İnceleme tamamlanamadı: {nice_err(e)}")
             conn.close()
@@ -1054,7 +1083,7 @@ def watch_box() -> None:
         if pipeline.has_api_key():
             est = pipeline.estimate_next_run(conn, analysis_limit=analysis_limit, quality=quality)
             st.caption(f"Şu an sırada {est['waiting']} haber; bu çalıştırmada en fazla {analysis_limit} haber analiz "
-                       f"edilir. Sıradakiler için tahmini maliyet {est['low_usd']:.3f}–{est['high_usd']:.3f} $ "
+                       f"edilir. Sıradakiler için tahmini maliyet {est['low_usd']:.3f}–{est['high_usd']:.3f} \\$ "
                        "(gece gelen yeni haberler toplanınca sıra değişebilir; üst sınır analiz adedidir).")
         else:
             st.caption("API anahtarı yok: yapay zekâ analizi yapılamaz, rapor ücretsiz kısımla hazırlanır.")
@@ -1065,10 +1094,10 @@ def watch_box() -> None:
         if pipeline.has_api_key():
             e1 = ai_comment.estimate(6300)
             spent_ = ai_comment.month_spend(conn)
-            st.caption(f"Tahmini maliyet: rapor yorumu {e1['low']:.3f}–{e1['high']:.3f} $ / çalıştırma"
-                       + (f" · kaçırılan açıklaması {e1['low']:.3f}–{e1['high']:.3f} $ / hisse (en fazla "
+            st.caption(f"Tahmini maliyet: rapor yorumu {e1['low']:.3f}–{e1['high']:.3f} \\$ / çalıştırma"
+                       + (f" · kaçırılan açıklaması {e1['low']:.3f}–{e1['high']:.3f} \\$ / hisse (en fazla "
                           f"{ai_comment.MAX_MISSED}; daha önce açıklanan ücretlendirilmez)" if ai_missed else "")
-                       + f" · bu ay harcanan {spent_:.3f} $ / bütçe {ai_budget:.2f} $")
+                       + f" · bu ay harcanan {spent_:.3f} \\$ / bütçe {ai_budget:.2f} \\$")
         else:
             st.caption("API anahtarı yok: yapay zekâ yorumu yapılamaz; rapor kodla hazırlanır.")
     for kind, col, label in (("sabah", w1, "🌅 Sabah analizi"), ("aksam", w2, "🌙 Akşam analizi")):
@@ -1112,7 +1141,7 @@ def watch_box() -> None:
         path = watchdog.report_dir() / f"{name}.md"
         if path.exists():
             with st.expander(f"📄 Son bekçi raporu: {name} (arşivde saklandı, değiştirilmez)", expanded=True):
-                st.markdown(path.read_text(encoding="utf-8"))
+                st.markdown(dollar(path.read_text(encoding="utf-8")))
                 st.download_button("Raporu indir (.md)", path.read_bytes(), file_name=f"{name}.md",
                                    key="watch_dl")
 
@@ -1160,14 +1189,14 @@ def settings_panel() -> None:
                                                       saved.get("sermaye"), saved.get("risk_pct")):
         pipeline.save_settings(komisyon_pct=commission, kayma_pct=slippage, sermaye=capital, risk_pct=risk_pct)
     # W6: bekçinin yapay zekâ yorumları için aylık bütçe (haber analizi maliyeti bunun dışında)
-    ai_budget = st.number_input("Bekçi yapay zekâ yorumu aylık bütçesi ($)", 0.0, 100.0,
+    ai_budget = st.number_input("Bekçi yapay zekâ yorumu aylık bütçesi (\\$)", 0.0, 100.0,
                                 float(saved.get("yz_butce_usd", ai_comment.DEFAULT_BUDGET_USD)), 1.0, format="%.2f",
                                 key="ai_budget", help="Rapor yorumu ve kaçırılan fırsat açıklamaları bu bütçeyi aşmaz: "
                                                      "bir çağrının en kötü durum maliyeti bütçeyi aşacaksa çağrı yapılmaz.")
     if ai_budget != saved.get("yz_butce_usd"):
         pipeline.save_settings(yz_butce_usd=ai_budget)
     # 2026-11-09 (kullanıcı onayı): haber analizinin de aylık bütçesi — bütçeyi aşacak analiz yapılmaz
-    news_budget = st.number_input("Haber analizi aylık bütçesi ($)", 0.0, 500.0,
+    news_budget = st.number_input("Haber analizi aylık bütçesi (\\$)", 0.0, 500.0,
                                   float(saved.get("haber_butce_usd", config.NEWS_BUDGET_USD)), 1.0, format="%.2f",
                                   key="news_budget", help="Haberleri güncelle, sabah analizi ve 🔬 Haber analizi bu "
                                   "bütçeyi aşmaz: bir haberin en kötü durum maliyeti kalan bütçeyi aşacaksa o haber ve "
@@ -1195,7 +1224,7 @@ def settings_panel() -> None:
     th_on = st.toggle("📰 Takip listemdeki hisselerin yeni KAP haberlerini otomatik analiz et ve önemliyse bildir",
                       key="tk_news_on", value=bool(saved.get("takip_haber_analizi", True)),
                       help="Bekçi işlem günlerinde 30 dakikada bir KAP listesine bakar; YALNIZ takip ettiğiniz hisselerin "
-                           "yeni bildirimlerini okur ve yapay zekâyla analiz eder (haber başına ~0,013 $; aylık haber "
+                           "yeni bildirimlerini okur ve yapay zekâyla analiz eder (haber başına ~0,013 \\$; aylık haber "
                            "analizi bütçesini aşmaz). Etkisi 3/5 ve üzeri olumlu/olumsuz haberler bildirilir.")
     if th_on != bool(saved.get("takip_haber_analizi", True)):
         pipeline.save_settings(takip_haber_analizi=th_on)
@@ -1396,7 +1425,7 @@ def advanced_panel() -> None:
     st.markdown("#### 🧪 Ucuz test analizi")
     st.caption("Sıradaki en yeni 1 haberi ekonomik ayarla (kısa düşünme, ikinci kontrol yok) analiz eder ve sonucu "
                "burada gösterir. HİÇBİR ŞEY KAYDEDİLMEZ: listeye ve skora karışmaz, haber sırada kalır. Akışı denemek "
-               "içindir; tahmini maliyet haber başına ~0,003–0,005 $.")
+               "içindir; tahmini maliyet haber başına ~0,003–0,005 \\$.")
     if st.button("🧪 1 haberle ucuz test yap", key="cheap_test"):
         if not pipeline.has_api_key():
             st.warning("Test için OpenAI API anahtarı gerekli.")
@@ -1415,7 +1444,7 @@ def advanced_panel() -> None:
         else:
             row_ = tr["row"]
             st.write(f"**Haber:** {row_['title']}  \nKaynak: {row_['source']} · {row_['published_at'][:16].replace('T', ' ')}")
-            st.write(f"**Maliyet:** {tr['usd']:.4f} $ · girdi {tr['input_tokens']:,} · çıktı {tr['output_tokens']:,} token")
+            st.write(f"**Maliyet:** {tr['usd']:.4f} \\$ · girdi {tr['input_tokens']:,} · çıktı {tr['output_tokens']:,} token")
             if tr["analysis"] is None:
                 st.write(f"Ön eleme bu haberi önemsiz buldu: {tr['filter'].neden if tr['filter'] else '-'}")
             else:
@@ -1521,7 +1550,7 @@ def reports_panel() -> None:
     # W3: bekçi rapor arşivi — yalnız okunur; dosyalar değiştirilmez, silinmez
     names = watchdog.list_reports()
     if not names:
-        st.info("Henüz bekçi raporu yok. **🛡️ Bekçi** ekranındaki **🌅 Sabah analizi** ya da **🌙 Akşam analizi** düğmesiyle ilk raporu "
+        st.info("Henüz bekçi raporu yok. Yukarıdaki **🌅 Sabah analizi** ya da **🌙 Akşam analizi** düğmesiyle ilk raporu "
                 "oluşturun; her rapor tarihiyle arşive kaydedilir.")
     else:
         f1, f2 = st.columns([1, 3])
@@ -1548,7 +1577,7 @@ def reports_panel() -> None:
             if jp.exists():
                 d2.download_button("Ham veriyi indir (.json)", jp.read_bytes(), file_name=jp.name, key="rep_dl_json")
             st.caption("Arşivdeki raporlar o anki veriyle üretildi ve sonradan değiştirilmez (geriye dönük bilgi karışmaz).")
-            st.markdown(path.read_text(encoding="utf-8"))
+            st.markdown(dollar(path.read_text(encoding="utf-8")))
         else:
             f2.info("Bu türde rapor yok.")
 
@@ -1574,20 +1603,26 @@ def regime_strip() -> None:
 def bist_metric(col) -> None:
     px = conn.execute("SELECT date, close FROM prices WHERE ticker='XU100' ORDER BY date DESC LIMIT 2").fetchall()
     if len(px) == 2 and px[1]["close"]:
-        col.metric("BIST 100", f"{px[0]['close']:,.0f}".replace(",", "."),
-                   f"%{(px[0]['close'] / px[1]['close'] - 1) * 100:+.2f} · {px[0]['date'][8:10]}.{px[0]['date'][5:7]}")
+        chg = (px[0]["close"] / px[1]["close"] - 1) * 100
+        tone = "up" if chg > 0 else "down" if chg < 0 else "flat"      # kart rengi günün yönüne göre
+        with col.container(key=f"kpi_bist_{tone}"):
+            st.metric("BIST 100", f"{px[0]['close']:,.0f}".replace(",", "."),
+                      f"%{chg:+.2f} · {px[0]['date'][8:10]}.{px[0]['date'][5:7]}")
     else:
-        col.metric("BIST 100", "—")
+        with col.container(key="kpi_bist_flat"):
+            st.metric("BIST 100", "—")
 
 
 def page_dashboard() -> None:
     with st.container(key="kpi"):
         k0, m1, m2, k3, m3 = st.columns(5)
     bist_metric(k0)
-    m1.metric("Olumlu haber", f"{len(positives)} hisse")
-    m2.metric("Olumsuz haber", f"{len(negatives)} hisse")
-    k3.metric("Uygun fırsat", f"{len(SUMMARY['uygun'])} hisse")
-    m3.metric("Son güncelleme", last_update_text())
+    for col_, key_, label_, val_ in ((m1, "kpi_pos", "Olumlu haber", f"{len(positives)} hisse"),
+                                     (m2, "kpi_neg", "Olumsuz haber", f"{len(negatives)} hisse"),
+                                     (k3, "kpi_opp", "Uygun fırsat", f"{len(SUMMARY['uygun'])} hisse"),
+                                     (m3, "kpi_upd", "Son güncelleme", last_update_text())):
+        with col_.container(key=key_):
+            st.metric(label_, val_)
     regime_strip()
     c1, c2 = st.columns([3, 2])
     with c1.container(border=True, key="d_opps"):
@@ -1622,7 +1657,7 @@ def page_dashboard() -> None:
                 "TP1": s["tp1"], "TP2": s["tp2"]} for s in act]), ["Giriş", "SL", "TP1", "TP2"]),
                 hide_index=True, width="stretch")
         else:
-            st.caption("Takip listenizde etkin senaryo yok. Hisse kartlarındaki **+ Takibe Al** ile ekleyin.")
+            st.caption("Takip listenizde etkin senaryo yok. Fırsatlar ya da Hisse Analizi ekranındaki **➕ Takibe Al** ile ekleyin.")
         go_button("Takip Listem →", PAGE_TAKIP, "d_to_takip")
     with c4.container(border=True, key="d_open"):
         jr = watchdog._journal_rows(conn)
@@ -1641,8 +1676,7 @@ def page_dashboard() -> None:
 
 def page_firsatlar() -> None:
     page_head(PAGE_FIRSAT, "Bütün BIST taranır; olumlu/olumsuz haber alan hisseler ve giriş senaryoları. Ayrıntı için 🔍 Analiz.")
-    with st.container(key="macro"):
-        macro_block()
+    opportunity_check_box()
     if not rows:
         st.info("Henüz liste yok. Yukarıdaki **Haberleri güncelle** düğmesine basın.")
     else:
@@ -1731,18 +1765,114 @@ def page_hisse() -> None:
         st.info("Şirket listesi henüz yok.")
         return
     by = {r["ticker"]: r for r in rows}
+    if "hisse_pick" not in st.session_state and st.session_state.get("_hisse") in opts:
+        st.session_state["hisse_pick"] = st.session_state["_hisse"]   # başka ekrandan dönünce seçim kaybolmasın
     if st.session_state.get("hisse_pick") not in opts:
         st.session_state["hisse_pick"] = positives[0]["ticker"] if positives else opts[0]
-    s1, s2 = st.columns([3, 1.6], vertical_alignment="bottom")
+    s0, s1, s2 = st.columns([1.6, 3, 1.6], vertical_alignment="bottom")
+    q = tr_fold(s0.text_input("Ara", key="hisse_q", placeholder="kod ya da şirket adı (ör. aksigorta)"))
+    if q:   # Türkçe karakterli adlar da bulunsun: "aksigorta" → AKSİGORTA, "sise" → ŞİŞE
+        found = [t for t in opts if all(w in tr_fold(f"{t} {names.get(t, '')}") for w in q.split())]
+        if found:
+            opts = found
+            if st.session_state.get("hisse_pick") not in opts:
+                st.session_state["hisse_pick"] = opts[0]
+        else:
+            s0.caption("Eşleşen hisse yok.")
     tk = s1.selectbox("Hisse", opts, key="hisse_pick", format_func=lambda t: f"{t} — {names.get(t, '')}")
+    st.session_state["_hisse"] = tk
     with s2:
         takip_ui.follow_button(conn, tk, f"card_{tk}")
     st.markdown(f"<div class='page-h'>{esc(tk)} · {esc(names.get(tk, ''))}</div>", unsafe_allow_html=True)
+    tracked_box(tk)
     r = by.get(tk)
     if r:
         stock_details(r)
     else:
         generic_details(tk)
+
+
+def tracked_box(tk: str) -> None:
+    """Takipteki senaryolar ile bugünkü analiz farklı olabilir: neden olduğunu açıkça yaz (2026-11-09 görünüm kontrolü)."""
+    if not tracker.is_watched(conn, tk):
+        return
+    sc = tracker.scenarios(conn, tk, active_only=True)
+    with st.container(border=True, key="h_tracked"):
+        section_title("⭐", "Takipteki senaryolar", count=len(sc), note="bekçi bunları izliyor")
+        if sc:
+            st.dataframe(dash_cells(pd.DataFrame([{
+                "Senaryo": tracker.NAMES.get(s["senaryo"], s["senaryo"]), "Durum": takip_ui.STATE_TR.get(s["durum"], s["durum"]),
+                "Giriş": s["giris"], "SL": s["sl"], "TP1": s["tp1"], "TP2": s["tp2"], "Hesap günü": s["signal_day"],
+                "Geçerlilik (işlem günü)": str(s["gecerlilik"])} for s in sc]), ["Giriş", "SL", "TP1", "TP2"]),
+                hide_index=True, width="stretch")
+        else:
+            st.caption("Etkin takip senaryosu yok; bekçi her kapanıştan sonra yeniden hesaplar.")
+        st.caption("Takip senaryoları **hesap günündeki** fiyatla kaydedildi ve sonuçlanana ya da süresi dolana kadar aynı "
+                   "seviyelerle izlenir. Aşağıdaki giriş senaryoları ise **bugünkü** fiyatla yeniden hesaplanır; fiyat "
+                   "değiştiyse ikisi farklı olabilir (ör. fiyat destekten uzaklaştıysa bugün \"destekten tepki\" "
+                   "uygulanamaz görünür, takipteki senaryo yine de giriş seviyesini bekler).")
+
+
+def opportunity_check_box() -> None:
+    """Fırsat sayısı neden değişti? Elle yeniden kontrol + tüm adayların durumu (2026-11-09 kullanıcı isteği)."""
+    with st.container(border=True, key="opp_check"):
+        c1, c2, c3 = st.columns([4, 1.8, 1.6], vertical_alignment="center")
+        ch = firsat_log.changes(1)
+        last_ch = ch[0] if ch else None
+        txt = f"**Şu an {len(SUMMARY['uygun'])} hissede uygun senaryo var.** "
+        if last_ch and last_ch.get("onceki_sayi") is not None:
+            txt += (f"Son değişiklik {last_ch['zaman'][8:10]}.{last_ch['zaman'][5:7]} {last_ch['zaman'][11:16]}: "
+                    f"{last_ch['onceki_sayi']} → {last_ch['sayi']}"
+                    + (f" · eklenen: {', '.join(last_ch['eklenen'])}" if last_ch["eklenen"] else "")
+                    + (f" · çıkan: {', '.join(x['hisse'] for x in last_ch['cikan'])}" if last_ch["cikan"] else "") + ".")
+        c1.markdown(txt)
+        c1.caption("Liste kayıtlı veriden her açılışta yeniden hesaplanır: haber skoru haber eskidikçe azalır, fiyatlar ve "
+                   "yeni analizler geldikçe senaryolar değişir. Hangi hissenin neden çıktığı aşağıdaki tabloda.")
+        upd_px = c2.checkbox("Fiyatları da güncelle (ücretsiz, birkaç saniye)", key="opp_px")
+        if c3.button("🔄 Fırsatları şimdi yeniden kontrol et", key="opp_recheck", width="stretch"):
+            if upd_px and not os.environ.get("HALLEY_OFFLINE"):
+                from bist_haber import prices as _prices
+                with st.spinner("Olumlu haberli hisselerin fiyatları güncelleniyor..."):
+                    try:
+                        _prices.update(conn, [r["ticker"] for r in positives] + ["XU100"], period="1mo")
+                    except Exception as e:
+                        flash("warning", f"Fiyatlar güncellenemedi: {nice_err(e)}; kayıtlı fiyatlarla kontrol edildi.")
+            st.session_state["opp_checked"] = datetime.now(config.TR_TZ).strftime("%H:%M:%S")
+            flash("success", f"Fırsatlar yeniden kontrol edildi ({st.session_state['opp_checked']}). Sonuç aşağıda; "
+                             "liste değiştiyse değişiklik kaydedildi.")
+            conn.close()
+            st.rerun()
+        with st.expander(f"📋 Tüm adaylar — elle kontrol ({len(positives)} olumlu haberli hisse)"):
+            cand = []
+            for r in positives:
+                d = signals.decide(CTX, r)
+                p = scenario(r)
+                g = p.get("girisler") or {}
+                best = next((s for s in g.get("senaryolar", []) if s["tur"] == g.get("en_uygun")), None)
+                cand.append({"Hisse": r["ticker"], "Haber skoru": r["score"],
+                             "Durum": "✅ uygun" if d["neden_kodu"] == "ONERILDI" else "❌ " + d["neden"],
+                             "En uygun senaryo": (best or {}).get("ad", "—"), "Giriş": (best or {}).get("giris"),
+                             "SL": (best or {}).get("sl"), "TP1": (best or {}).get("tp1"), "TP2": (best or {}).get("tp2"),
+                             "Risk": (best or {}).get("risk_seviyesi") or "—"})
+            cand.sort(key=lambda x: (not x["Durum"].startswith("✅"), -x["Haber skoru"]))
+            if cand:
+                st.dataframe(dash_cells(pd.DataFrame(cand), ["Haber skoru", "Giriş", "SL", "TP1", "TP2"]),
+                             hide_index=True, width="stretch")
+            near = [r for r in neutrals if r["score"] >= 1.0]
+            if near:
+                st.caption("Eşiğin hemen altında (skor 1,00–1,49; senaryo için en az 1,50 gerekir): "
+                           + ", ".join(f"{r['ticker']} {r['score']:.2f}" for r in near))
+            hist = firsat_log.changes(15)
+            if hist:
+                st.markdown("**Liste değişiklikleri** (en yeni üstte)")
+                st.dataframe(pd.DataFrame([{
+                    "Zaman": h["zaman"][:16].replace("T", " "),
+                    "Sayı": f"{h['onceki_sayi']} → {h['sayi']}" if h.get("onceki_sayi") is not None else str(h["sayi"]),
+                    "Eklenen": ", ".join(h["eklenen"]) or "—",
+                    "Çıkan (neden)": "; ".join(f"{x['hisse']}: {x['neden']}" for x in h["cikan"]) or "—"} for h in hist]),
+                    hide_index=True, width="stretch")
+            else:
+                st.caption("Henüz kayıtlı liste değişikliği yok (kayıt 9 Kasım 2026 akşamından itibaren tutuluyor).")
 
 
 def page_takip() -> None:
@@ -1787,7 +1917,7 @@ def page_haberler() -> None:
 
 
 def page_gunluk() -> None:
-    st.markdown("#### 📒 İşlem günlüğü")
+    page_head(PAGE_GUNLUK)
     _pf = sectors.portfolio(conn)
     if _pf["hisse"]:
         st.caption("🧺 Açık/bekleyen işlemlerin sektörleri: " + " · ".join(f"{k}: {', '.join(v)}" for k, v in _pf["ana"].items()))
@@ -1862,7 +1992,8 @@ def page_ayarlar() -> None:
     with t3:
         # Plan 1.3 (2026-11-09): programı kullanacak kişi için güncel kılavuz (KULLANIM.md ile aynı metin)
         _guide = config.ROOT / "KULLANIM.md"
-        st.markdown(_guide.read_text(encoding="utf-8") if _guide.exists() else "Kılavuz dosyası (KULLANIM.md) bulunamadı.")
+        st.markdown(dollar(_guide.read_text(encoding="utf-8")) if _guide.exists() else
+                    "Kılavuz dosyası (KULLANIM.md) bulunamadı.")
 
 
 {PAGE_DASH: page_dashboard, PAGE_FIRSAT: page_firsatlar, PAGE_HISSE: page_hisse, PAGE_TAKIP: page_takip,

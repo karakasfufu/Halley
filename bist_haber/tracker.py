@@ -22,10 +22,14 @@ from typing import Callable, Dict, List, Optional
 from . import config, entries, journal, market_calendar, technical, tradeplan
 
 ACTIVE = ("bekliyor", "açık", "açık (TP1 görüldü)")
-TYPES = {"giris": "Giriş (seviyeye gelme, teyit, gerçekleşme)", "sl": "Stop (SL, başabaş stop)",
-         "tp": "Hedef (TP1, TP2)", "gecersiz": "Geçersiz / süresi doldu", "teyit": "Alt fitil + yükselen kapanış teyidi",
-         "kirilim": "Destek / direnç kırılımı", "hacim": "Hacim artışı", "teknik": "Trend değişikliği, yeni senaryo",
-         "haber": "Önemli yeni haber"}
+# Kısa adlar (2026-11-09 görünüm kontrolü: uzun adlar seçim kutusunda kesiliyordu); açıklamaları TYPES_HELP'te
+TYPES = {"giris": "Giriş", "sl": "Stop (SL)", "tp": "Hedef (TP1/TP2)", "gecersiz": "Geçersiz / süre doldu",
+         "teyit": "Fitil teyidi", "kirilim": "Kırılım", "hacim": "Hacim artışı", "teknik": "Teknik değişim",
+         "haber": "Önemli haber"}
+TYPES_HELP = ("Giriş: seviyeye gelme, kırılım teyidi, gerçekleşme · Stop: SL ve başabaş stop · Hedef: TP1, TP2 · "
+              "Geçersiz: senaryo bozuldu ya da süresi doldu · Fitil teyidi: giriş bölgesinde alt fitil + yükselen kapanış · "
+              "Kırılım: 20 günlük destek/direnç kapanışla kırıldı · Hacim artışı · Teknik değişim: trend değişti, yeni "
+              "senaryo oluştu · Önemli haber: etkisi 3/5 ve üzeri yeni KAP haberi")
 INTRADAY_EVERY_MIN = 5
 CLOSE_DELAY_MIN = 20          # kapanış fiyatı kesinleşsin
 STALE_MIN = 45                # gün içi son veri bundan eskiyse (gecikme 15 dk + mum 5 dk + pay) olay üretilmez
