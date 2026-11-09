@@ -155,7 +155,11 @@ def main():
         data_tmp.rename(tmp)
         shutil.rmtree(app)
         copy_app(app)
-        tmp.rename(app / "data")
+        if a.veri and not a.veri_yok:                  # veri verildiyse tazele (en güncel hâli pakete girsin)
+            shutil.rmtree(tmp)
+            copy_data(Path(a.veri), app / "data")
+        else:
+            tmp.rename(app / "data")
     else:
         if stage.exists():
             shutil.rmtree(stage)
@@ -172,8 +176,13 @@ def main():
     ico = out / "halley.ico"
     make_icon(ico)
     shutil.copy2(ico, stage / "halley.ico")
+    wv = ROOT / "paket" / "webview2"                 # Microsoft WebView2 (Halley penceresi); exe'nin yanında durmalı
+    for f in ("Microsoft.Web.WebView2.Core.dll", "Microsoft.Web.WebView2.WinForms.dll", "WebView2Loader.dll"):
+        shutil.copy2(wv / f, stage / f)
+    shutil.copy2(wv / "LICENSE.txt", stage / "WebView2_LICENSE.txt")
     csc(["/target:winexe", f"/win32icon:{ico}", f"/out:{stage / 'Halley.exe'}", "/r:System.Windows.Forms.dll",
-         "/r:System.Drawing.dll", str(ROOT / "paket" / "Halley.cs")])
+         "/r:System.Drawing.dll", f"/r:{wv / 'Microsoft.Web.WebView2.Core.dll'}",
+         f"/r:{wv / 'Microsoft.Web.WebView2.WinForms.dll'}", str(ROOT / "paket" / "Halley.cs")])
     log("Paket sıkıştırılıyor…")
     payload = out / "payload.zip"
     with zipfile.ZipFile(payload, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z:

@@ -53,6 +53,8 @@ st.markdown("""
         radial-gradient(800px 300px at 100% -4%, var(--h-glow2) 0%, transparent 58%), var(--h-bg);}
 .block-container {padding-top: 3.4rem; max-width: 1180px;}
 header[data-testid="stHeader"] {background: transparent;}
+/* uygulama görünümü: web'e özgü sağ üst menü (Stop / ⋮) gizli; yenilemek için F5 */
+[data-testid="stToolbar"], [data-testid="stStatusWidget"], [data-testid="stMainMenu"], [data-testid="stAppDeployButton"] {display: none !important;}
 /* silik yazılar → okunur */
 [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p {color: var(--h-muted) !important;
   font-size: 0.9rem; line-height: 1.55; opacity: 1 !important;}

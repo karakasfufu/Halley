@@ -1,11 +1,12 @@
-// Halley başlatıcısı (2026-11-09). Paketin kökünde durur: python\ (gömülü Python 3.9) ve app\ (uygulama) klasörleriyle.
-// Siyah pencere açmadan paneli ve KAP okuyucusunu başlatır, saatin yanına simge koyar, kapatınca hepsini kapatır.
-// Derleme: Windows'taki .NET Framework 4 derleyicisi (csc.exe, C# 5). Bkz. paket/build_package.py.
+// Halley uygulaması (2026-11-09). Paketin kökünde durur: python\ (gömülü Python 3.9) ve app\ (uygulama) klasörleriyle.
+// Kendi "Halley" penceresini açar (Windows'un Microsoft WebView2 bileşeniyle; tarayıcı/adres çubuğu yok), paneli ve
+// KAP okuyucusunu siyah pencere olmadan arka planda çalıştırır. Pencere kapanınca hepsi kapanır.
+// Derleme: Windows'taki .NET Framework 4 derleyicisi (csc.exe, C# 5) + paket/webview2/ (Microsoft imzalı DLL'ler).
 //
-// Komutlar:  Halley.exe                 → başlat (zaten açıksa yalnız paneli tarayıcıda açar)
+// Komutlar:  Halley.exe                 → başlat (zaten açıksa açık pencereyi öne getirir)
 //            Halley.exe --kapat         → açık olan Halley'i kapatır
 //            Halley.exe --port 8503     → başka port (deneme için)
-//            Halley.exe --tarayici-yok  → tarayıcıyı açma (deneme için)
+//            Halley.exe --pencere-yok   → pencere açmadan yalnız arka planı çalıştır (deneme için)
 //            Halley.exe --kaldir        → programı kaldırır (veriler isteğe bağlı korunur)
 using System;
 using System.Collections.Generic;
@@ -16,7 +17,11 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.WinForms;
 
 static class Halley
 {
@@ -24,12 +29,13 @@ static class Halley
     const string QuitEventName = "Local\\HalleyPanel_Kapat";
     const string OpenEventName = "Local\\HalleyPanel_Ac";
 
-    static string Root, Py, App, LogDir;
+    internal static string Root, Py, App, LogDir;
     static int Port = 8501;
-    static bool NoBrowser = false;
+    static bool NoWindow = false;
     static Process Panel, Reader;
-    static NotifyIcon Tray;
-    static volatile bool Quitting = false;
+    static Control Ui;
+    static MainForm Window;
+    internal static volatile bool Quitting = false;
 
     [STAThread]
     static int Main(string[] args)
@@ -44,7 +50,7 @@ static class Halley
             string a = args[i].ToLowerInvariant();
             if (a == "--kapat") quit = true;
             else if (a == "--kaldir") uninstall = true;
-            else if (a == "--tarayici-yok") NoBrowser = true;
+            else if (a == "--pencere-yok" || a == "--tarayici-yok") NoWindow = true;
             else if (a == "--port" && i + 1 < args.Length) { Port = int.Parse(args[i + 1]); i++; }
         }
         if (quit) return SignalQuit(true) ? 0 : 1;
@@ -65,6 +71,7 @@ static class Halley
     static int Run()
     {
         Application.EnableVisualStyles();
+        Application.SetCompatibleTextRenderingDefault(false);
         if (!File.Exists(Py) || !File.Exists(Path.Combine(App, "app.py")))
         {
             MessageBox.Show("Halley dosyaları eksik görünüyor:\n" + Py + "\n\nLütfen Halley_Kurulum.exe ile yeniden kurun.",
@@ -78,19 +85,7 @@ static class Halley
             for (int k = 1; k <= 20 && !PortFree(p); k++) p = Port + k;
             Port = p;
         }
-
-        Tray = new NotifyIcon();
-        try { Tray.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { Tray.Icon = SystemIcons.Application; }
-        Tray.Text = "Halley açılıyor…";
-        ContextMenuStrip menu = new ContextMenuStrip();
-        menu.Items.Add("Paneli aç", null, delegate { OpenBrowser(); });
-        menu.Items.Add("Günlük klasörünü aç", null, delegate { Process.Start("explorer.exe", "\"" + LogDir + "\""); });
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Halley'i kapat", null, delegate { Shutdown(); });
-        Tray.ContextMenuStrip = menu;
-        Tray.DoubleClick += delegate { OpenBrowser(); };
-        Tray.Visible = true;
-
+        if (!NoWindow) { Window = new MainForm(); Window.Show(); Application.DoEvents(); }   // pencere hemen görünsün
         try
         {
             Reader = Start(new string[] { "-m", "bist_haber", "okuyucu" }, "okuyucu.log");
@@ -101,31 +96,37 @@ static class Halley
         catch (Exception e)
         {
             KillAll();
-            Tray.Visible = false;
             MessageBox.Show("Halley başlatılamadı: " + e.Message, "Halley", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return 3;
         }
-
-        // kapat / aç sinyalleri (ikinci Halley.exe veya --kapat)
         EventWaitHandle quitEv = new EventWaitHandle(false, EventResetMode.AutoReset, QuitEventName);
         EventWaitHandle openEv = new EventWaitHandle(false, EventResetMode.AutoReset, OpenEventName);
-        Control ui = new Control();    // arka plan iş parçacıklarından arayüze dönmek için (görünmez)
-        ui.CreateControl();
-        IntPtr unused = ui.Handle;
+        if (Window != null) Ui = Window;
+        else { Ui = new Control(); Ui.CreateControl(); }
+        IntPtr unused = Ui.Handle;
+        StartWatchers(quitEv, openEv);
+        Application.ApplicationExit += delegate { KillAll(); };
+        if (Window != null) Application.Run(Window); else Application.Run(new ApplicationContext());
+        KillAll();
+        return 0;
+    }
+
+    static void StartWatchers(EventWaitHandle quitEv, EventWaitHandle openEv)
+    {
         new Thread(delegate ()
         {
             WaitHandle[] hs = new WaitHandle[] { quitEv, openEv };
             while (!Quitting)
             {
                 int w = WaitHandle.WaitAny(hs, 1000);
-                if (w == 0) { ui.BeginInvoke((MethodInvoker)delegate { Shutdown(); }); break; }
-                if (w == 1) ui.BeginInvoke((MethodInvoker)delegate { OpenBrowser(); });
+                if (w == 0) { Ui.BeginInvoke((MethodInvoker)delegate { Shutdown(); }); break; }
+                if (w == 1) Ui.BeginInvoke((MethodInvoker)delegate { BringToFront(); });
                 if (Panel != null && Panel.HasExited && !Quitting)
                 {
-                    ui.BeginInvoke((MethodInvoker)delegate
+                    Ui.BeginInvoke((MethodInvoker)delegate
                     {
                         if (Quitting) return;
-                        MessageBox.Show("Halley paneli beklenmedik şekilde kapandı.\nAyrıntı: " + Path.Combine(LogDir, "panel.log"),
+                        MessageBox.Show("Halley beklenmedik şekilde kapandı.\nAyrıntı: " + Path.Combine(LogDir, "panel.log"),
                                         "Halley", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         Shutdown();
                     });
@@ -136,28 +137,25 @@ static class Halley
         new Thread(delegate ()
         {
             bool ok = WaitHealthy(120);
-            ui.BeginInvoke((MethodInvoker)delegate
+            Ui.BeginInvoke((MethodInvoker)delegate
             {
                 if (Quitting) return;
-                if (ok)
-                {
-                    Tray.Text = "Halley açık (sağ tık: menü)";
-                    if (!NoBrowser) OpenBrowser();
-                    Tray.ShowBalloonTip(4000, "Halley açık", "Panel tarayıcıda açıldı. Kapatmak için saatin yanındaki Halley simgesine sağ tıklayın.", ToolTipIcon.Info);
-                }
+                if (ok) { if (Window != null) Window.Ready("http://127.0.0.1:" + Port); }
                 else
                 {
-                    MessageBox.Show("Halley paneli 2 dakikada açılamadı.\nAyrıntı: " + Path.Combine(LogDir, "panel.log"),
+                    MessageBox.Show("Halley 2 dakikada açılamadı.\nAyrıntı: " + Path.Combine(LogDir, "panel.log"),
                                     "Halley", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     Shutdown();
                 }
             });
         }) { IsBackground = true }.Start();
-        Application.ApplicationExit += delegate { KillAll(); };
-        Application.Run(new ApplicationContext());
-        KillAll();
-        Tray.Visible = false;
-        return 0;
+    }
+
+    static void BringToFront()
+    {
+        if (Window == null) return;
+        if (Window.WindowState == FormWindowState.Minimized) Window.WindowState = FormWindowState.Normal;
+        Window.Activate();
     }
 
     static Process Start(string[] args, string logName)
@@ -244,18 +242,12 @@ static class Halley
         return false;
     }
 
-    static void OpenBrowser()
-    {
-        try { Process.Start("http://localhost:" + Port); } catch { }
-    }
-
-    static void Shutdown()
+    internal static void Shutdown()
     {
         if (Quitting) return;
         Quitting = true;
-        try { Tray.Text = "Halley kapanıyor…"; } catch { }
         KillAll();
-        try { Tray.Visible = false; } catch { }
+        if (Window != null) { try { Window.Close(); } catch { } }
         Application.Exit();
     }
 
@@ -331,5 +323,155 @@ static class Halley
             MessageBox.Show("Kaldırma tamamlanamadı: " + e.Message, "Halley", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return 4;
         }
+    }
+}
+
+
+// Halley penceresi: içerik Windows'un WebView2 bileşeniyle çizilir; dış bağlantılar (haber kaynağı) varsayılan
+// tarayıcıda açılır. WebView2 yoksa (çok eski Windows 10) panel varsayılan tarayıcıda açılır ve bu pencere bilgi verir.
+class MainForm : Form
+{
+    readonly WebView2 web = new WebView2();
+    readonly Label status = new Label();
+    string pendingUrl;
+    bool coreReady, fallback;
+    bool? darkTitle;
+    readonly System.Windows.Forms.Timer themeTimer = new System.Windows.Forms.Timer();
+
+    [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr h, int attr, ref int val, int size);
+    [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
+
+    // Başlık çubuğu panelin temasına uyar (Karanlık mod → koyu başlık). Ayar app\data\ayarlar.json'dan okunur.
+    void SyncTitleBar()
+    {
+        bool dark = false;
+        try
+        {
+            string f = Path.Combine(Halley.App, "data\\ayarlar.json");
+            if (File.Exists(f)) dark = System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(f), "\"karanlik_mod\"\\s*:\\s*true");
+        }
+        catch { }
+        if (darkTitle.HasValue && darkTitle.Value == dark) return;
+        darkTitle = dark;
+        int v = dark ? 1 : 0;
+        try
+        {
+            if (DwmSetWindowAttribute(Handle, 20, ref v, 4) != 0) DwmSetWindowAttribute(Handle, 19, ref v, 4);  // Win10 eski sürüm
+            SetWindowPos(Handle, IntPtr.Zero, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0004 | 0x0020);              // çerçeveyi yenile
+        }
+        catch { }
+    }
+
+    public MainForm()
+    {
+        Text = "Halley";
+        try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
+        StartPosition = FormStartPosition.CenterScreen;
+        Rectangle wa = Screen.PrimaryScreen.WorkingArea;
+        ClientSize = new Size(Math.Min(1380, wa.Width - 40), Math.Min(900, wa.Height - 40));
+        MinimumSize = new Size(900, 600);
+        BackColor = Color.FromArgb(13, 19, 34);
+        status.Dock = DockStyle.Fill;
+        status.TextAlign = ContentAlignment.MiddleCenter;
+        status.ForeColor = Color.FromArgb(226, 232, 240);
+        status.Font = new Font("Segoe UI", 15f);
+        status.Text = "Halley açılıyor…";
+        web.Dock = DockStyle.Fill;
+        web.DefaultBackgroundColor = Color.FromArgb(13, 19, 34);
+        Controls.Add(web);
+        Controls.Add(status);
+        status.BringToFront();   // panel çizilene kadar Halley açılış ekranı üstte (WebView2 gizlenirse sayfa yavaşlayabilir)
+        HandleCreated += (s, e) => SyncTitleBar();
+        themeTimer.Interval = 1500;
+        themeTimer.Tick += (s, e) => SyncTitleBar();
+        themeTimer.Start();
+        Shown += async (s, e) => await InitWeb();
+        FormClosing += (s, e) => { if (!Halley.Quitting) Halley.Shutdown(); };
+    }
+
+    async Task InitWeb()
+    {
+        try
+        {
+            string udf = Path.Combine(Halley.App, "data\\pencere");
+            Directory.CreateDirectory(udf);
+            CoreWebView2Environment env = await CoreWebView2Environment.CreateAsync(null, udf);
+            await web.EnsureCoreWebView2Async(env);
+            CoreWebView2Settings st = web.CoreWebView2.Settings;
+            st.AreDevToolsEnabled = false;
+            st.IsStatusBarEnabled = false;
+            st.IsZoomControlEnabled = true;
+            web.CoreWebView2.NewWindowRequested += (s, e) => { e.Handled = true; OpenExternal(e.Uri); };
+            web.CoreWebView2.NavigationStarting += (s, e) =>
+            {   // panel dışına giden bağlantılar uygulama içinde değil, tarayıcıda açılsın
+                if (pendingUrl != null && !e.Uri.StartsWith(pendingUrl)) { e.Cancel = true; OpenExternal(e.Uri); }
+            };
+            web.CoreWebView2.NavigationCompleted += (s, e) => WaitForContent();
+            coreReady = true;
+            if (pendingUrl != null) web.CoreWebView2.Navigate(pendingUrl);
+        }
+        catch (WebView2RuntimeNotFoundException)
+        {
+            Fallback("Bu bilgisayarda Microsoft WebView2 bileşeni bulunamadı.\nHalley şimdilik varsayılan tarayıcıda açılacak.\n\n" +
+                     "Bileşeni Microsoft'tan ücretsiz kurmak için: https://go.microsoft.com/fwlink/p/?LinkId=2124703\n\n" +
+                     "Bu pencereyi kapatınca Halley kapanır.");
+        }
+        catch (Exception ex)
+        {
+            Fallback("Halley penceresi hazırlanamadı (" + ex.Message + ").\nHalley varsayılan tarayıcıda açılacak.\n\n" +
+                     "Bu pencereyi kapatınca Halley kapanır.");
+        }
+    }
+
+    // Sayfa iskeleti yüklenince değil, panelin kendisi (üst bant) çizilince göster: arada boş beyaz sayfa görünmesin.
+    readonly System.Windows.Forms.Timer contentTimer = new System.Windows.Forms.Timer();
+    DateTime contentWaitStart;
+
+    void WaitForContent()
+    {
+        if (!status.Visible) return;
+        contentWaitStart = DateTime.Now;
+        contentTimer.Interval = 400;
+        contentTimer.Tick -= ContentTick;
+        contentTimer.Tick += ContentTick;
+        contentTimer.Start();
+    }
+
+    async void ContentTick(object sender, EventArgs e)
+    {
+        contentTimer.Stop();
+        bool ready = false;
+        try
+        {
+            string r = await web.CoreWebView2.ExecuteScriptAsync(
+                "!!(document.querySelector('.hero') || document.querySelector('[data-testid=\"stException\"]'))");
+            ready = r == "true";
+        }
+        catch { }
+        if (ready || (DateTime.Now - contentWaitStart).TotalSeconds > 120)
+        {
+            status.Visible = false;
+        }
+        else contentTimer.Start();
+    }
+
+    void Fallback(string msg)
+    {
+        fallback = true;
+        status.Font = new Font("Segoe UI", 11f);
+        status.Text = msg;
+        if (pendingUrl != null) OpenExternal(pendingUrl);
+    }
+
+    static void OpenExternal(string url)
+    {
+        try { Process.Start(url); } catch { }
+    }
+
+    public void Ready(string url)
+    {
+        pendingUrl = url;
+        if (coreReady) web.CoreWebView2.Navigate(url);
+        else if (fallback) OpenExternal(url);
     }
 }

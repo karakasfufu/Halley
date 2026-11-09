@@ -6,9 +6,9 @@ tavsiyesi değildir.
 
 ## Açmak
 
-- **Kurulum paketiyle (Halley_Kurulum.exe):** masaüstündeki **Halley** simgesine çift tıklayın; siyah pencere açılmaz,
-  panel tarayıcıda açılır ve saatin yanında Halley simgesi görünür. Kapatmak için o simgeye sağ tıklayıp
-  **Halley'i kapat** deyin (tarayıcı sekmesini kapatmak programı kapatmaz). Kaldırmak: Başlat menüsü → Halley →
+- **Kurulum paketiyle (Halley_Kurulum.exe):** masaüstündeki **Halley** simgesine çift tıklayın; Halley kendi penceresinde
+  açılır (tarayıcı gerekmez). Kapatmak için pencereyi kapatın; arka plandaki her şey de kapanır. Sayfayı yenilemek için
+  **F5**. Haber kaynağı bağlantıları varsayılan tarayıcıda açılır. Kaldırmak: Başlat menüsü → Halley →
   **Halley'i kaldır** (verileri saklamayı sorar). Windows ilk açılışta "Windows bilgisayarınızı korudu" derse:
   **Ek bilgi → Yine de çalıştır** (program imzasız olduğu için çıkan olağan uyarı).
 - **Geliştirici klasöründen:** **`baslat.bat`** dosyasına çift tıklayın. Kapatmak için siyah pencereyi kapatın.

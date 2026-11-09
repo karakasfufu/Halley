@@ -1204,3 +1204,22 @@ nadiren değişir, gerekirse aynı yolla yenilenir.
   - Denenemeyen: başka (temiz) bir bilgisayar — bu makinede Python ve VC++ kurulu olduğundan "hiçbir şey kurulu değil"
     durumu tam benzetilemedi (VC++ DLL'leri bu yüzden pakete kondu). Kurulum penceresinin görünümü ve `--kaldir`
     (onay pencereleri) elle denenmeli. Program imzasız: Windows SmartScreen "Ek bilgi → Yine de çalıştır" isteyebilir.
+
+## 2026-11-09 — Halley kendi penceresinde (kullanıcı: "tarayıcı tabanlı değil, Halley adında uygulama istiyorum") — A yolu
+- Kullanıcı A'yı seçti (B = ekranı baştan masaüstü kütüphanesiyle yazmak; A beğenilmezse sonra yapılabilir, hesap/veri
+  katmanı ekrandan ayrı olduğu için etkilenmez).
+- Halley.exe artık kendi "Halley" penceresini açar (WinForms + Microsoft WebView2; `paket/webview2/` Microsoft imzalı
+  1.0.4314.35 DLL'leri, nuget.org'dan kullanıcı onayıyla indirildi, imzalar doğrulandı). Tarayıcı / adres çubuğu / sekme
+  yok; tepsi simgesi kaldırıldı. Pencere kapanınca panel + okuyucu kapanır. İkinci açılış açık pencereyi öne getirir.
+  Panel çizilene kadar koyu "Halley açılıyor…" ekranı (üst bant `.hero` görünene kadar). Başlık çubuğu Karanlık mod
+  ayarına uyar (1,5 sn'de bir ayarlar.json'a bakar). Dış bağlantılar (haber kaynağı) varsayılan tarayıcıda açılır.
+  WebView2 bileşeni yoksa (çok eski Windows 10) panel varsayılan tarayıcıda açılır ve pencere kurulum bağlantısını verir.
+  Profil: app\data\pencere. `--pencere-yok` (eski `--tarayici-yok`) yalnız deneme için.
+- Panelin sağ üstündeki Streamlit menüsü (Stop / ⋮ / durum) gizlendi (CSS); yenileme F5.
+- İlk denenen Edge "--app" kipi kullanıcı istemediği için geri alındı (derlenmedi, kaydedilmedi).
+- Derleme betiği: `--hazir-klasor --veri <data>` veriyi tazeleyerek hızlı yeniden derler.
+- Doğrulama: temiz kurulum (449 MB) + yalıtılmış Python; pencere başlığı "Halley", içerik WebView2'de 127.0.0.1 paneli
+  (ayrı msedge.exe yok); ekran görüntüleriyle açılış ekranı ve hazır panel kontrol edildi; pencere kapatılınca Halley,
+  python ve WebView2 süreçlerinin hepsi bitti; tek kopya, --kapat, port çakışması (8502'ye geçti, canlı panel sağlam),
+  güncellemede .env/ayar/veri korunması yeniden geçti; 405 test geçti.
+- Denenemeyen: başka bilgisayar (temiz Windows), kurulum penceresinin görünümü, "Halley'i kaldır" onay pencereleri.
