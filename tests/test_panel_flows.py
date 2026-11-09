@@ -144,6 +144,28 @@ class PanelFlowTests(unittest.TestCase):
         self.go(at, "🔍 Hisse Analizi")
         self.assertEqual(at.selectbox(key="hisse_pick").value, "ZZZ")     # seçilen hisse kaybolmadı
 
+    def test_explanations_shown_where_users_got_confused(self):
+        """2026-11-09: fırsatlardaki risk (senaryo) ile analizdeki risk (şimdi alım) karışıyordu; İşlem Günlüğü anlaşılmıyordu."""
+        at = self.app()
+        caps = " ".join(c.value for c in at.caption)
+        for t in ("haber skoru +1,50 ve üstü", "olumlu haber + uygun giriş senaryosu", "son haber analizinin saati"):
+            self.assertIn(t, caps)
+        self.go(at, "🔍 Hisse Analizi")
+        labels = [m.label for m in at.metric]
+        if any(l.startswith("Referans") for l in labels):          # referans kutuları çizildiyse etiket açık olmalı
+            self.assertIn("Risk (şimdi alınırsa)", labels)
+            self.assertNotIn("Risk seviyesi", labels)
+        caps = " ".join(c.value for c in at.caption)
+        self.assertIn("Haber skoru: haberlerin yönü", caps)
+        self.go(at, "📒 İşlem Günlüğü")
+        self.assertTrue(any(e.label == "❓ İşlem Günlüğü nasıl okunur?" for e in at.expander))
+        guide = " ".join(m.value for m in at.markdown)
+        for t in ("Sanal işlem:", "Gerçek işlem:", "açık (TP1 görüldü)", "+1R = planlanan zarar kadar kazanç"):
+            self.assertIn(t, guide)
+        if at.metric:                                  # ölçüler yalnız kapanan işlem varsa çizilir; o zaman açıklaması da olmalı
+            self.assertTrue(any("Kâr faktörü: toplam kazanç / toplam zarar" in c.value for c in at.caption))
+        self.assertTrue(any("Henüz kapanan işlem yok" in c.value for c in at.caption))
+
     def test_settings_saved_across_pages(self):
         at = self.app("⚙️ Ayarlar")
         at.slider(key="set_window").set_value(12).run()

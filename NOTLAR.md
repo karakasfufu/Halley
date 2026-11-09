@@ -1423,3 +1423,19 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   korudu; yeni Halley.exe açıldı ve kapandı. Diğer bilgisayarda yeniden denenmedi (erişim yok).
 - Kalıcı çözümler (kullanıcının kararı/işi): Microsoft'a yanlış pozitif bildirimi (microsoft.com/wdsi/filesubmission,
   kullanıcının hesabıyla); kod imzalama sertifikası (ücretli).
+
+## 2026-11-09 — Açıklama yazıları (kullanıcı: AKSGY/DEVA'da fırsatlarda risk düşük/orta, analizde yüksek — çelişki mi?)
+- Çelişki değildi: Fırsatlar/Dashboard EN UYGUN GİRİŞ SENARYOSUNUN riskini (ortak riskler + o senaryonun r/g),
+  analizdeki "Risk seviyesi" kutusu ŞİMDİ SON FİYATTAN ALIMIN riskini gösteriyordu (o planın elverişsiz r/g'si 4 puan).
+  Canlı veri: AKSGY şimdi 9,12'den r/g 1:0,74 → yüksek; kırılım 9,58 üstü r/g 1:2,51 → düşük. DEVA şimdi 1:0,99 →
+  yüksek; kırılım 87,99 (+%10,8) r/g 1:4,52, ortak 2 madde (Enflasyon Raporu, haberden önce %16,2 yükseliş) → orta.
+  Hesap DEĞİŞMEDİ; yalnız etiketler ve açıklamalar.
+- Eklenen açıklamalar: analizde "Senaryo riski — Fırsatlar'da görünen risk budur", kutu yüzdeleri ve r/g'nin anlamı,
+  senaryo türleri/durum sütunu; referans bölümü "bugün son fiyattan alsaydınız" + etiketler "Referans (son fiyat)",
+  "Risk (şimdi alınırsa)"; haber skorunun anlamı; Dashboard kartlarının altında ne saydıkları; fırsat çiplerinde
+  "senaryo riski"; aktif senaryolar ve açık işlemler (sanal/gerçek, stopa uzaklık); Fırsatlar listesi (skor, teyit,
+  etiket, düğmeler); Takip Listem durumları, hesap günü, Bildirim düğmesi; bekçi olay tablosu (teyit, Telegram);
+  takip senaryosu sonuç tablosu sütunları.
+- İşlem Günlüğü: üstte açık "❓ İşlem Günlüğü nasıl okunur?" (amaç, sanal/gerçek, durumlar, sütunlar, ölçüler,
+  portföy riski), ölçülerin altında tanımlar, tablo başlıklarında açıklama (column_config help). KULLANIM.md'ye
+  iki bölüm. Test: açıklamaların göründüğü panel testi. 448 test geçti.

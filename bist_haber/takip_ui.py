@@ -137,6 +137,10 @@ def render(conn) -> None:
                     tracker.set_scenario_alert(conn, s["id"], on)
             if not act:
                 st.caption("Şu an etkin senaryo yok; bekçi her kapanıştan sonra yeniden hesaplar.")
+            else:
+                st.caption("⏳ giriş bekleniyor = fiyat giriş seviyesine henüz gelmedi · 🟢 açık = giriş gerçekleşti · "
+                           "*hesap günü* = seviyelerin hesaplandığı fiyat günü (seviyeler sonuçlanana dek değişmez) · "
+                           "**Bildirim** düğmesi yalnız o senaryonun Telegram bildirimini açar/kapatır; takip sürer.")
             types = st.multiselect("Bu hisse için bildirim türleri", list(tracker.TYPES), default=w["bildirimler"],
                                    format_func=lambda k: tracker.TYPES[k], key=f"tk_types_{tk}",
                                    help=tracker.TYPES_HELP)
@@ -166,6 +170,9 @@ def events_table(conn, limit: int = 100) -> None:
         "Olay": e["mesaj"], "Teyit": "kapanış" if e["kesin"] else "gün içi",
         "Telegram": sent.get(e["gonderildi"], "") + (f" ({e['hata']})" if e.get("hata") else "")} for e in ev]),
         hide_index=True, width="stretch")
+    st.caption("Teyit: *kapanış* = günlük mum kapandıktan sonra kesinleşti · *gün içi* = ~15 dk gecikmeli veriyle görüldü, "
+               "kapanışla teyit edilmedi. Telegram: ✅ gönderildi · ⏳ sırada (yeniden denenecek) · — gönderilmedi "
+               "(o bildirim türü kapalı ya da Telegram ayarlı değil).")
 
 
 def performance_table(conn) -> None:
@@ -175,6 +182,9 @@ def performance_table(conn) -> None:
                    "sonuçlandıkça burada strateji türüne göre birikir.")
         return
     st.dataframe(pd.DataFrame(perf), hide_index=True, width="stretch")
+    st.caption("Senaryo: sonuçlanan senaryo sayısı · Giriş olan: alım koşulu oluşanlar · Girişsiz biten: süresi dolan ya da "
+               "geçersizleşenler (para kaybı yok) · TP1/TP2/SL/Başabaş/Süre doldu %: giriş olanlar içinde oran · Ort. "
+               "net %: maliyet düşülmüş ortalama getiri.")
     n = sum(p["Giriş olan"] for p in perf)
     if n < 30:
         st.caption(f"⚠️ Giriş olan yalnız {n} senaryo var: 30'dan azken oranlar güvenilir değildir.")

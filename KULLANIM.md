@@ -78,8 +78,31 @@ tavsiyesi değildir.
 - **SL** zarar durdur, **TP1/TP2** hedefler. Günlükte TP1'de yarısı satılır, stop girişe çekilir; kalanı TP2'ye.
 - **Risk seviyesi** düşük/orta/yüksek; nedenleri kartta yazar (likidite, haberin fiyatlanması, bilanço, temettü,
   makro olay…).
+- **İki farklı risk var, karıştırmayın:**
+  - **Senaryo riski** (🎯 Fırsatlar, Dashboard, analizde "Senaryo riski"): fiyat gösterilen **giriş koşuluna gelince**
+    alırsanız geçerli risk. Halley'in önerdiği plan budur.
+  - **Risk (şimdi alınırsa)** (analizde "Mevcut fiyattan girilirse" bölümü): hisseyi **hemen şimdi**, son fiyattan
+    alırsanız geçerli risk. Genelde daha yüksektir, çünkü zarar durdur uzak ya da hedef yakın olabilir.
+  - Örnek (9 Kasım): AKSGY'de kırılım senaryosu (9,58 TL üstünde kapanınca al) risk **düşük**, ama şimdi 9,12'den almak
+    risk **yüksek** (olası kazanç olası zarardan küçük). Çelişki değil; iki ayrı alım planı.
 - **"Uygun giriş senaryosu yok"** da bir sonuçtur: koşullar elverişli değildir.
 - Haber skoru zamanla azalır (eski haberin etkisi söner); 1,50'nin altında senaryo üretilmez.
+
+## 📒 İşlem Günlüğü nasıl okunur?
+
+- **Ne işe yarar?** Halley'in önerdiği senaryoların gerçekte işe yarayıp yaramadığını **ölçer**. Para yatırılmaz, emir
+  verilmez; sonraki günlerin gerçek fiyatlarıyla "bu senaryoya uyulsaydı ne olurdu" hesaplanır.
+- **Sanal işlem:** bir hisse fırsatlarda "uygun" görünce Halley en uygun senaryoyu kendiliğinden kayda alır ve izler.
+  **Siz almadınız**; bu, Halley'in kendi karnesidir.
+- **Gerçek işlem:** Midas'tan gerçekten aldıysanız **✍️ Bu işleme girdim** bölümüne alış gününü ve fiyatını yazın;
+  aynı seviyelerle ayrıca izlenir, kendi sonuçlarınız ayrı ölçülür.
+- **Durum:** *bekliyor* = fiyat giriş seviyesine gelmedi · *açık* = giriş gerçekleşti · *açık (TP1 görüldü)* = ilk
+  hedefe ulaştı, yarısı satıldı sayılır, stop girişe çekilir · *kapandı* = TP2, SL, başabaş ya da 30 işlem günü dolması
+  · *iptal* = geçerlilik süresinde giriş olmadı (para kaybı yok).
+- **Sütunlar:** *Net %* komisyon ve kayma düşülmüş getiri · *R* kazancın planlanan zarara oranı (+1R = planlanan zarar
+  kadar kazanç, −1R = planlanan zarar kadar kayıp). Tablo başlığının üstüne gelince her sütunun açıklaması çıkar.
+- **Ölçüler:** kazanma oranı, ortalama net, ortalama R, kâr faktörü (toplam kazanç / toplam zarar; 1'in üstü kârlı),
+  maks. düşüş, Sharpe. En az 30 kapanan işlemden önce bu oranlar rastlantı olabilir.
 
 ## Ayarlar (⚙️ Ayarlar)
 

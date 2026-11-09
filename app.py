@@ -688,6 +688,9 @@ def entry_block(g: dict) -> None:
         st.caption("Uygun giriş senaryosu yok. " + g.get("neden_yok", ""))
     else:
         st.markdown(f"**En uygun görünen: {md(best['ad'])}** · {md(best['emir'])}")
+        st.caption("ℹ️ Bu, Halley'in önerdiği plan: fiyat gösterilen **giriş koşuluna gelince** alım. 🎯 Fırsatlar ve "
+                   "Dashboard'da görünen **risk bu senaryonun riskidir**. Aşağıdaki «Mevcut fiyattan girilirse» bölümü ise "
+                   "hemen şimdi almayı gösterir; riski farklı olabilir.")
         c1, c2, c3, c4, c5 = st.columns(5)
         c1.metric("Giriş", f"{best['giris']:.2f} TL", f"{best['uzaklik_%']:+.1f}% fiyattan", delta_color="off")
         c2.metric("Zarar durdur (SL)", f"{best['sl']:.2f} TL", f"{best['sl_%']:+.1f}%")
@@ -702,7 +705,10 @@ def entry_block(g: dict) -> None:
                            f"(%{ps['azami_kayip_%']:.2f}, maliyet dahil). Sınırlayan: {ps['sinirlayan']}. Yalnız hesaplamadır.")
             except ValueError as e:
                 st.caption(f"🧮 Pozisyon hesaplanamadı: {e}")
-        st.caption(f"Bu senaryonun risk seviyesi: **{best.get('risk_seviyesi', '—')}** (ortak risk faktörleri + "
+        st.caption("Kutulardaki yüzdeler: seviyenin giriş fiyatına uzaklığı; «fiyattan» yazan, girişin bugünkü fiyata "
+                   "uzaklığı (+ ise fiyatın o kadar yükselmesi beklenir). Risk/getiri 1 : 2,5 = olası kazanç olası zararın "
+                   "2,5 katı (1'in altı elverişsiz).")
+        st.caption(f"**Senaryo riski: {best.get('risk_seviyesi', '—')}** — 🎯 Fırsatlar'da görünen risk budur (ortak risk faktörleri + "
                    "bu senaryonun risk/getirisi) · "
                    f"Kaba vade tahmini: TP1 yaklaşık {best['tp1_gun']}, TP2 yaklaşık {best['tp2_gun']} işlem günü (garanti değil) · "
                    f"senaryo {best['gecerlilik_gun']} işlem günü geçerli · SL dayanağı: {best['sl_dayanak']} · "
@@ -719,6 +725,10 @@ def entry_block(g: dict) -> None:
                  for s in items]
         st.dataframe(dash_cells(pd.DataFrame(table), ["Giriş", "SL", "TP1", "TP2", "Risk/getiri (TP1)"]),
                      hide_index=True, width="stretch")
+        st.caption("Üç senaryo türü: **Kırılım** = fiyat direncin üstünde kapanınca ertesi gün alım · **Geri çekilme** = "
+                   "yükseliş trendinde ortalamaya inince alım · **Destekten tepki** = desteğe yakın alım. *Durum*: iyi / "
+                   "zayıf / elverişsiz = risk/getiri kalitesi; açıklama yazanlar şu an uygulanamaz (nedeni yazar). *Risk*: "
+                   "o senaryonun risk seviyesi.")
     st.caption("📏 " + entries.BACKTEST_NOTE)
 
 
@@ -727,6 +737,9 @@ def scenario_block(p: dict) -> None:
         entry_block(p["girisler"])
     st.markdown("**🎯 Mevcut fiyattan girilirse (referans)** <span class='news-meta'>(tahmini; yatırım tavsiyesi "
                 "değildir)</span>", unsafe_allow_html=True)
+    st.caption("ℹ️ Bu bölüm, hisseyi **bugün, son fiyattan** alsaydınız ne olurdu sorusunun cevabıdır (karşılaştırma "
+               "için). Buradaki risk, yukarıdaki giriş senaryosunun riski DEĞİLDİR: şimdi almak çoğu zaman daha risklidir, "
+               "çünkü zarar durdur uzak ya da hedef yakın olabilir.")
     if p["durum"] != "senaryo":
         st.caption(p["neden_yok"])
         if p["riskler"]:
@@ -735,13 +748,14 @@ def scenario_block(p: dict) -> None:
     if p.get("elverissiz"):
         st.warning("Mevcut seviyelerde risk/getiri elverişsiz: olası zarar olası kazançtan büyük.")
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Referans fiyat", f"{p['giris']:.2f} TL")
+    c1.metric("Referans (son fiyat)", f"{p['giris']:.2f} TL")
     c2.metric("Zarar durdur (SL)", f"{p['sl']:.2f} TL", f"{p['sl_%']:+.1f}%")
     c3.metric("Kâr al (TP)", f"{p['tp']:.2f} TL", f"{p['tp_%']:+.1f}%")
     c4.metric("Risk / getiri", f"1 : {p['rr']:.1f}" if p["rr"] else "—")
     d1, d2 = st.columns(2)
     d1.metric("Tahmini vade", f"{p['vade'][0]}–{p['vade'][1]} işlem günü")
-    d2.metric("Risk seviyesi", p["risk_seviyesi"].capitalize())
+    d2.metric("Risk (şimdi alınırsa)", p["risk_seviyesi"].capitalize(),
+              help="Hemen şimdi, son fiyattan alımın riski. Fırsatlardaki risk ise giriş senaryosunun riskidir.")
     st.caption(f"SL dayanağı: {p['sl_dayanak']} · TP dayanağı: {p['tp_dayanak']}")
     st.info(p["aciklama"])
     if p["riskler"] or p["notlar"]:
@@ -763,7 +777,8 @@ def stock_details(r: dict) -> None:
     """Bir hisseye tıklanınca açılan ayrıntı: senaryo, teknik görünüm, finansal özet ve haberler."""
     pct = lambda v: "—" if v is None else f"{v:+.1f}%"
     st.caption(f"Haber skoru {r['score']:+.2f} · son 1 gün {pct(r['chg_1d'])} · son 5 gün {pct(r['chg_5d'])} · "
-               f"{r['news_count']} haber. Emir vermeden önce haberin kendisini okuyun.")
+               f"{r['news_count']} haber. Haber skoru: haberlerin yönü, etkisi ve güveninden hesaplanır, haber eskidikçe "
+               "azalır (+1,50 ve üstü olumlu sinyal, −1,50 ve altı olumsuz). Emir vermeden önce haberin kendisini okuyun.")
     scenario_block(scenario(r))
     technical_block(tech(r["ticker"]))
     # D (2026-11-09): sektörüyle birlikte mi, ayrışıyor mu? (KAP sektör listesi; yalnız bilgi)
@@ -912,6 +927,22 @@ def _opp_why(tk: str) -> str:
 firsat_log.record([tk for tk, _, _ in SUMMARY["uygun"]], _opp_why)
 
 # ---------------- İşlem günlüğü ----------------
+JOURNAL_COLS = {   # tablo başlığının üstüne gelince çıkan açıklamalar
+    "Tür": st.column_config.Column(help="Sanal: Halley'in kendi önerisini izlediği işlem (siz almadınız). Gerçek: sizin "
+                                        "«Bu işleme girdim» ile kaydettiğiniz işlem."),
+    "Sinyal günü": st.column_config.Column(help="Senaryonun hesaplandığı fiyat günü; sonraki günler değerlendirilir."),
+    "Giriş": st.column_config.Column(help="Planlanan alış fiyatı"),
+    "SL": st.column_config.Column(help="Zarar durdur (stop loss)"),
+    "TP1": st.column_config.Column(help="İlk hedef: yarısı satılır, stop giriş fiyatına çekilir"),
+    "TP2": st.column_config.Column(help="İkinci hedef: kalan yarı satılır"),
+    "Durum": st.column_config.Column(help="bekliyor: giriş olmadı · açık: alındı, izleniyor · açık (TP1 görüldü): yarısı "
+                                          "satıldı · kapandı: bitti · iptal: süresinde giriş olmadı"),
+    "Sonuç": st.column_config.Column(help="TP2 / SL / başabaş (TP1 sonrası) / süre doldu / gerçekleşmedi"),
+    "Net %": st.column_config.Column(help="Komisyon ve kayma düşülmüş getiri; açık işlemde son kapanışa göre"),
+    "R": st.column_config.Column(help="Kazancın planlanan zarara (giriş − SL) oranı: +1R = planlanan zarar kadar kazanç"),
+}
+
+
 def metrics_block(title: str, m: dict) -> None:
     st.markdown(f"**{title}** — kayıt {m['kayit']} · kapanan {m['kapanan']} · açık/bekleyen {m['acik_bekleyen']} · "
                 f"gerçekleşmeyen {m['iptal']}")
@@ -925,6 +956,10 @@ def metrics_block(title: str, m: dict) -> None:
     d.metric("Kâr faktörü", "—" if m["kar_faktoru"] is None else f"{m['kar_faktoru']:.2f}")
     e.metric("Maks. düşüş", f"{m['maks_dusus_R']:.2f} R")
     f.metric("Sharpe (işlem başına)", "—" if m["sharpe_islem_basina"] is None else f"{m['sharpe_islem_basina']:.2f}")
+    st.caption("Kazanma oranı: kârla kapanan işlem yüzdesi · Ortalama net: maliyet düşülmüş ortalama getiri · "
+               "Ortalama R: kazancın planlanan zarara oranı (+1 = planlanan zarar kadar kazanç) · Kâr faktörü: toplam "
+               "kazanç / toplam zarar (1'in üstü kârlı) · Maks. düşüş: arka arkaya kayıpların en kötü toplamı (R) · "
+               "Sharpe: getirinin oynaklığa oranı (yüksek = daha istikrarlı).")
     if not m["yeterli_ornek"]:
         st.warning(f"Yalnız {m['kapanan']} kapanan işlem var: {journal.MIN_TRADES_FOR_STATS}'dan az örnekte bu oranlar "
                    "rastlantıdan ayırt edilemez; karar için kullanmayın.")
@@ -1608,6 +1643,7 @@ def bist_metric(col) -> None:
         with col.container(key=f"kpi_bist_{tone}"):
             st.metric("BIST 100", f"{px[0]['close']:,.0f}".replace(",", "."),
                       f"%{chg:+.2f} · {px[0]['date'][8:10]}.{px[0]['date'][5:7]}")
+            st.caption("son kapanış · önceki güne göre değişim")
     else:
         with col.container(key="kpi_bist_flat"):
             st.metric("BIST 100", "—")
@@ -1617,12 +1653,14 @@ def page_dashboard() -> None:
     with st.container(key="kpi"):
         k0, m1, m2, k3, m3 = st.columns(5)
     bist_metric(k0)
-    for col_, key_, label_, val_ in ((m1, "kpi_pos", "Olumlu haber", f"{len(positives)} hisse"),
-                                     (m2, "kpi_neg", "Olumsuz haber", f"{len(negatives)} hisse"),
-                                     (k3, "kpi_opp", "Uygun fırsat", f"{len(SUMMARY['uygun'])} hisse"),
-                                     (m3, "kpi_upd", "Son güncelleme", last_update_text())):
+    for col_, key_, label_, val_, note_ in (
+            (m1, "kpi_pos", "Olumlu haber", f"{len(positives)} hisse", f"son {window} günde haber skoru +1,50 ve üstü"),
+            (m2, "kpi_neg", "Olumsuz haber", f"{len(negatives)} hisse", f"son {window} günde haber skoru −1,50 ve altı"),
+            (k3, "kpi_opp", "Uygun fırsat", f"{len(SUMMARY['uygun'])} hisse", "olumlu haber + uygun giriş senaryosu"),
+            (m3, "kpi_upd", "Son güncelleme", last_update_text(), "son haber analizinin saati")):
         with col_.container(key=key_):
             st.metric(label_, val_)
+            st.caption(note_)
     regime_strip()
     c1, c2 = st.columns([3, 2])
     with c1.container(border=True, key="d_opps"):
@@ -1632,9 +1670,12 @@ def page_dashboard() -> None:
         for tk, name, risk in SUMMARY["uygun"][:8]:
             a, b, c = st.columns([1.3, 4, 1.5], vertical_alignment="center")
             a.markdown(f"**{tk}**")
-            b.caption(f"{name.split(' (')[0]} · risk {risk}")
+            b.caption(f"{name.split(' (')[0]} · senaryo riski {risk}")
             with c:
                 go_button("🔍 Analiz", PAGE_HISSE, f"d_an_{tk}", tk, width="stretch")
+        if SUMMARY["uygun"]:
+            st.caption("Risk, gösterilen senaryonun riskidir (koşul oluşunca alım). Hemen şimdi almanın riski 🔍 Analiz "
+                       "ekranında «Mevcut fiyattan girilirse» bölümünde ayrıca yazar.")
         go_button("Tüm fırsatlar →", PAGE_FIRSAT, "d_all_opps")
     with c2.container(border=True, key="d_watch"):
         section_title("🛡️", "Bekçi")
@@ -1650,6 +1691,8 @@ def page_dashboard() -> None:
     with c3.container(border=True, key="d_scen"):
         act = [s for s in tracker.scenarios(conn, active_only=True) if tracker.is_watched(conn, s["ticker"])]
         section_title("⭐", "Aktif senaryolarım", count=len(act), note="takip listesi")
+        st.caption("Takibe aldığınız hisselerin bekçinin izlediği senaryoları. ⏳ giriş bekleniyor = fiyat giriş "
+                   "seviyesine henüz gelmedi; 🟢 açık = giriş gerçekleşti.")
         if act:
             st.dataframe(dash_cells(pd.DataFrame([{
                 "Hisse": s["ticker"], "Senaryo": tracker.NAMES.get(s["senaryo"], s["senaryo"]),
@@ -1662,6 +1705,8 @@ def page_dashboard() -> None:
     with c4.container(border=True, key="d_open"):
         jr = watchdog._journal_rows(conn)
         section_title("📒", "Açık işlemler", count=len(jr), note="sanal + gerçek")
+        st.caption("Sanal = Halley'in kendi önerisini izlediği işlem (siz almadınız); Gerçek = sizin kaydettiğiniz. "
+                   "Stopa uzaklık % = son kapanışın stopun ne kadar üstünde olduğu (küçüldükçe stop yaklaşıyor).")
         if jr:
             st.dataframe(dash_cells(pd.DataFrame([{
                 "No": r["no"], "Tür": r["tur"], "Hisse": r["hisse"], "Durum": r["durum"], "Giriş": r["giris"],
@@ -1685,23 +1730,28 @@ def page_firsatlar() -> None:
             st.markdown(
                 f"<div class='opp'><div class='h'>🎯 Bugün {len(summary_['uygun'])} hissede uygun görünen giriş senaryosu var</div>"
                 "<div class='chips'>" + "".join(
-                    f"<span class='tk r-{esc(str(risk))}'><b>{esc(tk)}</b>{esc(name.split(' (')[0].lower())} · risk {esc(str(risk))}</span>"
+                    f"<span class='tk r-{esc(str(risk))}'><b>{esc(tk)}</b>{esc(name.split(' (')[0].lower())} · senaryo riski {esc(str(risk))}</span>"
                     for tk, name, risk in summary_["uygun"])
                 + "</div><div class='f'>Kenar rengi risk seviyesini gösterir (yeşil düşük, turuncu orta, kırmızı yüksek). "
-                "Ayrıntı için aşağıdan hisseye tıklayın. Bu bir senaryodur, yatırım tavsiyesi değildir.</div></div>",
+                "Risk, gösterilen giriş senaryosunun riskidir (fiyat koşula gelince alım); hemen şimdi almanın riski 🔍 Analiz "
+                "ekranında ayrıca yazar. Bu bir senaryodur, yatırım tavsiyesi değildir.</div></div>",
                 unsafe_allow_html=True)
         else:
             st.info("**Bugün uygun işlem fırsatı bulunamadı.** Her gün işlem yapmak gerekmez. "
                     + ("Nedenler: " + "; ".join(f"{k} ({v} hisse)" for k, v in summary_["nedenler"].items()) + "."
                        if summary_["nedenler"] else "Olumlu haber alan hisse yok."))
         section_title("📈", "Olumlu haber alanlar", "pos", len(positives))
+        st.caption("Skor = haber skoru: haberlerin yönü, etkisi ve güveninden hesaplanır, haber eskidikçe azalır (+1,50 ve "
+                   "üstü olumlu, −1,50 ve altı olumsuz). ✅ Teyitli: iki ayrı analiz aynı sonuca vardı · ⚠️ Kontrol et: "
+                   "analizler çelişti. Altındaki etiket teknik trend özeti. 🔍 Analiz: tüm analiz · ➕ Takibe Al: bekçi "
+                   "izlesin ve bildirsin.")
         stock_list(positives, "Bu dönemde olumlu haber alan hisse yok.", "pos")
         section_title("📉", "Olumsuz haber alanlar", "neg", len(negatives))
         stock_list(negatives, "Bu dönemde olumsuz haber alan hisse yok.", "neg")
         if neutrals and st.toggle(f"Etkisi zayıf/nötr haberleri de göster ({len(neutrals)} hisse)", key="show_neutral"):
             section_title("👁️", "İzlenecekler", "neu", len(neutrals))
             stock_list(neutrals, "", "neu")
-        st.caption("Bir hisseye tıklayınca haberin özeti, nedeni ve kaynağı açılır. "
+        st.caption("🔍 Analiz ile haberin özeti, nedeni ve kaynağı açılır. "
                    "✅ Teyitli: iki ayrı analiz aynı sonuca vardı · ⚠️ Kontrol et: analizler çelişti ya da emin değil.")
         if st.session_state.get("signals_export_ready"):
             # Detaylı liste: haber analizi + teknik göstergeler (hepsi kayıtlı veriden, kredi harcamaz).
@@ -1918,6 +1968,25 @@ def page_haberler() -> None:
 
 def page_gunluk() -> None:
     page_head(PAGE_GUNLUK)
+    with st.expander("❓ İşlem Günlüğü nasıl okunur?", expanded=True):
+        st.markdown(
+            "- **Ne işe yarar?** Halley'in önerdiği senaryoların **gerçekte işe yarayıp yaramadığını ölçer.** Para "
+            "yatırılmaz, emir verilmez; sonraki günlerin gerçek fiyatlarıyla \"bu senaryoya uyulsaydı ne olurdu\" "
+            "hesaplanır.\n"
+            "- **Sanal işlem:** bir hisse fırsatlarda \"uygun\" görünce Halley en uygun senaryoyu kendiliğinden kayda alır "
+            "ve izler. **Siz almadınız**; bu, Halley'in kendi karnesidir.\n"
+            "- **Gerçek işlem:** Midas'tan gerçekten aldıysanız aşağıdaki **✍️ Bu işleme girdim** bölümüne alış gününü ve "
+            "fiyatını yazın. Aynı seviyelerle ayrıca izlenir; kendi sonuçlarınız ayrı ölçülür.\n"
+            "- **Durum:** ⏳ *bekliyor* = fiyat giriş seviyesine henüz gelmedi · *açık* = giriş gerçekleşti, izleniyor · "
+            "*açık (TP1 görüldü)* = ilk hedefe ulaştı, yarısı satıldı sayılır ve stop giriş fiyatına çekilir · "
+            "*kapandı* = TP2, SL, başabaş ya da 30 işlem günü dolmasıyla bitti · *iptal* = geçerlilik süresinde giriş "
+            "koşulu oluşmadı (para kaybı yok).\n"
+            "- **Sütunlar:** *Sinyal günü* senaryonun hesaplandığı gün · *Giriş / SL / TP1 / TP2* planlanan alış, zarar "
+            "durdur ve hedefler · *Net %* komisyon ve kayma düşülmüş getiri (açık işlemde son kapanışa göre) · *R* "
+            "kazancın planlanan zarara oranı (+1R = planlanan zarar kadar kazanç, −1R = planlanan zarar kadar kayıp).\n"
+            "- **Üstteki ölçüler** ancak yeterli işlem kapanınca anlamlıdır (en az 30); öncesinde rastlantı olabilir.\n"
+            "- **🧺 Portföy riski:** açık/bekleyen işlemlerin aynı sektörde toplanması gibi uyarılar; sektör haberi "
+            "hepsini birlikte etkileyebilir.")
     _pf = sectors.portfolio(conn)
     if _pf["hisse"]:
         st.caption("🧺 Açık/bekleyen işlemlerin sektörleri: " + " · ".join(f"{k}: {', '.join(v)}" for k, v in _pf["ana"].items()))
@@ -1948,8 +2017,10 @@ def page_gunluk() -> None:
                         "Giriş": jr["giris"], "SL": jr["sl"], "TP1": jr["tp1"], "TP2": jr["tp2"],
                         "Durum": jr["durum"], "Sonuç": res.get("sonuc", ""), "Alış günü": res.get("giris_gunu", ""),
                         "Net %": res.get("net_getiri_pct", res.get("acik_getiri_%")), "R": res.get("r")})
+        st.caption("Tablo başlığının üstüne gelince sütunun açıklaması çıkar. Bekliyor/iptal satırlarında Net % boştur "
+                   "(alım olmadı).")
         st.dataframe(dash_cells(pd.DataFrame(tbl), ["Giriş", "SL", "TP1", "TP2", "Net %", "R"]),
-                     hide_index=True, width="stretch")
+                     hide_index=True, width="stretch", column_config=JOURNAL_COLS)
         open_auto = [jr for jr in rows_j if jr["kaynak"] == "otomatik" and jr["durum"] in journal.OPEN_STATES]
         if open_auto:
             with st.expander("✍️ Bu işleme girdim (gerçek işleminizi kaydedin)"):
