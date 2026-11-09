@@ -1411,6 +1411,7 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   güncellenen Halley açıldı (sağlık ok) ve "--kapat" ile kapandı. Kurulum penceresi (görsel) bu bilgisayarda
   açılıp gözle denenmedi; mantığı sessiz kiple aynı işlevden geçiyor.
 - Dağıtım: yeni verisiz Halley_Kurulum.exe (2026-11-09, e579cc6) masaüstüne, dagitim/ klasörüne ve GitHub sürümüne.
+- Dağıtım güncellendi: bb9c11d (açıklama yazıları dahil), dosya özellikleri + bildirim; masaüstü, dagitim/, GitHub sürümü.
 
 ## 2026-11-09 — Yanlış alarm (kullanıcının bilgisayarında Windows "tehdit bulundu")
 - Bu bilgisayarda Defender kayıtlarında Halley tespiti yok; kurulum dosyası ve Halley.exe MpCmdRun ile tarandı: temiz.
