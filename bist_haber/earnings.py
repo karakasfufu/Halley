@@ -60,8 +60,11 @@ def _is_special(conn, ticker: str) -> bool:
 
 def _consolidated(conn, ticker: str) -> Optional[bool]:
     like = f"%,{ticker},%"
-    rows = conn.execute("SELECT subject FROM news WHERE source='kap' AND (','||candidates||',') LIKE ? AND "
-                        "(subject LIKE 'Sorumluluk Beyanı (%' OR subject LIKE 'Faaliyet Raporu (%') "
+    rows = conn.execute("SELECT subject FROM news INDEXED BY ix_news_subject_cand WHERE source='kap' AND "
+                        "(','||candidates||',') LIKE ? AND "
+                        # "ile başlar" aralık olarak yazıldı (dizin kullanılır; '(' sonrası karakter ')'): LIKE ile aynı sonuç
+                        "((subject>='Sorumluluk Beyanı (' AND subject<'Sorumluluk Beyanı )') OR "
+                        "(subject>='Faaliyet Raporu (' AND subject<'Faaliyet Raporu )')) "
                         "ORDER BY published_at DESC", (like,)).fetchall()
     # Hem konsolide hem bireysel tablo veren şirket (gerçek örnek: QYATB) konsolide sayılır: yükümlülük varsa süre
     # konsolide süresidir (II-14.1 Md. 10/5, 11/5). Yalnız "Konsolide Olmayan" bildirimi varsa bireysel.
@@ -82,7 +85,8 @@ def status(conn, ticker: str, today: Optional[date] = None) -> Dict:
     like = f"%,{ticker},%"
     # Raporun DÖNEMİ KAP listesinden (year/period) eşleştirilir: geç verilen eski dönem raporu (gerçek örnek: BRKO,
     # BTCIM, BSOKE 6 aylık raporları Eylül sonu/Ekim başında) yeni dönem sanılmaz.
-    pub = conn.execute("SELECT MIN(published_at) d FROM news WHERE source='kap' AND subject='Finansal Rapor' AND "
+    pub = conn.execute("SELECT MIN(published_at) d FROM news INDEXED BY ix_news_subject_cand WHERE source='kap' AND "
+                       "subject='Finansal Rapor' AND "
                        "(','||candidates||',') LIKE ? AND donem=?", (like, last["kod"])).fetchone()["d"]
     # KAP kaydı yoksa: haber analizi bu dönem için "finansal sonuç" olayı bulduysa (ör. Bloomberg HT bilanço
     # haberi) rapor açıklanmış demektir; kaynağı ayrıca belirtilir.
@@ -117,7 +121,9 @@ def status(conn, ticker: str, today: Optional[date] = None) -> Dict:
 def _extension(conn, ticker: str, since: str) -> Optional[str]:
     """SPK'nın finansal rapor ek süre talebi değerlendirmesi bildirimi (gerçek örnek: TRKNT 13.10.2026). Bildirimin
     tarihi döner; verilen yeni süre bildirim metnindedir (metin okunmaz, kullanıcıya KAP'ı açması söylenir)."""
-    row = conn.execute("SELECT MAX(published_at) d FROM news WHERE source='kap' AND subject LIKE 'Finansal Rapor Ek Süre%' "
+    row = conn.execute("SELECT MAX(published_at) d FROM news INDEXED BY ix_news_subject_cand WHERE source='kap' AND "
+                       "subject>='Finansal Rapor Ek Süre' "
+                       "AND subject<'Finansal Rapor Ek Sürf' "
                        "AND (','||candidates||',') LIKE ? AND published_at > date(?, '-120 day')",
                        (f"%,{ticker},%", since)).fetchone()
     return row["d"][:10] if row and row["d"] else None

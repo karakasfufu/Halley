@@ -32,6 +32,13 @@ CREATE TABLE IF NOT EXISTS kap_coverage (
     listed_at TEXT NOT NULL               -- o günün listesinin en son alındığı an (ISO, TR)
 );
 CREATE INDEX IF NOT EXISTS ix_news_title_key ON news(title_key);
+-- 2026-11-09 hız: panel her hisse için konuya/tarihe göre KAP kaydı arıyor; dizinsiz her sorgu tüm haber metinlerini
+-- okuyordu (126 hissede 33 sn). Sonuçları değiştirmez.
+CREATE INDEX IF NOT EXISTS ix_news_subject ON news(subject);
+CREATE INDEX IF NOT EXISTS ix_news_published ON news(published_at);
+-- konu + hisse kodu birlikte: "candidates" sütunu tabloda büyük "body"den sonra geldiği için doğrudan okunması metni de
+-- okutuyordu; bu dizinle hisse eşleşmesi metne dokunmadan bulunur (sorgu başına 17,9 → 1,2 ms ölçüldü).
+CREATE INDEX IF NOT EXISTS ix_news_subject_cand ON news(subject, candidates, source);
 CREATE TABLE IF NOT EXISTS analyses (
     news_id       TEXT PRIMARY KEY REFERENCES news(id),
     stage         TEXT NOT NULL,          -- filter | full

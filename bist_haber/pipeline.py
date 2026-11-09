@@ -54,7 +54,7 @@ def update_all(conn, days: int = 1, progress: Optional[Progress] = None, analyze
     if analyze and has_api_key():
         say("Yapay zekâ haberleri analiz ediyor...", 0.5)
         out["analyze"] = analyzer.analyze(
-            conn, uni, limit=analysis_limit, quality=quality, budget_usd=news_budget(),
+            conn, uni, limit=analysis_limit, quality=quality, budget_usd=news_budget(), track=True,
             max_age_days=config.AUTO_ANALYSIS_MAX_AGE_DAYS,
             progress=lambda i, n: say(f"Yapay zekâ haberleri analiz ediyor ({i}/{n})...", 0.5 + 0.42 * i / max(n, 1)))
         out["analyze"]["waiting"] = len(analyzer.pending(conn, max_age_days=config.AUTO_ANALYSIS_MAX_AGE_DAYS))

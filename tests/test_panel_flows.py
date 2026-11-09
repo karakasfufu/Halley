@@ -114,6 +114,21 @@ class PanelFlowTests(unittest.TestCase):
             at.radio(key="na_mode").set_value("🔁 Analiz edilmiş haberi derin yeniden incele").run()
             self.assertEqual(len(at.exception), 0, str(at.exception))
 
+    def test_analysis_progress_box_visible(self):
+        import json as _j
+        from datetime import datetime
+        from bist_haber import analyzer
+        now = datetime.now(config.TR_TZ).isoformat(timespec="seconds")
+        analyzer.status_file().write_text(_j.dumps({"tur": "haber analizi", "durum": "çalışıyor", "toplam": 142,
+                                                    "biten": 45, "harcanan_usd": 0.6, "nabiz": now}), encoding="utf-8")
+        at = self.app()
+        self.assertTrue(any("Haber analizi sürüyor: 45/142" in str(i.value) for i in at.info), [i.value for i in at.info])
+        analyzer.status_file().write_text(_j.dumps({"tur": "haber analizi", "durum": "tamamlandı", "toplam": 142,
+                                                    "biten": 142, "harcanan_usd": 2.1, "nabiz": now, "bitti": now,
+                                                    "sonuc": {"analyzed": 130, "filtered_out": 12}}), encoding="utf-8")
+        at = self.app()
+        self.assertTrue(any("130 haber analiz edildi" in str(x.value) and "2.100 $" in str(x.value) for x in at.success))
+
     def test_double_save_real_trade_warns(self):
         at = self.app()
         at.number_input(key="real_px").set_value(100.5).run()

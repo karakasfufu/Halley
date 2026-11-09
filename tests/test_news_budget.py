@@ -80,6 +80,32 @@ class BudgetAndAgeTests(unittest.TestCase):
             pipeline.update_all(self.conn, analysis_limit=config.MAX_ANALYSIS_PER_RUN + 1)
 
 
+class ProgressStatusTests(unittest.TestCase):
+    def test_status_file_only_when_tracked(self):
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as d, patch.object(config, "DATA", Path(d)):
+            conn = memory_db()
+            add_news(conn, nid="kap:1", body="metin " * 50, published=now())
+            analyzer.analyze(conn, UNI, rows=analyzer.pending(conn), llm=FakeLLM())
+            self.assertEqual(analyzer.load_status(), {})                       # izlenmeyen çağrı dosya yazmaz
+            add_news(conn, nid="kap:2", body="metin " * 50, published=now())
+            seen = []
+            analyzer.analyze(conn, UNI, rows=analyzer.pending(conn), llm=FakeLLM(), track=True,
+                             progress=lambda i, n: seen.append(analyzer.load_status().get("durum")))
+            st = analyzer.load_status()
+            self.assertEqual((st["durum"], st["toplam"], st["biten"], st["sonuc"]["analyzed"]), ("tamamlandı", 1, 1, 1))
+            self.assertEqual(seen, ["çalışıyor"])
+            self.assertEqual(st["son"][0]["sonuc"], "TEST olumlu 3/5")         # son biten: hisse + yön + etki
+            self.assertEqual(st["suan"], [])                                   # bitince "şu an incelenen" boş
+            add_news(conn, nid="kap:3", body="metin " * 50, published=now())
+            during = []
+            analyzer.analyze(conn, UNI, rows=analyzer.pending(conn), llm=FakeLLM(), track=True,
+                             progress=lambda i, n: during.append(analyzer.load_status().get("suan")))
+            self.assertEqual(during[0][0]["hisse"], "TEST")                    # sürerken incelenen hisse görünür
+            self.assertAlmostEqual(st["harcanan_usd"], round(2 * COST_ONE, 4), places=4)   # etki 3 → ikinci görüş: 2 çağrı
+
+
 class ReanalysisTests(unittest.TestCase):
     def setUp(self):
         self.conn = memory_db()

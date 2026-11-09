@@ -40,6 +40,9 @@ class NumberCheckTests(unittest.TestCase):
         self.assertEqual(ai_comment.unverified_numbers("Endeks %1,32 arttı, QNBTR %43,8; 584 hisse; 3 madde", src), [])
         self.assertEqual(ai_comment.unverified_numbers("Hedef 55,5 TL ve 12000 adet", src), ["55,5", "12000"])
         self.assertEqual(ai_comment.unverified_numbers("11.482,60 puan", src), [])          # Türkçe biçim
+        body = "Özkaynaklar 1.324.948.123 TL; prim 27.272.071.119 TL. 3Ç'26 sonuçları"
+        self.assertEqual(ai_comment.unverified_numbers("özkaynak 1.324,9 mn TL, prim 27,27 mlr TL, 3Ç'26", body), [])
+        self.assertEqual(ai_comment.unverified_numbers("özkaynak 1.500,0 mn TL", body), ["1.500,0"])   # gerçekten yok
 
 
 class ReportCommentTests(Base):

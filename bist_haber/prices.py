@@ -108,6 +108,13 @@ def update_universe(conn, tickers: Iterable[str], progress=None, batch: int = 10
             done += len(part)
             if progress:
                 progress(done, total)
+    # 2026-11-09: piyasa rejimindeki BIST 100 EMA200'ü 1 yıllık geçmişte başlangıç değerine duyarlı (251 günde SMA ve
+    # ilk değer başlangıcı arasında %0,6 fark ölçüldü) → endeksin geçmişi 600 günden kısaysa bir kez 3 yıl indirilir.
+    if "XU100" in tickers and conn.execute("SELECT COUNT(*) FROM prices WHERE ticker='XU100'").fetchone()[0] < 600:
+        try:
+            rows += update(conn, ["XU100"], period="3y")
+        except Exception:
+            pass
     last = dict(conn.execute("SELECT ticker, MAX(date) FROM prices WHERE ticker IN (%s) GROUP BY ticker"
                              % ",".join("?" * len(tickers)), tickers).fetchall()) if tickers else {}
     newest = max(last.values()) if last else None

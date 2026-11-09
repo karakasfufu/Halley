@@ -117,13 +117,21 @@ def _candidates(tok: str) -> List[float]:
 
 
 def unverified_numbers(text: str, source: str) -> List[str]:
-    """Yorumda geçip kaynakta bulunamayan sayılar (0–10 arası tam sayılar ve sıra/sayım kelimeleri hariç)."""
+    """Yorumda geçip kaynakta bulunamayan sayılar (0–10 arası tam sayılar hariç).
+    2026-11-09: birim dönüşümü tanınır (kaynakta "1.324.948.123 TL" → yorumda "1.324,9 mn TL" ya da "1,3 mlr TL"; bin /
+    milyon / milyar ölçekleri) ve yıl kısaltması ("3Ç'26") sayı sayılmaz. Bunlar önceden yanlışlıkla
+    "bulunamadı" çıkıyordu (142 haberlik denetimde 26 sayının çoğu)."""
     src = set()
     for tok in _NUM.findall(source):
         for v in _candidates(tok):
-            src.update({round(v, 2), round(v, 1), round(v)})
+            for scale in (1, 1e3, 1e6, 1e9):
+                w = v / scale
+                src.update({round(w, 2), round(w, 1), round(w)})
     bad = []
-    for tok in _NUM.findall(text):
+    for m in _NUM.finditer(text):
+        tok = m.group(0)
+        if len(tok) == 2 and tok.isdigit() and m.start() > 0 and text[m.start() - 1] in "'’":
+            continue                                                     # yıl kısaltması: 3Ç'26
         cands = _candidates(tok)
         if not cands:
             continue

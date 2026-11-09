@@ -488,6 +488,45 @@ def _store(conn, row, universe, res, stats) -> None:
     stats["analyzed"] += 1
 
 
+def status_file():
+    return config.DATA / "analiz_durumu.json"
+
+
+def load_status() -> Dict:
+    """Son/çalışan haber analizinin durumu (panel kutusu için; hangi yoldan başlatılırsa başlatılsın)."""
+    try:
+        return json.loads(status_file().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def _write_status(st: Dict) -> None:
+    if not st.get("_izle"):
+        return          # yalnız gerçek kullanım yolları (panel, güncelleme, sabah analizi) yazar; testler yazmaz
+    try:
+        st["nabiz"] = datetime.now(config.TR_TZ).isoformat(timespec="seconds")
+        status_file().parent.mkdir(parents=True, exist_ok=True)
+        status_file().write_text(json.dumps(st, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass   # durum dosyası yazılamazsa analiz yine sürsün
+
+
+def _label(row) -> Dict:
+    return {"hisse": row["candidates"] or "—", "baslik": (row["title"] or "")[:80],
+            "konu": row["subject"] or row["source"]}
+
+
+def _result_label(conn, row) -> Dict:
+    """Biten analizin kısa sonucu: hisse başına yön ve etki (ör. "AKGRT olumlu 4/5")."""
+    yon = {1: "olumlu", -1: "olumsuz", 0: "nötr"}
+    imps = conn.execute("SELECT ticker, direction, magnitude FROM impacts WHERE news_id=? ORDER BY ticker",
+                        (row["id"],)).fetchall()
+    st = conn.execute("SELECT status FROM news WHERE id=?", (row["id"],)).fetchone()
+    text = ", ".join(f"{i[0]} {yon.get(i[1], '?')} {i[2]}/5" for i in imps) or (
+        "önemsiz bulundu" if st and st[0] == "filtered_out" else "hata" if st and st[0] == "error" else "etki yok")
+    return dict(_label(row), sonuc=text, saat=datetime.now(config.TR_TZ).strftime("%H:%M:%S"))
+
+
 DEEP_BODY_FACTOR = 2.0      # derin incelemede okunan metin (normalin 2 katı)
 DEEP_COST_FACTOR = 1.6      # maliyet tahmini çarpanı (uzun metin + zorunlu ikinci görüş)
 
@@ -513,7 +552,8 @@ def estimate_reanalysis(conn, rows) -> Dict[str, float]:
 
 
 def reanalyze(conn, universe: Dict[str, str], news_ids, llm: Optional[LLM] = None,
-              budget_usd: Optional[float] = None, progress: Optional[Callable[[int, int], None]] = None) -> Dict:
+              budget_usd: Optional[float] = None, progress: Optional[Callable[[int, int], None]] = None,
+              track: bool = False) -> Dict:
     """Analiz edilmiş haberi derin yeniden inceler (kullanıcı isteği 2026-11-09): en yüksek doğruluk profili, ZORUNLU
     ikinci bağımsız görüş, iki kat metin. Önceki sonuç silinmez: reanalysis_log'a (değiştirilemez) yazılır; yeni sonuç
     skor hesabında kullanılır. Habere sonradan gelen fiyat hareketi VERİLMEZ (geriye dönük bilgi karışmasın).
@@ -537,6 +577,10 @@ def reanalyze(conn, universe: Dict[str, str], news_ids, llm: Optional[LLM] = Non
     if not rows:
         return out
     llm = llm or LLM()
+    spend0 = month_spend(conn)
+    st_ = {"_izle": track, "tur": "derin inceleme", "durum": "çalışıyor", "toplam": len(rows), "biten": 0,
+           "basladi": datetime.now(config.TR_TZ).isoformat(timespec="seconds")}
+    _write_status(st_)
     from .prices import company_stats
     try:
         cstats = company_stats(conn, [c for r in rows for c in (r["candidates"] or "").split(",") if c in universe])
@@ -547,6 +591,8 @@ def reanalyze(conn, universe: Dict[str, str], news_ids, llm: Optional[LLM] = Non
                 * DEEP_COST_FACTOR > budget_usd:     # gerçek harcamayla her haberden önce yeniden kontrol
             out["butce_disi"] += len(rows) - i
             break
+        st_["suan"] = [_label(row)]
+        _write_status(st_)
         old = _impacts_snapshot(conn, row["id"])
         prev = conn.execute("SELECT input_tokens, output_tokens, created_at FROM analyses WHERE news_id=?",
                             (row["id"],)).fetchone()
@@ -586,6 +632,12 @@ def reanalyze(conn, universe: Dict[str, str], news_ids, llm: Optional[LLM] = Non
             out["sonuclar"].append({"news_id": row["id"], "baslik": row["title"], "hata": str(e)[:200]})
         if progress:
             progress(i + 1, len(rows))
+        st_.update(biten=i + 1, harcanan_usd=round(month_spend(conn) - spend0, 4), suan=[],
+                   son=([_result_label(conn, row)] + st_.get("son", []))[:8])
+        _write_status(st_)
+    st_.update(durum="tamamlandı", bitti=datetime.now(config.TR_TZ).isoformat(timespec="seconds"), suan=[],
+               sonuc={k: out[k] for k in ("incelenen", "degisen", "hata", "butce_disi")})
+    _write_status(st_)
     return out
 
 
@@ -608,7 +660,8 @@ def test_one(conn, universe: Dict[str, str], llm: Optional[LLM] = None) -> Optio
 
 def analyze(conn, universe: Dict[str, str], limit: Optional[int] = None, llm: Optional[LLM] = None,
             progress: Optional[Callable[[int, int], None]] = None, quality: Optional[str] = None,
-            rows=None, budget_usd: Optional[float] = None, max_age_days: Optional[int] = None) -> Dict[str, int]:
+            rows=None, budget_usd: Optional[float] = None, max_age_days: Optional[int] = None,
+            track: bool = False) -> Dict[str, int]:
     """Bekleyen haberleri analiz eder. LLM çağrıları paralel, veritabanı yazımı ana iş parçacığında.
 
     quality: "yuksek" | "dengeli" | "ekonomik" (panel ayarı). Boşsa yüksek doğruluk.
@@ -629,6 +682,10 @@ def analyze(conn, universe: Dict[str, str], limit: Optional[int] = None, llm: Op
     if not rows:
         return stats
     llm = llm or LLM()
+    spend0 = month_spend(conn)
+    st_ = {"_izle": track, "tur": "haber analizi", "durum": "çalışıyor", "toplam": len(rows), "biten": 0,
+           "basladi": datetime.now(config.TR_TZ).isoformat(timespec="seconds")}
+    _write_status(st_)
     # Şirket büyüklüğü bağlamı (piyasa değeri, son fiyat) — tutarları ölçeklemek için
     from .prices import company_stats
     try:
@@ -654,6 +711,8 @@ def analyze(conn, universe: Dict[str, str], limit: Optional[int] = None, llm: Op
                         return
                 r = queue.pop(0)
                 futures[ex.submit(_work, llm, r, universe, cstats, q)] = r
+            st_["suan"] = [_label(x) for x in futures.values()]
+            _write_status(st_)
 
         fill()
         while futures:
@@ -664,6 +723,7 @@ def analyze(conn, universe: Dict[str, str], limit: Optional[int] = None, llm: Op
                 progress(done, len(rows))
             try:
                 _store(conn, row, universe, fut.result(), stats)
+                st_["son"] = ([_result_label(conn, row)] + st_.get("son", []))[:8]
             except (AuthenticationError, PermissionDeniedError, RateLimitError) as e:
                 # Hesap/kota sorunu: haberleri hatalı işaretleme, kalanları iptal et.
                 conn.rollback()
@@ -679,7 +739,16 @@ def analyze(conn, universe: Dict[str, str], limit: Optional[int] = None, llm: Op
                 conn.commit()
                 stats["errors"] += 1
                 print(f"[hata] {row['id']}: {e}")
+            st_.update(biten=done, harcanan_usd=round(month_spend(conn) - spend0, 4),
+                       suan=[_label(x) for x in futures.values()])
+            _write_status(st_)
             fill()
     if stats.get("butce_disi"):
         stats["butce_kalan_usd"] = round((budget_usd or 0) - month_spend(conn), 4)
+    st_.update(durum="durdu" if stats.get("stopped") else "tamamlandı", suan=[],
+               bitti=datetime.now(config.TR_TZ).isoformat(timespec="seconds"),
+               harcanan_usd=round(month_spend(conn) - spend0, 4),
+               sonuc={k: stats.get(k, 0) for k in ("analyzed", "filtered_out", "errors", "butce_disi")},
+               neden=stats.get("stopped"))
+    _write_status(st_)
     return stats

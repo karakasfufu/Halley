@@ -4,6 +4,7 @@ Fiyat verisinden KODLA hesaplanır; yapay zekâ kullanılmaz, kredi harcamaz. Ha
 teknik görünüm ayrı bir bilgi olarak gösterilir (skora katmak geçmiş veriyle test edilmeden yapılmamalı).
 Fiyatlar yfinance'tan, gecikmelidir.
 """
+import json
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional
 
@@ -331,12 +332,18 @@ def for_ticker(conn, ticker: str, today: Optional[date] = None) -> Optional[Dict
     if t is None:
         return None
     since = (date.fromisoformat(t["tarih"]) - timedelta(days=60)).isoformat()
+    # 2026-11-09 hız: hisse eşleşmesi önce dizinden (metin okunmadan), olay koşulu yalnız eşleşen satırlarda
+    rowids = [r[0] for r in conn.execute("SELECT rowid FROM news INDEXED BY ix_news_subject_cand WHERE "
+                                         "(','||candidates||',') LIKE ? AND subject IS NOT NULL", (f"%,{ticker},%",))]
+    rowids += [r[0] for r in conn.execute("SELECT rowid FROM news WHERE subject IS NULL AND published_at>=? AND "
+                                          "(','||candidates||',') LIKE ?", (since, f"%,{ticker},%"))]
     events = conn.execute(
         "SELECT DISTINCT substr(n.published_at,1,10) d, COALESCE(n.subject, i.event_type) s FROM news n "
         "LEFT JOIN impacts i ON i.news_id=n.id AND i.ticker=? "
-        "WHERE (','||n.candidates||',') LIKE ? AND n.published_at>=? AND (i.event_type IN (%s) OR %s) ORDER BY d DESC"
+        "WHERE n.rowid IN (SELECT value FROM json_each(?)) AND n.published_at>=? AND (i.event_type IN (%s) OR %s) "
+        "ORDER BY d DESC"
         % (",".join("?" * len(EVENT_TYPES)), " OR ".join("n.subject LIKE ?" for _ in EVENT_SUBJECTS)),
-        (ticker, f"%,{ticker},%", since, *EVENT_TYPES, *[f"%{s}%" for s in EVENT_SUBJECTS])).fetchall()
+        (ticker, json.dumps(rowids), since, *EVENT_TYPES, *[f"%{s}%" for s in EVENT_SUBJECTS])).fetchall() if rowids else []
     for e in events[:3]:
         t["veri_uyarilari"].append(f"{e['d']} kurumsal olay ({e['s']}): fiyat düzeltmesi destek/direnç ve "
                                    "ortalamaları bozmuş olabilir")

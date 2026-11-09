@@ -26,6 +26,12 @@ def log_run(conn, universe: Dict[str, str], kind: str, window: int = 7, today: O
     counts = Counter(d["neden_kodu"] for d in decisions)
     summary = {"hisse": len(decisions), "onerilen": counts.get("ONERILDI", 0), "nedenler": dict(counts),
                "pencere_gun": window}
+    try:   # D (2026-11-09): o günün piyasa rejimi karar kaydıyla saklanır (ileride rejime göre başarı ölçülür)
+        from . import regime
+        rg = regime.regime(conn, ctx.today)
+        summary["rejim"] = {k: rg.get(k) for k in ("gun", "trend", "oynaklik", "genislik_%")} if not rg.get("yok") else None
+    except Exception:
+        summary["rejim"] = None
     now = datetime.now(config.TR_TZ).isoformat(timespec="seconds")
     with conn:  # hepsi ya da hiçbiri
         cur = conn.execute("INSERT INTO watch_runs(kind, day, started_at, summary_json) VALUES(?,?,?,?)",
@@ -299,6 +305,8 @@ def morning_report(conn, ctx, out) -> tuple:
     tickers = sorted({r["ticker"] for r in rec + watch} | {r["hisse"] for r in open_rows})
     cal = _calendar_lines(conn, ctx, tickers, 5) if tickers else _calendar_lines(conn, ctx, [], 5)
     md = _header("sabah", out["zaman"]["zaman"], out["zaman"])
+    from . import regime
+    md += "**📊 Piyasa durumu:** " + regime.regime(conn, ctx.today).get("ozet", "—") + "\n\n"
     md += (f"## 1. Gece gelen haberler\nÖnceki kapanıştan ({night['since'][:16].replace('T', ' ')}) bu yana: KAP "
            f"{night['kap']}, haber siteleri {night['haber_sitesi']}. Bunlardan {night['onemsiz']} tanesi ön elemede "
            f"önemsiz/rutin bulundu, {night['analiz_edilen']} tanesi analiz edildi, {night['bekleyen']} tanesi analiz "
@@ -445,6 +453,8 @@ def evening_report(conn, ctx, out) -> tuple:
 
     # 1 — piyasa özeti
     md += "## 1. Günlük piyasa özeti\n"
+    from . import regime
+    md += "**📊 Piyasa rejimi:** " + regime.regime(conn, ctx.today).get("ozet", "—") + "\n\n"
     if ms.get("yok") and "hisse" not in ms:
         md += f"_{ms['yok']}_\n\n"
     else:

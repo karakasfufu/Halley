@@ -192,7 +192,8 @@ def parse_notice(subject: str, body: str, tickers: List[str], published_at: str,
 
 def events_for(conn, ticker: str) -> List[Dict]:
     """Hissenin kayıtlı KAP bildirimlerinden olaylar; aynı tür + aynı konu için en son bildirim geçerli."""
-    rows = conn.execute("SELECT id, published_at, subject, body, candidates FROM news WHERE source='kap' AND "
+    rows = conn.execute("SELECT id, published_at, subject, body, candidates FROM news INDEXED BY ix_news_subject_cand "
+                        "WHERE source='kap' AND "
                         "(','||candidates||',') LIKE ? AND subject IN (%s) ORDER BY published_at" % ",".join("?" * len(SUBJECTS)),
                         (f"%,{ticker},%", *SUBJECTS)).fetchall()
     latest: Dict = {}

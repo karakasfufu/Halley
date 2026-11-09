@@ -1057,3 +1057,35 @@ olumsuz işaretlenmiş" (analiz edilmiş) haberlerin derin yeniden incelenmesi; 
 - **B seçeneği tahmini (canlı kopya, tüm BIST fiyatlarıyla):** 6–9 Kasım, açık işlem + likit: 296 haber (250 KAP, 46 site)
   → 3,71–9,85 $ (temkinli üst tahmin). Çalıştırılmadı: kullanıcıya verdiğim "üst uç 8 $'ı aşmazsa" sınırının üstünde →
   onay bekleniyor. 390 test, ağsız 0 bağlantı; uçtan uca kontrol temiz.
+
+## 2026-11-09 — D aşaması 1: piyasa rejimi (`bist_haber/regime.py`) — yalnız bilgi, kararları değiştirmez
+Tanımlar: trend = BIST 100 kapanış > EMA50 > EMA200 "yükseliş", tersi "düşüş", diğer "kararsız"; oynaklık = son 20 gün
+ATR% değerinin son ~1 yıldaki yüzdeliği (< %30 düşük, > %70 yüksek); genişlik = likit hisselerin (20 gün ort. hacim ≥ 2 mn
+TL) kendi EMA50 üstünde kapanan yüzdesi. Gün = verilen günde ya da öncesinde son fiyat günü (sonraki gün testle dışarıda).
+Nerede: sabah raporu başı ("📊 Piyasa durumu"), akşam raporu bölüm 1, panel üst özet (fiyat günü değişince hesaplanır),
+bekçi karar kaydı özetine `rejim` (ileride rejime göre başarı). Gerçek veri (06.11): düşüş (11.483; EMA50 12.320, EMA200
+12.935), oynaklık yüksek (ATR %2,61, yılın %90'lık dilimi), genişlik %9 (574 likit hisse); 0,5 sn.
+**Doğrulama:** EMA50 pandas ile birebir; EMA200'de 12.935 vs 13.011 farkı → modül TA-Lib yöntemiyle (SMA başlangıçlı)
+birebir aynı (12.934,5); fark yalnız 251 günlük geçmişte başlangıç değeri duyarlılığı. Düzeltme: BIST 100 geçmişi 600
+günden kısaysa sabah analizi bir kez 3 yıl indirir. **Bilinen sınır:** hisselerin EMA200'ü de 1 yıllık geçmişle
+(TA-Lib yöntemi) hesaplanıyor; daha uzun geçmiş indirme süresini artırır, şimdilik değiştirilmedi. 394 test.
+
+## 2026-11-09 — B seçeneği (önemli konular) sonucu, canlı ilerleme, panel hızı
+**B — yalnız önemli konular (kullanıcı onayı):** 6–9 Kasım, likit hisselerin Finansal Rapor (92) + Özel Durum (46) +
+Yeni İş İlişkisi (3) + açık işlem (1) = 142 haber. Tahmin 1,78–4,72 $ → **gerçek 2,20 $**, 142/142 analiz, hata 0,
+26,5 dk. Sonra panelde olumlu 50 / olumsuz 43 hisse (önce 3 / 3; kural değişmedi — analiz edilmemiş haber skor üretmez).
+**Uydurma denetimi (151 etki):** aday dışı hisse 0. Gerekçelerdeki 1.416 sayının 1.409'u haber metninde ya da yapay
+zekâya verilen bağlamda (piyasa değeri, son fiyat); kalan 7'si metindeki sayılardan hesap (ör. REEDR 1.925.450.870 −
+673.200.619 = 1,25 mlr TL ✓) ya da tarih/yıl. Sayı denetleyicisi geliştirildi: birim dönüşümü (TL → mn/mlr TL) ve yıl
+kısaltması (3Ç'26) tanınır — önceden yanlış "bulunamadı" veriyordu.
+**Canlı ilerleme (kullanıcı: "ilerleme barı yok", "kendisi güncellensin, incelenen hisseyi göstersin"):** analiz durumu
+`data/analiz_durumu.json` (yalnız gerçek kullanım yolları yazar; testler yazmaz — testte yakalandı, .gitignore).
+Panel üstünde 10 sn'de bir yenilenen kutu: ilerleme çubuğu, canlı olumlu/olumsuz sayısı, "⏳ şu an inceleniyor"
+(paralel 5 haber), "✅ son biten" (ör. AKGRT olumlu 4/5), gerçek maliyet. Yeni sonuç geldikçe TÜM sayfa (liste ve
+sayılar) kendiliğinden yenilenir: en az 30 sn arayla, sayfa çizimi uzunsa çizim süresinin 3 katı (sürekli yenilenme
+döngüsü olmasın); bitince bir kez. Not: B analizi panel dışından eski kodla başladığı için kutuda görünmedi.
+**Panel hızı:** çok hisse haberli olunca açılış 32 sn oldu (sorguların %94'ü; KAP metinleri büyük, `candidates` sütunu
+`body`den sonra → her hisse araması metinleri okuyordu). Dizinler (`subject`, `published_at`, `subject+candidates+source`)
++ "ile başlar" aramaları aralık olarak + `INDEXED BY` + teknik olay uyarısında iki adımlı arama: 126 hissede 33 → 5 sn,
+panel açılışı 32 → 7 sn. Çıktılar eski kodla birebir aynı (126 hissenin plan/risk/bilanço/takvimi karşılaştırıldı).
+396 test, ağsız 0 bağlantı; uçtan uca kontrol temiz.

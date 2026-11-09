@@ -6,6 +6,7 @@ Ayarlar katlanır bölümde; durum ve geçmiş veri pilotu "Gelişmiş" sekmesin
 import json
 import os
 import re
+import time
 from datetime import date, datetime, timedelta
 from html import escape as esc
 
@@ -17,6 +18,7 @@ from bist_haber import (analyzer, calendar_sync, config, corp_events, db, earnin
                         trends, watchdog, ai_comment)
 
 st.set_page_config(page_title="Halley", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
+_RENDER_T0 = time.time()   # sayfa çizim süresi (otomatik yenileme aralığı buna göre)
 
 st.markdown("""
 <style>
@@ -299,6 +301,13 @@ def watch_box() -> None:
 watch_box()
 
 # ---------------- Özet ----------------
+_pd_key = conn.execute("SELECT MAX(date) FROM prices WHERE ticker='XU100'").fetchone()[0]
+if st.session_state.get("_regime_key") != _pd_key:      # fiyat günü değişince yeniden hesapla (her çizimde değil)
+    from bist_haber import regime as _regime
+    st.session_state["_regime"] = _regime.regime(conn).get("ozet")
+    st.session_state["_regime_key"] = _pd_key
+if st.session_state.get("_regime"):
+    st.caption("📊 Piyasa durumu (bilgi; kararları değiştirmez): " + st.session_state["_regime"].replace("**", ""))
 rows = report.build(conn, uni, days=window)
 positives = [r for r in rows if r["score"] >= 1.5]
 negatives = [r for r in rows if r["score"] <= -1.5]
@@ -338,6 +347,67 @@ def kap_reader_live() -> None:
         kap_worker.start()   # panel yeniden başlatıldıysa yarım iş birkaç dakika içinde kendiliğinden sürer
     kap_reader_box()
 
+
+def analysis_status_box() -> None:
+    """Haber analizi ilerlemesi (2026-11-09 kullanıcı geri bildirimi: "ilerleme barı yok"). Hangi yoldan başlatılırsa
+    başlatılsın (panel düğmesi, sabah analizi, arka plan) durum dosyasından okunur; sayfa yenilense de kaybolmaz."""
+    s_ = analyzer.load_status()
+    if not s_:
+        return
+    beat = datetime.fromisoformat(s_["nabiz"]) if s_.get("nabiz") else None
+    fresh = beat and (datetime.now(config.TR_TZ) - beat).total_seconds() < 300
+    tur, n, k = s_.get("tur", "haber analizi"), s_.get("toplam", 0), s_.get("biten", 0)
+    if s_.get("durum") == "çalışıyor" and fresh:
+        live = report.build(conn, uni, days=window)
+        pos_, neg_ = sum(1 for r in live if r["score"] >= 1.5), sum(1 for r in live if r["score"] <= -1.5)
+        st.info(f"🔬 {tur.capitalize()} sürüyor: {k}/{n} haber · şu ana kadar ≈ {s_.get('harcanan_usd', 0):.3f} $ · "
+                f"şu an **olumlu {pos_} · olumsuz {neg_} hisse** (canlı). Paneli kullanmaya devam edebilirsiniz; bu kutu "
+                "10 sn'de bir, liste ve sayılar yeni sonuç geldikçe en fazla 30 sn'de bir kendiliğinden yenilenir.")
+        st.progress(min(1.0, k / max(n, 1)))
+        if s_.get("suan"):
+            st.caption("⏳ Şu an inceleniyor: " + " · ".join(f"**{x['hisse']}** — {x['konu']}: {x['baslik'][:60]}"
+                                                            for x in s_["suan"]))
+        if s_.get("son"):
+            st.caption("✅ Son biten: " + " · ".join(f"{x['saat'][:5]} {x['sonuc']}" for x in s_["son"][:6]))
+    elif s_.get("durum") == "çalışıyor":
+        st.warning(f"🔬 {tur.capitalize()} yarıda kaldı ({k}/{n}; program kapanmış olabilir). Analiz edilen haberler "
+                   "kaydedildi; kalanlar bekleyen listesinde.")
+    elif (s_.get("bitti") or "")[:10] == datetime.now(config.TR_TZ).date().isoformat():
+        r_ = s_.get("sonuc") or {}
+        if tur == "derin inceleme":
+            text_ = f"{r_.get('incelenen', 0)} haber yeniden incelendi, {r_.get('degisen', 0)} haberde sonuç değişti"
+        else:
+            text_ = (f"{r_.get('analyzed', 0)} haber analiz edildi, {r_.get('filtered_out', 0)} haber önemsiz bulundu"
+                     + (f", {r_['errors']} hata" if r_.get("errors") else "")
+                     + (f", {r_['butce_disi']} haber bütçe nedeniyle bekliyor" if r_.get("butce_disi") else ""))
+        (st.warning if s_.get("durum") == "durdu" else st.success)(
+            f"🔬 Son {tur} ({s_['bitti'][11:16]}): {text_} · gerçek maliyet ≈ {s_.get('harcanan_usd', 0):.3f} $"
+            + (f" · durdu: {s_['neden']}" if s_.get("neden") else ""))
+
+
+@st.fragment(run_every=10)
+def analysis_status_live() -> None:
+    """Her 10 sn durum dosyasını okur (ucuz). Analiz sürerken yeni sonuç geldiyse en fazla 30 sn'de bir, bittiğinde bir
+    kez TÜM sayfayı yeniler: üstteki olumlu/olumsuz sayıları ve Bugünün listesi kullanıcı yenilemeden güncellenir."""
+    s_ = analyzer.load_status()
+    analysis_status_box()
+    key = (s_.get("basladi"), s_.get("biten"), s_.get("durum"))
+    seen = st.session_state.get("_an_seen")
+    if seen is None:
+        st.session_state["_an_seen"] = key
+        st.session_state["_an_full_at"] = time.time()
+        return
+    if key != seen:
+        finished = s_.get("durum") != "çalışıyor" and seen[2] == "çalışıyor"
+        # aralık: en az 30 sn, sayfa çizimi uzunsa çizim süresinin 3 katı (sürekli yenilenme döngüsü olmasın)
+        gap = max(30.0, 3 * st.session_state.get("_render_sec", 0.0))
+        if finished or time.time() - st.session_state.get("_an_full_at", 0) >= gap:
+            st.session_state["_an_seen"] = key
+            st.session_state["_an_full_at"] = time.time()
+            st.rerun(scope="app")
+
+
+analysis_status_live()
 
 if not os.environ.get("HALLEY_OFFLINE"):
     kap_worker.start()   # bekleyen çok sayfa varsa ya da önceki iş yarım kaldıysa kendiliğinden başlar
@@ -885,7 +955,7 @@ def news_analysis_box() -> None:
             bar = st.progress(0.0, text="Yapay zekâ haberleri analiz ediyor...")
             before = analyzer.month_spend(conn)
             try:
-                res = analyzer.analyze(conn, uni, rows=fit, quality=quality, budget_usd=news_budget,
+                res = analyzer.analyze(conn, uni, rows=fit, quality=quality, budget_usd=news_budget, track=True,
                                        progress=lambda i, n: bar.progress(i / max(n, 1), text=f"Analiz ({i}/{n})..."))
                 cost = analyzer.month_spend(conn) - before
                 flash("success", f"{res.get('analyzed', 0)} haber analiz edildi, {res.get('filtered_out', 0)} haber ön "
@@ -940,7 +1010,7 @@ def news_analysis_box() -> None:
             bar = st.progress(0.0, text="Derin inceleme...")
             before = analyzer.month_spend(conn)
             try:
-                res = analyzer.reanalyze(conn, uni, chosen, budget_usd=news_budget,
+                res = analyzer.reanalyze(conn, uni, chosen, budget_usd=news_budget, track=True,
                                          progress=lambda i, n: bar.progress(i / max(n, 1), text=f"İnceleme ({i}/{n})..."))
                 st.session_state["ra_last"] = res
                 cost = analyzer.month_spend(conn) - before
@@ -1237,3 +1307,4 @@ with tab_reports:
 st.markdown("<div class='disclaimer'>Halley haberleri otomatik olarak özetler ve puanlar; yatırım tavsiyesi değildir. "
             "Puan eşikleri henüz geçmiş veriyle ayarlanmadı. Karar ve emir sorumluluğu kullanıcıdadır.</div>",
             unsafe_allow_html=True)
+st.session_state["_render_sec"] = time.time() - _RENDER_T0

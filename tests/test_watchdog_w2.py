@@ -169,6 +169,21 @@ class UpdateUniverseTests(unittest.TestCase):
         self.run_u(["MISS"])
         self.assertEqual(self.seen, [("1y", ["MISS"])])
 
+    def test_benchmark_long_history_once(self):
+        calls = []
+
+        def fake(c, tickers, period="1y"):
+            calls.append((period, list(tickers)))
+            if period == "3y":
+                for i in range(700):
+                    c.execute("INSERT OR IGNORE INTO prices(ticker,date,close) VALUES('XU100',?,1)", (f"2024-{i:04d}",))
+            return 0
+
+        with patch.object(prices, "update", fake):
+            prices.update_universe(self.conn, ["XU100"], batch=10)
+            prices.update_universe(self.conn, ["XU100"], batch=10)
+        self.assertEqual([c for c in calls if c[0] == "3y"], [("3y", ["XU100"])])     # yalnız bir kez
+
     def test_failed_batch_counted_others_continue(self):
         def fake(c, tickers, period="1y"):
             if "BAD" in tickers:
