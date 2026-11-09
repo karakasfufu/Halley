@@ -460,14 +460,102 @@ def in_session(now: datetime) -> bool:
     return bool(close) and time(10, 0) <= now.time() <= close
 
 
+# ---------------------------------------------------------------- önemli yeni haberler (Aşama 4)
+NEWS_EVERY_MIN = 30
+NEWS_MIN_MAGNITUDE = 3        # etki 3/5 ve üzeri, yönü olumlu ya da olumsuz → "önemli"
+NEWS_MAX_AGE_DAYS = 3
+
+
+def news_window(now: datetime) -> bool:
+    """KAP bildirimleri işlem günlerinde 08:00–19:30 arası izlenir (hafta sonu/tatilde liste çekilmez)."""
+    return market_calendar.is_trading_day(now.date()) and time(8, 0) <= now.time() <= time(19, 30)
+
+
+def _watch_rows(conn, tickers: List[str], extra: str, args: tuple = ()) -> List:
+    like = " OR ".join("(','||candidates||',') LIKE ?" for _ in tickers)
+    return conn.execute(f"SELECT * FROM news WHERE source='kap' AND ({like}) {extra} ORDER BY published_at",
+                        tuple(f"%,{t},%" for t in tickers) + args).fetchall()
+
+
+def news_check(conn, now: Optional[datetime] = None, collect_fn: Optional[Callable] = None,
+               body_fn: Optional[Callable] = None, analyze_fn: Optional[Callable] = None,
+               sleep: Optional[Callable] = None) -> Dict:
+    """Takip listesindeki hisselerin yeni KAP bildirimleri: listeyi al (yalnız liste, mevcut KAP bekleme süreleri),
+    YALNIZ takip edilen hisselerin metnini oku, aylık haber bütçesi içinde yapay zekâyla analiz et (kullanıcı onayı
+    2026-11-09: "haber bildirimi bütçe tavanı içinde otomatik açık"), önemli olanları olay olarak kaydet.
+    Analiz edilmiş her haber (panelden yapılanlar dahil) hisse takibe alındıktan sonra yayımlandıysa değerlendirilir."""
+    import time as _t
+    from . import analyzer, kap, pipeline
+    from .universe import load_universe
+    now = now or _now()
+    ws = watched(conn)
+    tickers = [w["ticker"] for w in ws]
+    out = {"liste": None, "metin": 0, "analiz": None, "olay": 0}
+    if not tickers:
+        return out
+    settings = pipeline.load_settings()
+    since = _iso(now - timedelta(days=NEWS_MAX_AGE_DAYS))
+    uni = load_universe(conn)
+    try:
+        out["liste"] = (collect_fn or (lambda c: kap.collect(c, uni, days=1, fetch_bodies=False)))(conn).get("new", 0)
+    except Exception as e:                       # KAP sınırı / bağlantı: bir sonraki turda yeniden
+        out["hata"] = str(e)[:150]
+    for r in _watch_rows(conn, tickers, "AND status='new' AND body IS NULL AND published_at>=?", (since,)):
+        try:
+            body = (body_fn or kap.fetch_body)(int(r["id"].split(":")[1]), r["subject"] or "")
+        except Exception as e:
+            out["hata"] = f"metin alınamadı: {str(e)[:120]}"
+            break                                  # KAP sınırı: kalanlar sonraki turda
+        finally:
+            (sleep or _t.sleep)(config.KAP_REQUEST_DELAY)
+        if body.strip():
+            conn.execute("UPDATE news SET body=? WHERE id=?", (body, r["id"]))
+            conn.commit()
+            out["metin"] += 1
+    if settings.get("takip_haber_analizi", True) and pipeline.has_api_key():
+        todo = [r for r in _watch_rows(conn, tickers, "AND status='new' AND body IS NOT NULL AND TRIM(body)!='' "
+                                                       "AND published_at>=?", (since,))]
+        if todo:
+            res = (analyze_fn or analyzer.analyze)(
+                conn, uni, rows=todo, quality=settings.get("analiz_kalitesi"),
+                budget_usd=float(settings.get("haber_butce_usd", config.NEWS_BUDGET_USD)))
+            out["analiz"] = {k: res.get(k) for k in ("analyzed", "filtered_out", "errors", "butce_disi") if k in res}
+    elif not pipeline.has_api_key():
+        out["analiz"] = "API anahtarı yok"
+    added = {w["ticker"]: w["eklendi"] for w in ws}
+    for tk in tickers:
+        for i in conn.execute(
+                "SELECT i.*, n.title, n.id AS nid FROM impacts i JOIN news n ON n.id=i.news_id WHERE i.ticker=? AND "
+                "i.direction!=0 AND i.magnitude>=? AND i.published_at>=? AND i.published_at>=?",
+                (tk, NEWS_MIN_MAGNITUDE, added[tk], since)):
+            word = "Olumlu" if i["direction"] > 0 else "Olumsuz"
+            if _event(conn, now, tk, "haber",
+                      f"{word} önemli haber (etki {i['magnitude']}/5, güven %{i['confidence'] * 100:.0f}): "
+                      f"{(i['title'] or '')[:120]} — {(i['reason'] or '')[:160]}", f"h:{i['nid']}:{tk}"):
+                out["olay"] += 1
+    conn.commit()
+    return out
+
+
 def tick(conn, now: Optional[datetime] = None, price_fn: Optional[Callable] = None,
-         quote_fn: Optional[Callable] = None, send: Optional[Callable] = None) -> Dict:
+         quote_fn: Optional[Callable] = None, send: Optional[Callable] = None,
+         news_fn: Optional[Callable] = None) -> Dict:
     """Arka plan bekçisinin bir turu (okuyucu döngüsü ~2 dk'da bir çağırır). Ağ işlevleri testte değiştirilebilir."""
+    import os
     from . import prices
     now = now or _now()
     st = load_state()
     out = {}
     tickers = [w["ticker"] for w in watched(conn)]
+    if tickers and news_window(now) and (news_fn or not os.environ.get("HALLEY_OFFLINE")):
+        last = st.get("haber_son")
+        if not last or (now - datetime.fromisoformat(last)).total_seconds() >= NEWS_EVERY_MIN * 60 - 5:
+            try:
+                res = (news_fn or news_check)(conn, now)
+            except Exception as e:
+                res = {"hata": str(e)[:200]}
+            out["haber"] = res
+            st.update(haber_son=_iso(now), haber_sonuc=res)
     if tickers:
         target = last_closed_day(now)
         if target and target.isoformat() > st.get("kapanis_gunu", ""):   # yalnız ileri; eski günü yeniden işleme

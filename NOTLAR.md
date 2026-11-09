@@ -1340,3 +1340,23 @@ motor (Aşama 1–2), sonra arayüz (Aşama 3); haber bildirimi bütçe tavanı 
   Dashboard, Fırsatlar, Hisse Analizi.
 - Not: Streamlit'in yerleşik çok sayfalı yapısı (st.navigation) yerine tek dosyada radyo menü seçildi: test
   edilebilir (AppTest), widget anahtarları korunur, ekranlar arası yönlendirme basit.
+
+## 2026-11-09 — Aşama 4: önemli yeni haber bildirimi + strateji başarı raporu
+- tracker.news_check (bekçi turunda, işlem günlerinde 08:00–19:30, 30 dk'da bir): kap.collect(days=1, metin yok — tüm
+  evren, normal güncellemeyle aynı; KAP bekleme süreleri DEĞİŞMEDİ) → YALNIZ takip edilen hisselerin son 3 gündeki
+  metni olmayan bildirimleri okunur (KAP_REQUEST_DELAY; sınır/hata olursa tur bırakılır) → takip edilen hisselerin
+  metni hazır bildirimleri analyzer.analyze ile, ayarlar.json'daki analiz kalitesi ve AYLIK HABER BÜTÇESİ tavanıyla
+  analiz edilir (kullanıcı onayı: bütçe içinde otomatik) → hisse takibe alındıktan SONRA yayımlanmış, yönü olumlu/
+  olumsuz ve etkisi ≥3/5 olan her etki "haber" olayı (anahtar h:haber:hisse, bir kez). Panelden yapılan analizler
+  de değerlendirilir. Ayar: takip_haber_analizi (varsayılan açık; Ayarlar'da düğme). API anahtarı yoksa analiz yok.
+- Not: bekçinin günlük KAP listesini alması, panelde "Haberleri güncelle"nin ilk adımıyla aynıdır; yeni bildirimler
+  analiz sırasına girer ve mevcut arka plan okuyucusu metinleri (ücretsiz, yapay zekâsız) her zamanki gibi tamamlar.
+- Strateji başarısı: 🏁 Performans ekranında takip senaryolarının strateji türüne göre TP1/TP2/SL/başabaş/süre doldu
+  oranları ve ortalama net % (tracker.performance; 30'dan az örnekte "güvenilir değil" uyarısı) + mevcut Gelişim.
+- Testler: tests/test_tracker.py NewsTests (yalnız takip edilen hissenin metni okunur, bütçe iletilir, bir kez
+  bildirilir, ikinci turda yeniden analiz yok; takipten önceki/zayıf haber bildirilmez; ayar kapalıyken yapay zekâ
+  çağrılmaz; KAP hatası turu durdurmaz; API anahtarı yoksa analiz yok; 30 dk aralık, hafta sonu yok). 442 test geçti.
+- Gerçek KAP'la deneme (canlı verinin KOPYASI, sahte analiz, maliyet 0): liste alındı (662 bildirim), takip
+  edilenlerde metni bekleyen yoktu; kopyada takip tarihi 3 gün geriye alınınca AKGRT'nin analiz edilmiş etki 3/5
+  haberi doğru şekilde olay oldu. Gerçek yapay zekâ çağrısıyla haber bildirimi DENENMEDİ (maliyet; canlıda bütçe
+  içinde kendiliğinden olacak). Gerçek Telegram gönderimi DENENMEDİ (bot anahtarı kullanıcıda).

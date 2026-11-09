@@ -252,5 +252,87 @@ class PerformanceTests(Base):
         self.assertEqual(perf["Kırılım"]["Girişsiz biten"], 1)
 
 
+class NewsTests(Base):
+    """Aşama 4: takip edilen hissenin yeni KAP haberi → metin → bütçe içinde analiz → önemliyse olay (bir kez)."""
+
+    def setUp(self):
+        super().setUp()
+        self.now = at(D1, 11)
+        self.conn.execute("UPDATE watchlist SET eklendi=? WHERE ticker='TST'", (tracker._iso(self.now - timedelta(days=1)),))
+        self.news("kap:1", "TST", self.now - timedelta(hours=1))             # takip sonrası, metni yok
+        self.news("kap:2", "POS", self.now - timedelta(hours=1))             # takip edilmeyen hisse
+        self.conn.commit()
+        self.bodies, self.analyzed = [], []
+        p = patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"})
+        p.start()
+        self.addCleanup(p.stop)
+
+    def news(self, nid, tk, when, body=None, status="new"):
+        self.conn.execute("INSERT INTO news(id,source,published_at,effective_date,title,subject,body,candidates,status,"
+                          "fetched_at) VALUES(?,'kap',?,?,'TST A.Ş.: Yeni iş ilişkisi','Özel Durum',?,?,?,'f')",
+                          (nid, tracker._iso(when), when.date().isoformat(), body, tk, status))
+
+    def body_fn(self, index, subject):
+        self.bodies.append(index)
+        return "Şirket 1 milyar TL'lik sözleşme imzaladı."
+
+    def analyze_fn(self, conn, uni, rows=None, quality=None, budget_usd=None):
+        self.analyzed.append(([r["id"] for r in rows], budget_usd))
+        for r in rows:
+            conn.execute("UPDATE news SET status='analyzed' WHERE id=?", (r["id"],))
+            conn.execute("INSERT INTO impacts(news_id,ticker,direction,magnitude,confidence,persistence,event_type,reason,"
+                         "published_at,effective_date) VALUES(?,?,1,4,0.8,'orta','is_iliskisi','büyük sözleşme',?,?)",
+                         (r["id"], "TST", r["published_at"], r["effective_date"]))
+        conn.commit()
+        return {"analyzed": len(rows), "filtered_out": 0, "errors": 0}
+
+    def run_check(self, **k):
+        return tracker.news_check(self.conn, self.now, collect_fn=k.get("collect", lambda c: {"new": 0}),
+                                  body_fn=self.body_fn, analyze_fn=self.analyze_fn, sleep=lambda s: None)
+
+    def test_only_watched_news_read_analyzed_and_alerted_once(self):
+        pipeline.save_settings(haber_butce_usd=7.5)
+        res = self.run_check()
+        self.assertEqual(self.bodies, [1])                                   # yalnız takip edilen hissenin metni
+        self.assertEqual(self.analyzed, [(["kap:1"], 7.5)])                 # bütçe tavanı iletildi
+        self.assertEqual(res["olay"], 1)
+        self.assertIn("h:kap:1:TST", self.keys())
+        msg = self.conn.execute("SELECT mesaj, tur FROM takip_olay").fetchone()
+        self.assertEqual(msg["tur"], "haber")
+        self.assertIn("Olumlu önemli haber (etki 4/5", msg["mesaj"])
+        self.assertEqual(self.run_check()["olay"], 0)                       # ikinci tur: tekrar yok, yeniden analiz yok
+        self.assertEqual(len(self.analyzed), 1)
+
+    def test_old_or_weak_news_not_alerted_and_switch_off(self):
+        for nid, when, mag in (("kap:9", self.now - timedelta(days=2), 5), ("kap:8", self.now - timedelta(hours=2), 2)):
+            self.news(nid, "TST", when, body="x", status="analyzed")         # takipten önce / etkisi zayıf
+            self.conn.execute("INSERT INTO impacts(news_id,ticker,direction,magnitude,confidence,persistence,event_type,"
+                              "reason,published_at,effective_date) VALUES(?,'TST',1,?,0.9,'orta','diger','r',?,?)",
+                              (nid, mag, tracker._iso(when), when.date().isoformat()))
+        self.conn.commit()
+        pipeline.save_settings(takip_haber_analizi=False)
+        res = self.run_check()
+        self.assertEqual(self.analyzed, [])                                  # kapalı: yapay zekâ çağrılmaz
+        self.assertEqual(res["olay"], 0)
+
+    def test_kap_error_does_not_stop_and_no_key_no_ai(self):
+        boom = lambda c: (_ for _ in ()).throw(OSError("429 Request Limit"))
+        with patch.dict(os.environ, {"OPENAI_API_KEY": ""}):
+            res = self.run_check(collect=boom)
+        self.assertIn("429", res["hata"])
+        self.assertEqual(res["analiz"], "API anahtarı yok")
+        self.assertEqual(self.analyzed, [])
+
+    def test_tick_runs_news_every_30_min_on_trading_days(self):
+        calls = []
+        fn = lambda conn, now: calls.append(now) or {"olay": 0}
+        noop = lambda *a, **k: {}
+        tracker.tick(self.conn, at(D1, 11, 0), noop, noop, self.send, fn)
+        tracker.tick(self.conn, at(D1, 11, 10), noop, noop, self.send, fn)    # 30 dk dolmadı
+        tracker.tick(self.conn, at(D1, 11, 31), noop, noop, self.send, fn)
+        tracker.tick(self.conn, at("2026-11-08", 12, 0), noop, noop, self.send, fn)   # pazar: yok
+        self.assertEqual(len(calls), 2)
+
+
 if __name__ == "__main__":
     unittest.main()

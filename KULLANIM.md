@@ -85,6 +85,10 @@ Halley bütün BIST'i taramaya devam eder; ama **Telegram'a yalnız takibe aldı
   - **Kapanıştan 20 dakika sonra** (günlük mum kesinleşince): giriş gerçekleşti, kırılım teyidi, TP1, TP2, SL,
     başabaş stop, süresi doldu / geçersiz, alt fitil + yükselen kapanış teyidi, destek / direnç kırılımı, hacim
     artışı, trend değişikliği, yeni senaryo. Halley o saatte kapalıysa, açıldığı ilk anda yapılır.
+  - **Önemli yeni haber:** işlem günlerinde 08:00–19:30 arası 30 dakikada bir KAP listesine bakılır; yalnız takip
+    ettiğiniz hisselerin yeni bildirimleri okunur ve yapay zekâyla analiz edilir (haber başına ~0,013 $; aylık haber
+    analizi bütçesini aşmaz). Etkisi 3/5 ve üzeri olumlu/olumsuz haberler bildirilir. Yalnız hisseyi takibe aldıktan
+    sonra yayımlanan haberler değerlendirilir. Kapatmak: ⚙️ Ayarlar → "yeni KAP haberlerini otomatik analiz et".
   - Tatil ve yarım günler hesaba katılır. **Fiyat verisi gelmezse ya da eskiyse olay üretilmez** (sahte sinyal yok).
   - Aynı olay **bir kez** bildirilir. İnternet kesilirse bildirim 24 saat içinde yeniden denenir.
 - **Bildirim ayarları (⭐ Takip Listem):** her hisse için bildirim türlerini seçin (ör. yalnız giriş, SL ve TP);

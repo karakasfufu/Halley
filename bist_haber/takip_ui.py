@@ -68,6 +68,12 @@ def watcher_status(conn, compact: bool = False) -> None:
     if st_.get("kapanis_gunu"):
         k = st_.get("kapanis_sonuc") or {}
         bits.append(f"son kapanış kontrolü {st_['kapanis_gunu']} ({k.get('hisse', 0)} hisse, {k.get('olay', 0)} olay)")
+    if st_.get("haber_son"):
+        h = st_.get("haber_sonuc") or {}
+        an = h.get("analiz")
+        bits.append(f"son haber kontrolü {st_['haber_son'][11:16]}"
+                    + (f" ({h.get('metin', 0)} yeni metin" + (f", {an.get('analyzed', 0)} analiz" if isinstance(an, dict) else "")
+                       + f", {h.get('olay', 0)} önemli haber)" if not h.get("hata") else f" — {h['hata']}"))
     if st_.get("gunici_son"):
         bits.append(f"son gün içi kontrol {st_['gunici_son'][11:16]}")
     for part in ("kapanis_sonuc", "gunici_sonuc"):
