@@ -6,6 +6,9 @@ kendiniz girersiniz. Çıktı yatırım tavsiyesi değildir.
 
 ## Kullanım (Python bilgisi gerekmez)
 
+> **Güncel ve ayrıntılı kılavuz: [KULLANIM.md](KULLANIM.md)** (panelde de **❓ Nasıl kullanılır** bölümünde).
+> Aşağıdaki kısa özet ilk sürümdendir.
+
 1. Bilgisayarda Python 3.9 veya üstü kurulu olmalı.
 2. **`baslat.bat`** dosyasına çift tıklayın. İlk açılışta gerekli paketler kurulur (birkaç dakika).
 3. Tarayıcıda panel açılır. İlk açılışta üstte çıkan kutuya kendi OpenAI API anahtarınızı bir kez girin.

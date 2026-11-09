@@ -1026,3 +1026,6 @@ etkisinin türü. Etiketler ortak `bist_haber/labels.py` (panel + gelişim). Gel
 **1.2:** `use_container_width=True` (20 yer; Streamlit'te kaldırılıyor) → `width="stretch"`; kurulumda
 `streamlit>=1.50,<2` (eski sınır 1.38 yeni parametreyi desteklemiyordu). Test çıktısında kullanımdan kalkma uyarısı 0;
 uçtan uca kontrol temiz. 380 test, ağsız 0 bağlantı.
+**1.3 Kullanım kılavuzu:** `KULLANIM.md` (açma, günlük sabah/akşam akışı, maliyetler, sekmeler, senaryo kartı, ayarlar,
+bilinmesi gerekenler) + panelde "❓ Nasıl kullanılır" bölümü; README'den bağlantı. Test: kılavuzdaki 14 düğme/sekme adı
+panel kodunda birebir var. 381 test.

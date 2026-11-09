@@ -209,6 +209,11 @@ if last:
     if last.get("rss", {}).get("failed_feeds"):
         st.caption("Bazı haber siteleri okunamadı. Ayrıntı: Gelişmiş sekmesi.")
 
+with st.expander("❓ Nasıl kullanılır"):
+    # Plan 1.3 (2026-11-09): programı kullanacak kişi için güncel kılavuz (KULLANIM.md ile aynı metin)
+    _guide = config.ROOT / "KULLANIM.md"
+    st.markdown(_guide.read_text(encoding="utf-8") if _guide.exists() else "Kılavuz dosyası (KULLANIM.md) bulunamadı.")
+
 # ---------------- Piyasa bekçisi (W2): sabah / akşam analizi — kullanıcı elle başlatır ----------------
 def watch_box() -> None:
     st.markdown("#### 🛡️ Piyasa bekçisi")

@@ -75,6 +75,18 @@ class PanelFlowTests(unittest.TestCase):
             for col in s.columns:
                 self.assertFalse(s[col].isin(["None", "nan"]).any(), f"{col} sütununda None/nan")
 
+    def test_guide_is_shown_and_names_real_buttons(self):
+        at = self.app()
+        guide = next((m.value for m in at.markdown if "Kullanım kılavuzu" in m.value), "")
+        self.assertTrue(guide, "kılavuz panelde yok")
+        src = Path(APP).read_text(encoding="utf-8")
+        for name in ("🌅 Sabah analizi", "🌙 Akşam analizi", "🔄 Haberleri güncelle", "🧪 Ücretsiz dene",
+                     "✍️ Bu işleme girdim", "⚙️ Ayarlar", "📈 Bugünün listesi", "📒 İşlem günlüğü", "📋 Raporlar",
+                     "🧭 Gelişim", "📰 Haberler", "🔧 Gelişmiş", "🤖 Raporu yapay zekâ ile yorumla",
+                     "🤖 Kaçırılan fırsatları yapay zekâ ile açıkla"):
+            self.assertIn(name, guide)
+            self.assertIn(name, src)        # kılavuzdaki ad panelde gerçekten var
+
     def test_double_save_real_trade_warns(self):
         at = self.app()
         at.number_input(key="real_px").set_value(100.5).run()
