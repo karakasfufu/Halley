@@ -158,6 +158,9 @@ def main():
         if a.veri and not a.veri_yok:                  # veri verildiyse tazele (en güncel hâli pakete girsin)
             shutil.rmtree(tmp)
             copy_data(Path(a.veri), app / "data")
+        elif a.veri_yok:                               # verisiz paket (ör. GitHub sürümü): boş veri klasörü
+            shutil.rmtree(tmp)
+            (app / "data").mkdir()
         else:
             tmp.rename(app / "data")
     else:

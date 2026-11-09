@@ -1223,3 +1223,9 @@ nadiren değişir, gerekirse aynı yolla yenilenir.
   python ve WebView2 süreçlerinin hepsi bitti; tek kopya, --kapat, port çakışması (8502'ye geçti, canlı panel sağlam),
   güncellemede .env/ayar/veri korunması yeniden geçti; 405 test geçti.
 - Denenemeyen: başka bilgisayar (temiz Windows), kurulum penceresinin görünümü, "Halley'i kaldır" onay pencereleri.
+
+## 2026-11-09 — Verisiz kurulum dosyası GitHub'a sürüm olarak (kullanıcı onayı)
+- `build_package.py --hazir-klasor --veri-yok` → boş veri klasörüyle Halley_Kurulum.exe (147 MB). Paket içinde .db / .env /
+  ayarlar.json yok (tarandı; "sk-" yalnız örnek yazılar). Kurulup açıldı (sağlık ok), sonra kapatıldı.
+- Gizli depoya sürüm: `v2026.11.09` (yalnız bu dosya; veriler USB ile taşınır). Veri dahil kurulum dosyası GitHub'a
+  YÜKLENMEDİ (kullanıcı kuralı: veritabanı GitHub'a yüklenmez).
