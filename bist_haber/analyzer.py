@@ -254,18 +254,90 @@ def priority(row, ctx: Dict) -> int:
     return best
 
 
-def pending(conn, limit: Optional[int] = None) -> List:
+def pending(conn, limit: Optional[int] = None, max_age_days: Optional[int] = None) -> List:
     # body NULL: KAP metni henüz alınamadı → metin gelene kadar bekle.
     # Sıra (2026-11-09): önce açık/bekleyen işlemi olan hisseler, sonra likit, sığ, fiyatı olmayan; her grupta en yeni
     # haber önce (2026-11-06 kullanıcı isteği: taze haber daha değerli). Neden: güncelleme başına 10 haber sınırı var ve
     # bilanço sezonunda kuyruk yüzlerce haber (ölçüm 08.11: 961 bekleyen, 887'si likit hisse) — sınırlı analiz
     # işlem yapılabilecek hisselere gitsin. Maliyet değişmez (aynı adet).
     sql = ("SELECT * FROM news WHERE status='new' AND body IS NOT NULL "
-           "AND LENGTH(TRIM(body, char(9)||char(10)||char(13)||' '))>0 ORDER BY published_at DESC, id")
-    rows = conn.execute(sql).fetchall()
+           "AND LENGTH(TRIM(body, char(9)||char(10)||char(13)||' '))>0")
+    args = []
+    if max_age_days is not None:   # kendiliğinden analizde eski haber atlanır (elle seçimde sınır yok)
+        from datetime import timedelta
+        cutoff = (datetime.now(config.TR_TZ) - timedelta(days=max_age_days)).isoformat(timespec="seconds")
+        sql += " AND published_at>=?"
+        args.append(cutoff)
+    rows = conn.execute(sql + " ORDER BY published_at DESC, id", args).fetchall()
     ctx = priority_context(conn)
     rows = sorted(rows, key=lambda r: priority(r, ctx))     # sıralama kararlı: grup içinde en yeni önce kalır
     return rows[:int(limit)] if limit else rows
+
+
+def month_spend(conn, now: Optional[datetime] = None) -> float:
+    """Bu ay haber analizine harcanan (kayıtlı token × fiyat; ön eleme + analiz + ikinci görüş birlikte)."""
+    from .pipeline import INPUT_USD_PER_TOKEN, OUTPUT_USD_PER_TOKEN
+    now = now or datetime.now(config.TR_TZ)
+    ay = now.strftime("%Y-%m")
+    r = conn.execute("SELECT COALESCE(SUM(input_tokens),0), COALESCE(SUM(output_tokens),0) FROM analyses "
+                     "WHERE substr(created_at,1,7)=?", (ay,)).fetchone()
+    # derin yeniden incelemede analyses satırı yenisiyle değişir; o ay yapılmış ÖNCEKİ analizin maliyeti buradan eklenir
+    o = conn.execute("SELECT COALESCE(SUM(eski_input_tokens),0), COALESCE(SUM(eski_output_tokens),0) FROM reanalysis_log "
+                     "WHERE durum='tamam' AND eski_ay=?", (ay,)).fetchone()
+    return (r[0] + o[0]) * INPUT_USD_PER_TOKEN + (r[1] + o[1]) * OUTPUT_USD_PER_TOKEN
+
+
+def _avg_out(conn) -> float:
+    v = conn.execute("SELECT AVG(output_tokens) FROM analyses WHERE stage='full' AND output_tokens>0").fetchone()[0]
+    return float(v or 4000)
+
+
+HIGH_OUT_DEFAULT = 16000   # geçmiş yokken haber başına üst çıktı varsayımı (ölçülen en fazla 12.961, ikinci görüş dahil)
+
+
+def _high_out(conn) -> float:
+    """Üst tahmin: gözlenen en pahalı haberin %25 fazlası ya da ortalamanın 2 katı (hangisi büyükse).
+    2026-11-09: önceki üst tahmin (2 × ortalama) gerçek en pahalı haberin altında kalabiliyordu → bütçe aşılabilirdi."""
+    r = conn.execute("SELECT MAX(output_tokens), AVG(output_tokens), COUNT(*) FROM analyses WHERE stage='full' AND "
+                     "output_tokens>0").fetchone()
+    if not r or not r[2]:
+        return float(HIGH_OUT_DEFAULT)
+    return max(1.25 * r[0], 2 * r[1])
+
+
+def row_cost(row, avg_out: float, quality: Optional[str] = None, high_out: Optional[float] = None) -> Tuple[float, float]:
+    """Bir haberin tahmini maliyeti (alt, üst $). Alt: ortalama çıktı; üst: ikinci görüş + en pahalı gözlenen çıktı."""
+    from .pipeline import INPUT_USD_PER_TOKEN, OUTPUT_USD_PER_TOKEN
+    f, a = estimate([row])
+    if row["source"] == "kap":
+        f = 0                      # KAP haberleri ön elemeye girmez (doğrudan analiz)
+    low = (f + a) * INPUT_USD_PER_TOKEN + avg_out * OUTPUT_USD_PER_TOKEN
+    high = (f + 2 * a) * INPUT_USD_PER_TOKEN + (high_out or 2 * avg_out) * OUTPUT_USD_PER_TOKEN
+    if not quality_profile(quality)["second_opinion"]:
+        high = low
+    return low, high
+
+
+def estimate_cost(conn, rows, quality: Optional[str] = None) -> Dict[str, float]:
+    avg, hi_out = _avg_out(conn), _high_out(conn)
+    costs = [row_cost(r, avg, quality, hi_out) for r in rows]
+    return {"adet": len(rows), "low_usd": sum(c[0] for c in costs), "high_usd": sum(c[1] for c in costs)}
+
+
+def within_budget(conn, rows, budget_usd: Optional[float], quality: Optional[str] = None):
+    """Bütçeye sığan haberler (sıra korunur; her birinin ÜST tahmini sayılır). (seçilen, bütçe dışı kalan sayısı)."""
+    if budget_usd is None:
+        return list(rows), 0
+    left = budget_usd - month_spend(conn)
+    avg, hi_out = _avg_out(conn), _high_out(conn)
+    keep = []
+    for r in rows:
+        hi = row_cost(r, avg, quality, hi_out)[1]
+        if hi > left:
+            break
+        keep.append(r)
+        left -= hi
+    return keep, len(rows) - len(keep)
 
 
 def estimate(rows) -> Tuple[int, int]:
@@ -351,7 +423,7 @@ def _work(llm: LLM, row, universe: Dict[str, str], stats: Dict[str, dict], quali
                              config.FILTER_REASONING_EFFORT)
         if not res["filter"].onemli:
             return res
-        article = fetch_article(row["url"])  # özet yerine tam metin
+        article = fetch_article(row["url"]) if row["url"] else ""  # özet yerine tam metin (adres yoksa denenmez)
         if len(article) > len(body):
             res["article"] = article
             body = f"{row['body'] or ''}\n\n[TAM METİN]\n{article}"
@@ -416,6 +488,107 @@ def _store(conn, row, universe, res, stats) -> None:
     stats["analyzed"] += 1
 
 
+DEEP_BODY_FACTOR = 2.0      # derin incelemede okunan metin (normalin 2 katı)
+DEEP_COST_FACTOR = 1.6      # maliyet tahmini çarpanı (uzun metin + zorunlu ikinci görüş)
+
+
+def _impacts_snapshot(conn, news_id: str) -> List[Dict]:
+    return [dict(r) for r in conn.execute("SELECT ticker, direction, magnitude, confidence, persistence, event_type, "
+                                          "reason, flag FROM impacts WHERE news_id=? ORDER BY ticker", (news_id,))]
+
+
+def analyzed_rows(conn, news_ids) -> List:
+    if not news_ids:
+        return []
+    q = ",".join("?" * len(news_ids))
+    rows = conn.execute(f"SELECT * FROM news WHERE id IN ({q}) AND status='analyzed'", list(news_ids)).fetchall()
+    order = {nid: i for i, nid in enumerate(news_ids)}
+    return sorted(rows, key=lambda r: order[r["id"]])
+
+
+def estimate_reanalysis(conn, rows) -> Dict[str, float]:
+    est = estimate_cost(conn, rows, "yuksek")
+    hi = est["high_usd"] * DEEP_COST_FACTOR
+    return {"adet": len(rows), "low_usd": est["high_usd"], "high_usd": hi}
+
+
+def reanalyze(conn, universe: Dict[str, str], news_ids, llm: Optional[LLM] = None,
+              budget_usd: Optional[float] = None, progress: Optional[Callable[[int, int], None]] = None) -> Dict:
+    """Analiz edilmiş haberi derin yeniden inceler (kullanıcı isteği 2026-11-09): en yüksek doğruluk profili, ZORUNLU
+    ikinci bağımsız görüş, iki kat metin. Önceki sonuç silinmez: reanalysis_log'a (değiştirilemez) yazılır; yeni sonuç
+    skor hesabında kullanılır. Habere sonradan gelen fiyat hareketi VERİLMEZ (geriye dönük bilgi karışmasın).
+    Bütçe: bu ayın harcaması + her haberin üst tahmini (×DEEP_COST_FACTOR) bütçeyi aşacaksa o haber atlanır."""
+    rows = analyzed_rows(conn, news_ids)
+    q = quality_profile("yuksek")
+    q.update(second_opinion=True, second_min_impact=0, body_factor=q["body_factor"] * DEEP_BODY_FACTOR)
+    out = {"istenen": len(news_ids), "incelenen": 0, "hata": 0, "butce_disi": 0, "degisen": 0, "sonuclar": []}
+    if budget_usd is not None:
+        left = budget_usd - month_spend(conn)
+        avg, hi_out = _avg_out(conn), _high_out(conn)
+        keep = []
+        for r in rows:
+            hi = row_cost(r, avg, "yuksek", hi_out)[1] * DEEP_COST_FACTOR
+            if hi > left:
+                break
+            keep.append(r)
+            left -= hi
+        out["butce_disi"] = len(rows) - len(keep)
+        rows = keep
+    if not rows:
+        return out
+    llm = llm or LLM()
+    from .prices import company_stats
+    try:
+        cstats = company_stats(conn, [c for r in rows for c in (r["candidates"] or "").split(",") if c in universe])
+    except Exception:
+        cstats = {}
+    for i, row in enumerate(rows):
+        if budget_usd is not None and month_spend(conn) + row_cost(row, _avg_out(conn), "yuksek", _high_out(conn))[1] \
+                * DEEP_COST_FACTOR > budget_usd:     # gerçek harcamayla her haberden önce yeniden kontrol
+            out["butce_disi"] += len(rows) - i
+            break
+        old = _impacts_snapshot(conn, row["id"])
+        prev = conn.execute("SELECT input_tokens, output_tokens, created_at FROM analyses WHERE news_id=?",
+                            (row["id"],)).fetchone()
+        now = datetime.now(config.TR_TZ).isoformat(timespec="seconds")
+        work_row = {k: row[k] for k in row.keys()}
+        if "[TAM METİN]" in (work_row.get("body") or ""):
+            work_row["url"] = None          # tam metin zaten eklenmiş: yeniden indirilip iki kez eklenmesin
+        try:
+            res = _work(llm, work_row, universe, cstats, q)
+            if res["analysis"] is None:            # KAP dışı haberde ön eleme "önemsiz" dedi: eski sonuç korunur
+                raise RuntimeError("ön eleme bu haberi önemsiz buldu; önceki sonuç korundu")
+            stats = {"analyzed": 0, "filtered_out": 0, "errors": 0, "impacts": 0, "dropped_tickers": 0, "flagged": 0,
+                     "input_tokens": 0, "output_tokens": 0}
+            res["article"] = None if work_row["url"] is None else res["article"]
+            _store(conn, work_row, universe, res, stats)
+            new = _impacts_snapshot(conn, row["id"])
+            conn.execute("INSERT INTO reanalysis_log(news_id, eski_json, yeni_json, input_tokens, output_tokens, durum, "
+                         "created_at, eski_input_tokens, eski_output_tokens, eski_ay) VALUES(?,?,?,?,?,'tamam',?,?,?,?)",
+                         (row["id"], json.dumps(old, ensure_ascii=False), json.dumps(new, ensure_ascii=False),
+                          res["tokens"][0], res["tokens"][1], now, prev["input_tokens"] if prev else 0,
+                          prev["output_tokens"] if prev else 0, (prev["created_at"] or "")[:7] if prev else None))
+            conn.commit()
+            changed = [(o, n) for o in old for n in new if o["ticker"] == n["ticker"] and
+                       (o["direction"], o["magnitude"]) != (n["direction"], n["magnitude"])]
+            gone = {o["ticker"] for o in old} ^ {n["ticker"] for n in new}
+            if changed or gone:
+                out["degisen"] += 1
+            out["incelenen"] += 1
+            out["sonuclar"].append({"news_id": row["id"], "baslik": row["title"], "eski": old, "yeni": new,
+                                    "degisti": bool(changed or gone)})
+        except Exception as e:
+            conn.rollback()
+            conn.execute("INSERT INTO reanalysis_log(news_id, eski_json, yeni_json, durum, created_at) "
+                         "VALUES(?,?,?, 'hata', ?)", (row["id"], json.dumps(old, ensure_ascii=False), str(e)[:300], now))
+            conn.commit()
+            out["hata"] += 1
+            out["sonuclar"].append({"news_id": row["id"], "baslik": row["title"], "hata": str(e)[:200]})
+        if progress:
+            progress(i + 1, len(rows))
+    return out
+
+
 def test_one(conn, universe: Dict[str, str], llm: Optional[LLM] = None) -> Optional[dict]:
     """Ucuz test analizi: sıradaki en yeni 1 haberi "ekonomik" profille analiz eder, HİÇBİR ŞEY KAYDETMEZ.
 
@@ -434,18 +607,28 @@ def test_one(conn, universe: Dict[str, str], llm: Optional[LLM] = None) -> Optio
 
 
 def analyze(conn, universe: Dict[str, str], limit: Optional[int] = None, llm: Optional[LLM] = None,
-            progress: Optional[Callable[[int, int], None]] = None, quality: Optional[str] = None) -> Dict[str, int]:
+            progress: Optional[Callable[[int, int], None]] = None, quality: Optional[str] = None,
+            rows=None, budget_usd: Optional[float] = None, max_age_days: Optional[int] = None) -> Dict[str, int]:
     """Bekleyen haberleri analiz eder. LLM çağrıları paralel, veritabanı yazımı ana iş parçacığında.
 
     quality: "yuksek" | "dengeli" | "ekonomik" (panel ayarı). Boşsa yüksek doğruluk.
+    rows: kullanıcının seçtiği haberler (verilmezse öncelik sırası). budget_usd: aylık bütçe — bu ayın harcaması +
+    her haberin ÜST tahmini bütçeyi aşacaksa o haber ve sonrakiler analiz edilmez (2026-11-09).
     """
     q = quality_profile(quality)
-    llm = llm or LLM()
     stats = {"analyzed": 0, "filtered_out": 0, "errors": 0, "impacts": 0, "dropped_tickers": 0,
              "flagged": 0, "input_tokens": 0, "output_tokens": 0}
-    rows = pending(conn, limit)
+    if rows is None:
+        rows = pending(conn, limit, max_age_days=max_age_days)
+    elif limit:
+        rows = list(rows)[:limit]
+    rows, over = within_budget(conn, rows, budget_usd, quality)
+    if over:
+        stats["butce_disi"] = over
+        stats["butce_kalan_usd"] = round(budget_usd - month_spend(conn), 4)
     if not rows:
         return stats
+    llm = llm or LLM()
     # Şirket büyüklüğü bağlamı (piyasa değeri, son fiyat) — tutarları ölçeklemek için
     from .prices import company_stats
     try:
@@ -453,10 +636,29 @@ def analyze(conn, universe: Dict[str, str], limit: Optional[int] = None, llm: Op
     except Exception:
         cstats = {}
     done = 0
+    # Bütçe denetimli sıra (2026-11-09): bir haber ancak GERÇEK harcama + çalışan haberlerin üst tahmini + bu haberin
+    # üst tahmini bütçeye sığıyorsa başlatılır; her biten haberden sonra gerçek harcama yeniden okunur.
+    avg_o, hi_o = _avg_out(conn), _high_out(conn)
+    hi_of = {r["id"]: row_cost(r, avg_o, quality, hi_o)[1] for r in rows}
+    queue = list(rows)
     with ThreadPoolExecutor(max_workers=config.ANALYSIS_WORKERS) as ex:
-        futures = {ex.submit(_work, llm, row, universe, cstats, q): row for row in rows}
-        for fut in as_completed(futures):
-            row = futures[fut]
+        futures = {}
+
+        def fill():
+            while queue and len(futures) < config.ANALYSIS_WORKERS:
+                if budget_usd is not None:
+                    running = sum(hi_of[futures[f]["id"]] for f in futures)
+                    if month_spend(conn) + running + hi_of[queue[0]["id"]] > budget_usd:
+                        stats["butce_disi"] = stats.get("butce_disi", 0) + len(queue)
+                        queue.clear()
+                        return
+                r = queue.pop(0)
+                futures[ex.submit(_work, llm, r, universe, cstats, q)] = r
+
+        fill()
+        while futures:
+            fut = next(as_completed(list(futures)))
+            row = futures.pop(fut)
             done += 1
             if progress:
                 progress(done, len(rows))
@@ -468,6 +670,7 @@ def analyze(conn, universe: Dict[str, str], limit: Optional[int] = None, llm: Op
                 print(f"[durdu] OpenAI hesap/kota sorunu: {e}")
                 for other in futures:
                     other.cancel()
+                queue.clear()
                 stats["stopped"] = str(e)[:300]
                 break
             except Exception as e:  # tek bir haber tüm akışı durdurmasın
@@ -476,4 +679,7 @@ def analyze(conn, universe: Dict[str, str], limit: Optional[int] = None, llm: Op
                 conn.commit()
                 stats["errors"] += 1
                 print(f"[hata] {row['id']}: {e}")
+            fill()
+    if stats.get("butce_disi"):
+        stats["butce_kalan_usd"] = round((budget_usd or 0) - month_spend(conn), 4)
     return stats

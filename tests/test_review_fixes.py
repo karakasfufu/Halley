@@ -284,9 +284,11 @@ if __name__ == "__main__":
 class FreeCheckTests(unittest.TestCase):
     def test_free_check_never_calls_ai_and_estimates_cost(self):
         from bist_haber import pipeline
+        from datetime import datetime
         conn = memory_db()
-        add_news(conn, nid="kap:1", body="Sözleşme bedeli 10 milyon TL. " * 20)
-        add_news(conn, nid="kap:2", body="Yeni yatırım kararı alındı. " * 20)
+        now = datetime.now(config.TR_TZ).isoformat(timespec="seconds")   # güncel haber (5 günden eski otomatik atlanır)
+        add_news(conn, nid="kap:1", body="Sözleşme bedeli 10 milyon TL. " * 20, published=now)
+        add_news(conn, nid="kap:2", body="Yeni yatırım kararı alındı. " * 20, published=now)
         with patch.object(pipeline, "universe", return_value={"TEST": "Deneme"}), \
                 patch.object(kap, "collect", return_value={"new": 2}), \
                 patch.object(kap, "list_disclosures", return_value=[]), \

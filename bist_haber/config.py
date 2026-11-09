@@ -115,5 +115,11 @@ RSS_FEEDS = {
 RSS_SOURCE_LABELS = {"bloomberght": "BloombergHT", "uzmanpara": "Uzmanpara", "dunya": "Dünya",
                      "haberturk": "Habertürk", "ntv": "NTV", "trt": "TRT Haber"}
 RSS_MAX_AGE_DAYS = 3  # bazı akışlar aylar önceki haberleri de içeriyor
+# 2026-11-09 (kullanıcı onayı): kendiliğinden (güncelleme / sabah analizi) analiz edilecek haberin en fazla yaşı.
+# Haber skoru orta kalıcılıkta 5 günde yarıya iner; daha eski haber elle seçilirse yine analiz edilir.
+AUTO_ANALYSIS_MAX_AGE_DAYS = 5
+NEWS_BUDGET_USD = 10.0     # haber analizi aylık bütçe varsayılanı (Ayarlar'dan değişir)
+MAX_ANALYSIS_PER_RUN = 50  # güncelleme / sabah analizi başına en fazla haber (Ayarlar seçenekleri 1–30)
+MAX_ANALYSIS_MANUAL = 300  # "🔬 Haber analizi" bölümünde tek seferde en fazla
 # Hisse eşleşmesi olmayan RSS haberleri ancak bu kelimelerden birini içerirse LLM'e gider.
 RSS_MARKET_KEYWORDS = ["borsa", "bist", "hisse", "kap'a", "kap’a", "temettü", "halka arz", "bedelsiz", "bedelli"]

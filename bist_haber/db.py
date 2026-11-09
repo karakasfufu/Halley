@@ -170,6 +170,24 @@ WHEN OLD.durum != 'bekliyor' OR NEW.anahtar != OLD.anahtar OR NEW.metin != OLD.m
 BEGIN SELECT RAISE(ABORT, 'öneri kaydı değiştirilemez (karar yalnız bir kez verilir)'); END;
 CREATE TRIGGER IF NOT EXISTS suggestions_no_delete BEFORE DELETE ON suggestions
 BEGIN SELECT RAISE(ABORT, 'öneri kaydı silinemez'); END;
+-- 2026-11-09: analiz edilmiş haberin "derin yeniden inceleme"si; önceki ve yeni sonuç. YALNIZ EKLENİR.
+CREATE TABLE IF NOT EXISTS reanalysis_log (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    news_id       TEXT NOT NULL,
+    eski_json     TEXT NOT NULL,
+    yeni_json     TEXT,
+    input_tokens  INTEGER,
+    output_tokens INTEGER,
+    durum         TEXT NOT NULL,          -- tamam | hata
+    created_at    TEXT NOT NULL,
+    eski_input_tokens  INTEGER,           -- yerine yazılan önceki analizin maliyeti (aylık harcamada kaybolmasın)
+    eski_output_tokens INTEGER,
+    eski_ay            TEXT               -- önceki analizin yapıldığı ay (YYYY-AA)
+);
+CREATE TRIGGER IF NOT EXISTS reanalysis_log_no_update BEFORE UPDATE ON reanalysis_log
+BEGIN SELECT RAISE(ABORT, 'yeniden inceleme kaydı değiştirilemez'); END;
+CREATE TRIGGER IF NOT EXISTS reanalysis_log_no_delete BEFORE DELETE ON reanalysis_log
+BEGIN SELECT RAISE(ABORT, 'yeniden inceleme kaydı silinemez'); END;
 -- W6: yapay zekâ yorumları ve maliyetleri (aylık bütçe denetimi buradan). YALNIZ EKLENİR.
 CREATE TABLE IF NOT EXISTS ai_comments (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -114,9 +114,12 @@ if not pipeline.has_api_key():
 with st.expander("⚙️ Ayarlar"):
     s1, s2, s3 = st.columns(3)
     days = s1.select_slider("KAP: kaç günlük bildirim taransın?", options=[1, 2, 3, 5, 7], value=1)
-    analysis_limit = s2.selectbox("Bir güncellemede en fazla kaç haber analiz edilsin?", [1, 3, 5, 10], index=3,
-                                  help="KAP ve haber siteleri birlikte bu adede dahildir. Kalanlar sonraki güncellemeyi "
-                                       "bekler. Bu bir adet sınırıdır, para tavanı değildir.", key="live_analysis_limit")
+    analysis_limit = s2.selectbox("Güncellemede / sabah analizinde en fazla kaç haber analiz edilsin?",
+                                  [1, 3, 5, 10, 20, 30], index=3,
+                                  help="KAP ve haber siteleri birlikte bu adede dahildir; öncelik sırası: açık işlemler, "
+                                       f"likit hisseler… {config.AUTO_ANALYSIS_MAX_AGE_DAYS} günden eski haberler "
+                                       "kendiliğinden analiz edilmez (📰 Haberler sekmesinden elle seçilebilir). Para "
+                                       "tavanı ayrıca: haber analizi aylık bütçesi.", key="live_analysis_limit")
     window = s3.slider("Son kaç günün haberleri listeye katılsın?", 3, 30, 7)
     # Analiz kalitesi: kullanıcı seçer, seçim bu bilgisayarda saklanır (data/ayarlar.json).
     q_keys = list(config.QUALITY_PROFILES)
@@ -153,6 +156,14 @@ with st.expander("⚙️ Ayarlar"):
                                                      "bir çağrının en kötü durum maliyeti bütçeyi aşacaksa çağrı yapılmaz.")
     if ai_budget != saved.get("yz_butce_usd"):
         pipeline.save_settings(yz_butce_usd=ai_budget)
+    # 2026-11-09 (kullanıcı onayı): haber analizinin de aylık bütçesi — bütçeyi aşacak analiz yapılmaz
+    news_budget = st.number_input("Haber analizi aylık bütçesi ($)", 0.0, 500.0,
+                                  float(saved.get("haber_butce_usd", config.NEWS_BUDGET_USD)), 1.0, format="%.2f",
+                                  key="news_budget", help="Haberleri güncelle, sabah analizi ve 🔬 Haber analizi bu "
+                                  "bütçeyi aşmaz: bir haberin en kötü durum maliyeti kalan bütçeyi aşacaksa o haber ve "
+                                  "sonrakiler analiz edilmez. Bu ay harcanan 📰 Haberler sekmesinde görünür.")
+    if news_budget != saved.get("haber_butce_usd"):
+        pipeline.save_settings(haber_butce_usd=news_budget)
     if quality != config.DEFAULT_QUALITY:
         st.caption("⚠️ Bu ayarda maliyet düşer ama analizler daha az ayrıntılı ve hata payı daha yüksek olabilir.")
     st.caption("Kaynaklar: KAP + " + ", ".join(config.RSS_SOURCE_LABELS.get(n, n) for n in config.RSS_FEEDS)
@@ -812,7 +823,149 @@ with tab_journal:
 
 
 # ---------------- Haberler ----------------
+def news_analysis_box() -> None:
+    """🔬 Haber analizi (kullanıcı isteği 2026-11-09): kaç haber, hangileri, tahmini maliyet; ve analiz edilmiş haberi
+    derin yeniden inceleme. Her ikisi aylık haber analizi bütçesine tabidir."""
+    st.markdown("#### 🔬 Haber analizi")
+    spent = analyzer.month_spend(conn)
+    st.caption(f"Bu ay haber analizine harcanan ≈ {spent:.3f} $ · bütçe {news_budget:.2f} $ · kalan "
+               f"{max(0.0, news_budget - spent):.3f} $ (Ayarlar'dan değişir). Tahminler bu bilgisayardaki gerçek analiz "
+               "maliyetlerinden hesaplanır; gerçek tutar haberin uzunluğuna göre değişir.")
+    if not pipeline.has_api_key():
+        st.info("Analiz için OpenAI API anahtarı gerekir (sayfanın üstünden girin).")
+    mode = st.radio("Ne yapılsın?", ["🆕 Bekleyen haberleri analiz et", "🔁 Analiz edilmiş haberi derin yeniden incele"],
+                    horizontal=True, key="na_mode")
+    if mode.startswith("🆕"):
+        pend = analyzer.pending(conn)
+        if not pend:
+            st.info("Analiz bekleyen haber yok.")
+            return
+        pctx = analyzer.priority_context(conn)
+        now_ = datetime.now(config.TR_TZ)
+        rows_ = []
+        for r in pend:
+            age = (now_ - datetime.fromisoformat(r["published_at"])).days
+            rows_.append({"Seç": False, "Öncelik": analyzer.PRIORITY_LABELS[analyzer.priority(r, pctx)],
+                          "Tarih": r["published_at"][:16].replace("T", " "), "Yaş (gün)": age,
+                          "Hisse": r["candidates"] or "—",
+                          "Konu / kaynak": r["subject"] or config.RSS_SOURCE_LABELS.get(r["source"][4:], r["source"]),
+                          "Başlık": (r["title"] or "")[:90], "_id": r["id"]})
+        f1, f2, f3 = st.columns([1, 2, 1])
+        tk = f1.text_input("Hisse kodu (süz)", key="na_ticker").strip().upper()
+        groups = f2.multiselect("Öncelik grubu", list(analyzer.PRIORITY_LABELS.values()),
+                                default=list(analyzer.PRIORITY_LABELS.values())[:2], key="na_groups")
+        old_too = f3.checkbox(f"{config.AUTO_ANALYSIS_MAX_AGE_DAYS} günden eski haberler de", value=False, key="na_old")
+        view = [x for x in rows_ if (not tk or tk in x["Hisse"].split(",")) and x["Öncelik"] in groups
+                and (old_too or x["Yaş (gün)"] <= config.AUTO_ANALYSIS_MAX_AGE_DAYS)]
+        st.caption(f"Bekleyen {len(pend)} haber · süzgeçten geçen {len(view)} (öncelik sırasıyla; en üstteki önce)")
+        how = st.radio("Hangileri?", ["Listedeki ilk N haber (öncelik sırasıyla)", "Yalnız işaretlediklerim"],
+                       horizontal=True, key="na_how")
+        if how.startswith("Listedeki"):
+            n_ = st.number_input("Kaç haber incelensin?", 1, config.MAX_ANALYSIS_MANUAL, min(30, max(1, len(view))), 1,
+                                 key="na_n")
+            chosen = [x["_id"] for x in view[:int(n_)]]
+            st.dataframe(pd.DataFrame(view[:200]).drop(columns=["Seç", "_id"]) if view else pd.DataFrame(),
+                         hide_index=True, width="stretch")
+        else:
+            edited = st.data_editor(pd.DataFrame(view[:300]) if view else pd.DataFrame(columns=["Seç"]),
+                                    hide_index=True, width="stretch", key="na_pick",
+                                    disabled=[c for c in (view[0].keys() if view else []) if c != "Seç"],
+                                    column_config={"_id": None})
+            chosen = [r["_id"] for r in edited.to_dict("records") if r.get("Seç")] if view else []
+        sel = [r for r in pend if r["id"] in set(chosen)]
+        sel.sort(key=lambda r: chosen.index(r["id"]))
+        if not sel:
+            st.caption("Seçili haber yok.")
+            return
+        est = analyzer.estimate_cost(conn, sel, quality)
+        fit, over = analyzer.within_budget(conn, sel, news_budget, quality)
+        st.info(f"Seçilen {len(sel)} haber · tahmini maliyet {est['low_usd']:.3f}–{est['high_usd']:.3f} $"
+                + (f" · bütçe nedeniyle yalnız ilk {len(fit)} haber analiz edilir ({over} haber kalır)" if over else ""))
+        if st.button(f"🔬 {len(fit)} haberi analiz et", key="na_run", disabled=not (fit and pipeline.has_api_key())):
+            bar = st.progress(0.0, text="Yapay zekâ haberleri analiz ediyor...")
+            before = analyzer.month_spend(conn)
+            try:
+                res = analyzer.analyze(conn, uni, rows=fit, quality=quality, budget_usd=news_budget,
+                                       progress=lambda i, n: bar.progress(i / max(n, 1), text=f"Analiz ({i}/{n})..."))
+                cost = analyzer.month_spend(conn) - before
+                flash("success", f"{res.get('analyzed', 0)} haber analiz edildi, {res.get('filtered_out', 0)} haber ön "
+                      f"elemede önemsiz bulundu" + (f", {res['errors']} haberde hata" if res.get("errors") else "")
+                      + f". Gerçek maliyet ≈ {cost:.3f} $." + (" OpenAI hesabı/kotası nedeniyle durdu: "
+                                                              + res["stopped"] if res.get("stopped") else ""))
+            except Exception as e:
+                flash("error", f"Analiz tamamlanamadı: {nice_err(e)}")
+            conn.close()
+            st.rerun()
+        return
+    # 🔁 derin yeniden inceleme
+    since_ = (datetime.now(config.TR_TZ) - timedelta(days=14)).isoformat()
+    an = conn.execute("SELECT n.id, n.published_at, n.title, n.source, n.subject, "
+                      "GROUP_CONCAT(i.ticker || ':' || i.direction || ':' || i.magnitude || ':' || COALESCE(i.flag,''), ';') "
+                      "AS imp, MAX(ABS(i.direction)) AS yonlu FROM news n JOIN impacts i ON i.news_id=n.id "
+                      "WHERE n.status='analyzed' AND n.published_at>=? GROUP BY n.id ORDER BY n.published_at DESC",
+                      (since_,)).fetchall()
+    only_dir = st.checkbox("Yalnız olumlu/olumsuz işaretlenmiş haberler", value=True, key="ra_dir")
+    only_flag = st.checkbox("Yalnız ⚠️ kontrol gerektirenler (çelişkili / tek görüş / etki belirsiz)", value=False,
+                            key="ra_flag")
+    yon = {1: "olumlu", -1: "olumsuz", 0: "nötr"}
+    rows_ = []
+    for r in an:
+        parts = [x.split(":") for x in (r["imp"] or "").split(";") if x]
+        if only_dir and not r["yonlu"]:
+            continue
+        if only_flag and not any(p_[3] in ("çelişkili", "tek görüş", "etki belirsiz") for p_ in parts):
+            continue
+        rows_.append({"Seç": False, "Tarih": r["published_at"][:16].replace("T", " "),
+                      "Etki": ", ".join(f"{p_[0]} {yon.get(int(p_[1]), '?')} {p_[2]}/5" + (f" ({p_[3]})" if p_[3] else "")
+                                        for p_ in parts),
+                      "Başlık": (r["title"] or "")[:90], "_id": r["id"]})
+    if not rows_:
+        st.info("Son 14 günde bu süzgeçle analiz edilmiş haber yok.")
+        return
+    st.caption("Derin inceleme: en yüksek doğruluk, ZORUNLU ikinci bağımsız görüş ve iki kat metin. Önceki sonuç silinmez "
+               "(geçmişte saklanır), yenisi skor hesabında kullanılır. Habere sonradan gelen fiyat hareketi analize "
+               "verilmez (geriye dönük bilgi karışmasın).")
+    edited = st.data_editor(pd.DataFrame(rows_), hide_index=True, width="stretch", key="ra_pick",
+                            disabled=["Tarih", "Etki", "Başlık", "_id"], column_config={"_id": None})
+    chosen = [r["_id"] for r in edited.to_dict("records") if r.get("Seç")]
+    sel = analyzer.analyzed_rows(conn, chosen)
+    if not sel:
+        st.caption("İncelemek için tablodan haber işaretleyin.")
+    else:
+        est = analyzer.estimate_reanalysis(conn, sel)
+        left_ = news_budget - analyzer.month_spend(conn)
+        st.info(f"Seçilen {len(sel)} haber · tahmini maliyet {est['low_usd']:.3f}–{est['high_usd']:.3f} $"
+                + (" · kalan bütçe yetmeyebilir; sığmayanlar atlanır" if est["high_usd"] > left_ else ""))
+        if st.button(f"🔁 {len(sel)} haberi derin incele", key="ra_run", disabled=not pipeline.has_api_key()):
+            bar = st.progress(0.0, text="Derin inceleme...")
+            before = analyzer.month_spend(conn)
+            try:
+                res = analyzer.reanalyze(conn, uni, chosen, budget_usd=news_budget,
+                                         progress=lambda i, n: bar.progress(i / max(n, 1), text=f"İnceleme ({i}/{n})..."))
+                st.session_state["ra_last"] = res
+                cost = analyzer.month_spend(conn) - before
+                flash("success", f"{res['incelenen']} haber yeniden incelendi; {res['degisen']} haberde sonuç değişti"
+                      + (f", {res['hata']} haberde hata" if res["hata"] else "")
+                      + (f", {res['butce_disi']} haber bütçe nedeniyle atlandı" if res["butce_disi"] else "")
+                      + f". Gerçek maliyet ≈ {cost:.3f} $.")
+            except Exception as e:
+                flash("error", f"İnceleme tamamlanamadı: {nice_err(e)}")
+            conn.close()
+            st.rerun()
+    last_ = st.session_state.get("ra_last")
+    if last_ and last_.get("sonuclar"):
+        fmt = lambda xs: ", ".join(f"{x['ticker']} {yon.get(x['direction'], '?')} {x['magnitude']}/5" for x in xs) or "etki yok"
+        st.markdown("**Son derin incelemenin sonucu (önce → sonra):**")
+        st.dataframe(pd.DataFrame([{"Haber": (x.get("baslik") or "")[:70],
+                                    "Önce": fmt(x.get("eski", [])) if "eski" in x else "—",
+                                    "Sonra": fmt(x["yeni"]) if "yeni" in x else f"hata: {x.get('hata', '')}",
+                                    "Değişti mi": "evet" if x.get("degisti") else ("—" if "hata" in x else "hayır")}
+                                   for x in last_["sonuclar"]]), hide_index=True, width="stretch")
+
+
 with tab_news:
+    news_analysis_box()
+    st.divider()
     news = conn.execute(
         "SELECT n.*, GROUP_CONCAT(i.ticker || ':' || i.direction) AS imp FROM news n "
         "LEFT JOIN impacts i ON i.news_id=n.id WHERE n.status='analyzed' "

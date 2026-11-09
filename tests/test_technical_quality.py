@@ -113,8 +113,10 @@ class QualityProfileTests(unittest.TestCase):
             self.assertEqual(pipeline.load_settings()["analiz_kalitesi"], "dengeli")
 
     def test_estimate_without_second_opinion_has_equal_bounds(self):
+        from datetime import datetime
+        from bist_haber import config
         conn = memory_db()
-        add_news(conn, body="Metin " * 50)
+        add_news(conn, body="Metin " * 50, published=datetime.now(config.TR_TZ).isoformat(timespec="seconds"))
         est = pipeline.estimate_next_run(conn, 10, "ekonomik")
         self.assertEqual(est["low_usd"], est["high_usd"])
         self.assertGreater(pipeline.estimate_next_run(conn, 10, "yuksek")["high_usd"], est["high_usd"])

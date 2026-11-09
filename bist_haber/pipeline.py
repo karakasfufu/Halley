@@ -30,8 +30,8 @@ def universe(conn) -> Dict[str, str]:
 
 def update_all(conn, days: int = 1, progress: Optional[Progress] = None, analyze: bool = True,
                analysis_limit: int = 10, quality: Optional[str] = None) -> Dict[str, dict]:
-    if not isinstance(analysis_limit, int) or not 1 <= analysis_limit <= 10:
-        raise ValueError("Bir güncellemede en fazla 10 haber analiz edilebilir.")
+    if not isinstance(analysis_limit, int) or not 1 <= analysis_limit <= config.MAX_ANALYSIS_PER_RUN:
+        raise ValueError(f"Bir güncellemede en fazla {config.MAX_ANALYSIS_PER_RUN} haber analiz edilebilir.")
     say = progress or (lambda msg, p: None)
     uni = universe(conn)
     out = {}
@@ -54,9 +54,11 @@ def update_all(conn, days: int = 1, progress: Optional[Progress] = None, analyze
     if analyze and has_api_key():
         say("Yapay zekâ haberleri analiz ediyor...", 0.5)
         out["analyze"] = analyzer.analyze(
-            conn, uni, limit=analysis_limit, quality=quality, progress=lambda i, n: say(f"Yapay zekâ haberleri analiz ediyor ({i}/{n})...",
-                                                 0.5 + 0.42 * i / max(n, 1)))
-        out["analyze"]["waiting"] = len(analyzer.pending(conn))
+            conn, uni, limit=analysis_limit, quality=quality, budget_usd=news_budget(),
+            max_age_days=config.AUTO_ANALYSIS_MAX_AGE_DAYS,
+            progress=lambda i, n: say(f"Yapay zekâ haberleri analiz ediyor ({i}/{n})...", 0.5 + 0.42 * i / max(n, 1)))
+        out["analyze"]["waiting"] = len(analyzer.pending(conn, max_age_days=config.AUTO_ANALYSIS_MAX_AGE_DAYS))
+        out["analyze"]["eski_bekleyen"] = len(analyzer.pending(conn)) - out["analyze"]["waiting"]
     elif analyze:
         out["analyze"] = {"atlandı": "OpenAI anahtarı yok"}
     say("Fiyatlar güncelleniyor...", 0.94)
@@ -82,16 +84,19 @@ def estimate_next_run(conn, analysis_limit: int = 10, quality: Optional[str] = N
     (yoksa ihtiyatlı 4000) tahmin edilir. Alt sınır ikinci görüşsüz, üst sınır her habere ikinci görüş
     alınmış ve tüm haber siteleri ön elemeyi geçmiş gibi hesaplanır.
     """
-    rows = analyzer.pending(conn, analysis_limit)
-    f_tok, a_tok = analyzer.estimate(rows)
-    avg_out = conn.execute("SELECT AVG(output_tokens) FROM analyses WHERE stage='full' AND output_tokens>0").fetchone()[0]
-    avg_out = float(avg_out or 4000)
-    n = len(rows)
-    low = (f_tok + a_tok) * INPUT_USD_PER_TOKEN + n * avg_out * OUTPUT_USD_PER_TOKEN
-    high = (f_tok + 2 * a_tok) * INPUT_USD_PER_TOKEN + 2 * n * avg_out * OUTPUT_USD_PER_TOKEN
-    if not analyzer.quality_profile(quality)["second_opinion"]:
-        high = low  # ikinci görüş kapalı
-    return {"next_count": n, "waiting": len(analyzer.pending(conn)), "low_usd": low, "high_usd": high}
+    rows = analyzer.pending(conn, analysis_limit, max_age_days=config.AUTO_ANALYSIS_MAX_AGE_DAYS)
+    rows, over = analyzer.within_budget(conn, rows, news_budget(), quality)
+    est = analyzer.estimate_cost(conn, rows, quality)
+    return {"next_count": len(rows), "waiting": len(analyzer.pending(conn, max_age_days=config.AUTO_ANALYSIS_MAX_AGE_DAYS)),
+            "low_usd": est["low_usd"], "high_usd": est["high_usd"], "butce_disi": over}
+
+
+def news_budget() -> float:
+    """Haber analizi aylık bütçesi (Ayarlar; varsayılan config.NEWS_BUDGET_USD)."""
+    try:
+        return max(0.0, float(load_settings().get("haber_butce_usd", config.NEWS_BUDGET_USD)))
+    except (TypeError, ValueError):
+        return config.NEWS_BUDGET_USD
 
 
 def free_check(conn, days: int = 1, progress: Optional[Progress] = None, analysis_limit: int = 10,

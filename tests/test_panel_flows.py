@@ -87,6 +87,33 @@ class PanelFlowTests(unittest.TestCase):
             self.assertIn(name, guide)
             self.assertIn(name, src)        # kılavuzdaki ad panelde gerçekten var
 
+    def test_news_analysis_section_runs_with_estimate_and_budget(self):
+        from bist_haber import analyzer
+        conn = db.connect()
+        from datetime import datetime
+        now = datetime.now(config.TR_TZ).isoformat(timespec="seconds")
+        for i in range(3):
+            conn.execute("INSERT INTO news(id,source,published_at,effective_date,title,body,candidates,status,fetched_at)"
+                         " VALUES(?,'kap',?,?,'Başlık','metin metin','POS','new','f')", (f"k{i}", now, now[:10]))
+        conn.commit()
+        conn.close()
+        calls = []
+
+        def fake_analyze(conn, uni, rows=None, **k):
+            calls.append((len(rows), k.get("budget_usd")))
+            return {"analyzed": len(rows), "filtered_out": 0, "errors": 0}
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}), patch.object(analyzer, "analyze", fake_analyze):
+            at = self.app()
+            self.assertTrue(any("🔬 Haber analizi" in m.value for m in at.markdown))
+            self.assertTrue(any("tahmini maliyet" in str(i.value) for i in at.info))
+            at.number_input(key="na_n").set_value(2).run()
+            at.button(key="na_run").click().run()
+            self.assertEqual(len(at.exception), 0, str(at.exception))
+            self.assertEqual(calls, [(2, config.NEWS_BUDGET_USD)])           # seçilen adet + bütçe iletildi
+            self.assertTrue(any("2 haber analiz edildi" in str(s.value) for s in at.success))
+            at.radio(key="na_mode").set_value("🔁 Analiz edilmiş haberi derin yeniden incele").run()
+            self.assertEqual(len(at.exception), 0, str(at.exception))
+
     def test_double_save_real_trade_warns(self):
         at = self.app()
         at.number_input(key="real_px").set_value(100.5).run()

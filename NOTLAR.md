@@ -1033,3 +1033,27 @@ panel kodunda birebir var. 381 test.
 fiyatı (sanal gerçekleştiyse onun dolumu, değilse planlanan giriş); yalnız alış tarafı (satışlar kaydedilmiyor).
 İşlem günlüğünde gerçek işlemlerin altında ortalama/medyan/en kötü ve ayar varsayımının alış payıyla karşılaştırma;
 10 işlemden az örnekte "varsayımı değiştirmeyin" uyarısı. Ayar kendiliğinden değişmez. 382 test.
+
+## 2026-11-09 — Haber analizi: aylık bütçe, eski haber kuralı, 🔬 Haber analizi bölümü, derin yeniden inceleme
+Kullanıcı isteği: ayrı analiz düğmesi (kaç haber, tahmini maliyet), kullanıcının seçtiği haberlerin analizi ve "olumlu/
+olumsuz işaretlenmiş" (analiz edilmiş) haberlerin derin yeniden incelenmesi; benim önerim: haber analizine de bütçe.
+- **Aylık bütçe** (Ayarlar → "Haber analizi aylık bütçesi", varsayılan 10 $): tüm yollar (Haberleri güncelle, sabah
+  analizi, 🔬 bölümü, derin inceleme). Harcama `analyses` token × fiyat (ön eleme + analiz + ikinci görüş birlikte) +
+  derin incelemede yerine yazılan önceki analizin maliyeti (`reanalysis_log.eski_*`; aksi hâlde kaybolurdu).
+  **Bütçe denetimli sıra:** bir haber ancak gerçek harcama + çalışan haberlerin üst tahmini + kendi üst tahmini bütçeye
+  sığarsa başlatılır; her biten haberden sonra gerçek harcama yeniden okunur. Üst tahmin = gözlenen en pahalı haber
+  çıktısı × 1,25 ya da 2 × ortalama (geçmiş yoksa 16.000 token) — eski üst tahmin (2 × ortalama) gerçek en pahalı haberin
+  (0,0279 $) altında kalabiliyordu → testte bütçe aşımı yakalandı, düzeltildi.
+- **Eski haber kuralı:** 5 günden eski haber kendiliğinden analiz edilmez (elle seçilebilir). Ayarlar adet seçenekleri
+  1/3/5/10/20/30 (sınır 50; elle bölümde 300).
+- **🔬 Haber analizi** (📰 Haberler sekmesi): bekleyen haberler tablosu (öncelik, tarih, yaş, hisse, konu, başlık; hisse /
+  öncelik grubu / eski haber süzgeci), "ilk N (öncelik sırasıyla)" ya da "yalnız işaretlediklerim", seçime göre tahmini
+  maliyet (alt–üst), bu ay harcanan / bütçe / kalan, bütçeye sığmayan sayısı; sonuçta gerçek maliyet.
+- **🔁 Derin yeniden inceleme:** son 14 günün analiz edilmiş haberleri (varsayılan yalnız olumlu/olumsuz; isteğe "⚠️
+  kontrol gerektirenler": çelişkili / tek görüş / etki belirsiz), en yüksek doğruluk + ZORUNLU ikinci görüş + iki kat
+  metin; önceki sonuç `reanalysis_log`'da (yalnız eklenir), önce → sonra tablosu. Habere sonradan gelen fiyat hareketi
+  verilmez (geriye dönük bilgi yok). Tam metni olan haber sitesi haberinde metin yeniden indirilmez/iki kez eklenmez
+  (testte yakalandı; ayrıca adres yoksa indirme denenmez).
+- **B seçeneği tahmini (canlı kopya, tüm BIST fiyatlarıyla):** 6–9 Kasım, açık işlem + likit: 296 haber (250 KAP, 46 site)
+  → 3,71–9,85 $ (temkinli üst tahmin). Çalıştırılmadı: kullanıcıya verdiğim "üst uç 8 $'ı aşmazsa" sınırının üstünde →
+  onay bekleniyor. 390 test, ağsız 0 bağlantı; uçtan uca kontrol temiz.
