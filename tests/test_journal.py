@@ -49,6 +49,31 @@ class EvaluateTests(unittest.TestCase):
         r = J.evaluate(REC, bars((101, 101.5, 99.5, 100.5), (90, 91, 89, 90)))
         self.assertAlmostEqual(r["brut_getiri_pct"], -10.0)
 
+    def test_record_real_guards(self):
+        import tempfile
+        from datetime import datetime
+        from pathlib import Path
+        from bist_haber import config, db
+        with tempfile.TemporaryDirectory() as d:
+            c = db.connect(Path(d) / "t.db")
+            c.execute("INSERT INTO trade_journal(created_at,signal_day,ticker,kaynak,senaryo,giris,sl,tp1,tp2,gecerlilik)"
+                      " VALUES('x','2026-11-06','AAA','otomatik','destek',100,95,104,110,5)")
+            c.commit()
+            today = datetime.now(config.TR_TZ).date().isoformat()
+            for day, px, msg in (("2099-01-01", 100.0, "ileri"), ("2026-11-06", 100.0, "sonra olmalı"),
+                                 ("2026-11-09", 10000.0, "aralığı"), ("2026-11-09", 94.0, "aralığı"),
+                                 ("2026-11-09", 0.0, "geçersiz")):
+                with self.assertRaises(ValueError) as cm:
+                    J.record_real(c, 1, day if day != "2026-11-09" else min(today, day), px)
+                self.assertIn(msg, str(cm.exception))
+            day = min(today, "2026-11-09")
+            if day > "2026-11-06":
+                J.record_real(c, 1, day, 100.5)
+                with self.assertRaises(ValueError) as cm:                      # ikinci "Kaydet": çökme değil, uyarı
+                    J.record_real(c, 1, day, 100.5)
+                self.assertIn("zaten kaydedilmiş", str(cm.exception))
+            c.close()
+
     def test_breakout_waiting_below_stop_is_not_cancelled(self):
         # Kırılımda SL giriş seviyesine göredir; kırılım olmadan fiyatın SL altında durması senaryoyu bozmaz
         # (kartta "kapanış SL altına inerse kırılım başarısız" kırılımdan SONRASI içindir). Erken iptal hatası önlenir.

@@ -60,8 +60,23 @@ def record_real(conn, auto_id: int, fill_day: str, fill_price: float) -> int:
     r = conn.execute("SELECT * FROM trade_journal WHERE id=?", (auto_id,)).fetchone()
     if r is None:
         raise ValueError("Kayıt bulunamadı")
+    # 2026-11-09 uçtan uca kontrol: "Kaydet"e ikinci kez basınca veritabanı hatası paneli çökertiyordu; kullanıcı
+    # hatalarına (ileri tarih, sinyalden önce alış, yanlış yazılmış fiyat) açık Türkçe uyarı.
+    dup = conn.execute("SELECT id FROM trade_journal WHERE kaynak='gercek' AND ticker=? AND signal_day=? AND senaryo=?",
+                       (r["ticker"], r["signal_day"], r["senaryo"])).fetchone()
+    if dup:
+        raise ValueError(f"Bu sanal kayıt için gerçek işleminiz zaten kaydedilmiş (#{dup['id']}).")
     if not (fill_price > 0):
         raise ValueError("Alış fiyatı geçersiz")
+    today = datetime.now(config.TR_TZ).date().isoformat()
+    if fill_day > today:
+        raise ValueError("Alış günü bugünden ileri olamaz.")
+    if fill_day <= r["signal_day"]:
+        raise ValueError(f"Alış günü, senaryonun hesaplandığı günden ({r['signal_day']}) sonra olmalı.")
+    if fill_price <= r["sl"] or fill_price >= r["tp2"]:
+        raise ValueError(f"Alış fiyatı {fill_price:.2f} TL, senaryonun SL ({r['sl']:.2f}) – TP2 ({r['tp2']:.2f}) aralığı "
+                         "dışında: yanlış yazılmış olabilir (ör. virgül). Bu aralık dışında alındıysa senaryo zaten "
+                         "geçersizdir.")
     cur = conn.execute(
         "INSERT INTO trade_journal(created_at,signal_day,ticker,kaynak,haber_skoru,risk_seviyesi,senaryo,emir,alarm,giris,"
         "sl,tp1,tp2,gecerlilik,gercek_giris_gunu,gercek_giris_fiyati,ana_id) "

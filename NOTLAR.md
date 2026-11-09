@@ -989,3 +989,32 @@ açık işlem + 37 likit. Likidite katmanının şimdiki etkisi küçük (bekley
 işlemler. Kuyruğun kendisi bununla erimez → Plan 2.1 (maliyet tahmini, onay).
 Ayrıca: panel takvim tablosunda "Kaç işlem günü sonra" sütunu sayı + "—" karışıktı (bugün olayı olunca tablo dönüştürme
 uyarısı) → hep metin. 374 test, ağsız 0 bağlantı.
+
+## 2026-11-09 — Sistem geneli uçtan uca kontrol + veri kaynağı (uydurma veri) denetimi (kullanıcı isteği)
+Canlı veritabanı KOPYASI + tüm BIST fiyatları, ağ kapalı; gerçek panel ayarları/verisi değişmedi (dosya zamanlarıyla
+doğrulandı). Betikler: scratchpad `e2e_check.py`, `provenance_audit.py`, `concurrency_check.py`.
+**Panel akışları (AppTest, gerçek veri):** açılış (6 sekme, 18 tablo), Sabah/Akşam analizi, Raporlar (seçim + süzgeç),
+gerçek işlem kaydı, ayar kaydı, ağsız Ücretsiz dene / Takvim kontrolü / KAP geçmişi.
+**Bulunan ve düzeltilenler:**
+1. Düğme hataları ve saat uyarısı `st.rerun()` yüzünden kullanıcı göremeden siliniyordu (Haberleri güncelle,
+   Ücretsiz dene, Sabah/Akşam analizi) → `flash()`: mesaj yenilemeden sonra gösterilir; başarı mesajı da eklendi.
+2. Teknik İngilizce hata ("HTTPSConnectionPool… Max retries") → `nice_err()`: "www.kap.org.tr adresine bağlanılamadı…".
+3. Takvim kontrolü ağsız başarısız olunca mesaj yoktu → hangi kaynağın okunamadığı yazılır; TÜİK satırı tabloda yoktu.
+4. "Kaydet"e ikinci kez basınca veritabanı hatası paneli ÇÖKERTİYORDU → yinelenen kayıt, ileri tarih, sinyal gününden
+   önce alış ve SL–TP2 aralığı dışı fiyat (yazım hatası) açık Türkçe uyarı; beklenmeyen hata da yakalanır.
+5. Senaryo ve işlem günlüğü tablolarında boş hücreler "None" görünüyordu → "—".
+6. "Olumlu haber sinyali yok" metni skor olumlu ama eşik altıyken de yazıyordu (FROTO 1,19) → "olumlu ama zayıf ya da
+   eskidi (skor X; en az 1,50)".
+7. KAP geçmişi düğmesi "0 eklendi, okunacak sayfa kalmadı" → liste eksiksizse bunu açıkça söyler.
+8. Rapor listesi etiketi beklenmeyen değerde çökmeye açıktı → dayanıklı.
+**Veri kaynağı denetimi (uydurma veri var mı):** fiyat 154.426 satır — OHLC çelişkisi 0, hafta sonu/tatil fiyatı 0,
+negatif/boş 0; ±%10,5 sıçrama 23 (bölünme/bedelsiz/veri hatası adayları; ör. DUNYH 09.11 −%88,8 → sistem "veri kritik"
+işaretliyor, senaryo üretmiyor). Yapay zekâ etkileri: aday listesi dışında hisse 0, haberi olmayan etki 0; gerekçedeki
+40 sayıdan 39'u haber metninde, 1'i (TOASO "piyasa değeri ~120,6 milyar TL") yapay zekâya bağlam olarak verilen Yahoo
+piyasa değeri (120.599.998.474 TL) — uydurma değil. Şirket olayı 1.434 — tarihi kaynak KAP metninde bulunamayan 0.
+Bilanço "açıklandı" 398 — KAP kaydı olmayan 0. Makro olay doğrulama etiketi olmayan 0. Haber skoru elle formülle
+aynı (8/8). İşlem günlüğü yeniden hesapla aynı (3/3). Panel kararı = bekçi kararı; rapor önerileri = karar kaydı;
+aynı hissede çift açık sanal kayıt yok.
+**Eşzamanlı yazım:** ayrı süreçte 1.168 okuyucu-benzeri yazım sürerken sabah + akşam analizi: kilit hatası 0.
+**Kalıcı testler:** `tests/test_panel_flows.py` (4; eski kodda 3 başarısız + 1 hata), `test_journal` kayıt korumaları.
+379 test, ağsız 0 bağlantı. Not: fiyatın tek kaynağı Yahoo (gecikmeli); bağımsız ikinci kaynakla karşılaştırma yok.

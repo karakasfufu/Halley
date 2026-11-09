@@ -114,7 +114,12 @@ def plan(t: Optional[Dict], news: Dict) -> Dict:
                 "fiyatlar güvenilmez; senaryo üretilmedi.",
                 "riskler": risks}
     if news.get("direction", 0) <= 0 or news.get("score", 0) < 1.5:
-        return {"durum": "yok", "neden_yok": "Olumlu bir haber sinyali olmadığı için alım senaryosu üretilmedi.",
+        sc = news.get("score", 0) or 0
+        # 2026-11-09: skor olumlu ama eşik altıyken "olumlu sinyal yok" yazıyordu (yanıltıcı; FROTO 1,19)
+        why = (f"Haber etkisi olumlu ama zayıf ya da eskidi (haber skoru {sc:.2f}; senaryo için en az 1,50 gerekir; "
+               "skor haberin yaşıyla azalır)." if 0 < sc < 1.5 else
+               "Haber etkisi olumsuz ya da nötr olduğu için alım senaryosu üretilmedi.")
+        return {"durum": "yok", "neden_yok": why + (" Alım senaryosu üretilmedi." if 0 < sc < 1.5 else ""),
                 "riskler": risks}
     entry = t["son_fiyat"]
     atr = (t["atr_%"] or 0) * entry / 100 or None

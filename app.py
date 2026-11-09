@@ -5,6 +5,7 @@ Ayarlar katlanır bölümde; durum ve geçmiş veri pilotu "Gelişmiş" sekmesin
 """
 import json
 import os
+import re
 from datetime import date, datetime, timedelta
 from html import escape as esc
 
@@ -79,6 +80,32 @@ def last_update_text() -> str:
 
 
 # ---------------- Başlık ve ana düğme ----------------
+def nice_err(e: Exception) -> str:
+    """Teknik hata metnini sade Türkçeye çevirir (kullanıcı Python bilmiyor). Ayrıntı parantez içinde kısa kalır."""
+    raw = str(e)
+    m = re.search(r"host='([^']+)'", raw)
+    host = m.group(1) if m else None
+    net_words = ("Max retries", "ConnectionError", "NewConnectionError", "timed out", "Timeout", "Name or service",
+                 "getaddrinfo", "ağ kapalı", "Failed to establish", "Connection aborted", "RemoteDisconnected")
+    if host or any(w in raw for w in net_words) or isinstance(e, (ConnectionError, TimeoutError)):
+        return (f"{host or 'İnternet'} adresine bağlanılamadı. İnternet bağlantınızı kontrol edip birkaç dakika sonra "
+                "yeniden deneyin.")
+    if "429" in raw or "Too Many" in raw:
+        return "Site çok sık istek nedeniyle geçici olarak yanıt vermiyor; birkaç dakika sonra yeniden deneyin."
+    if "database is locked" in raw:
+        return "Veritabanı o an başka bir işlemde meşguldü; birkaç saniye sonra yeniden deneyin."
+    return raw[:200]
+
+
+def flash(kind: str, text: str) -> None:
+    """Sayfa yenilenmeden (st.rerun) hemen önce yazılan mesaj kaybolmasın: bir sonraki çizimde gösterilir.
+    2026-11-09 uçtan uca kontrolde bulundu: düğme hataları ve saat uyarıları kullanıcı göremeden siliniyordu."""
+    st.session_state.setdefault("_flash", []).append((kind, text))
+
+
+for _kind, _text in st.session_state.pop("_flash", []):
+    {"error": st.error, "warning": st.warning, "success": st.success}.get(_kind, st.info)(_text)
+
 h1, h2 = st.columns([3, 1])
 h1.markdown("## 📡 Halley")
 h1.caption("Bugün haberi çıkan hisseler · KAP ve ekonomi haberleri yapay zekâ ile okunur")
@@ -149,7 +176,7 @@ if h2.button("🔄 Haberleri güncelle", type="primary", use_container_width=Tru
         if not os.environ.get("HALLEY_OFFLINE"):  # yarım kalan / boşluk sayfalarını arka planda tamamla
             kap_worker.start(force=bool(res.get("kap", {}).get("rate_limited") or res.get("takvim_boslugu", {}).get("eklenen")))
     except Exception as e:
-        st.error(f"Güncelleme tamamlanamadı: {e}")
+        flash("error", f"Güncelleme tamamlanamadı: {nice_err(e)}")
     conn.close()  # sayfa yenilenmeden önce bağlantıyı bırak (aksi hâlde açık kalıyordu)
     st.rerun()
 
@@ -164,7 +191,7 @@ if h2.button("🧪 Ücretsiz dene", use_container_width=True, key="free_check",
         if not os.environ.get("HALLEY_OFFLINE"):
             kap_worker.start(force=bool(res.get("kap", {}).get("rate_limited") or res.get("takvim_boslugu", {}).get("eklenen")))
     except Exception as e:
-        st.error(f"Ücretsiz deneme tamamlanamadı: {e}")
+        flash("error", f"Ücretsiz deneme tamamlanamadı: {nice_err(e)}")
     conn.close()  # sayfa yenilenmeden önce bağlantıyı bırak (aksi hâlde açık kalıyordu)
     st.rerun()
 
@@ -226,7 +253,7 @@ def watch_box() -> None:
                             "fırsatları ve takvim." if kind == "sabah" else
                             "Kapanıştan sonra: günün fiyatları, işlem günlüğü (TP/SL), botun kararları.")):
             if tm["uyari"]:
-                st.warning(tm["uyari"] + " Analiz yine de çalıştırıldı; rapora bu uyarı yazıldı.")
+                flash("warning", tm["uyari"] + " Analiz yine de çalıştırıldı; rapora bu uyarı yazıldı.")
             bar = st.progress(0.0, text="Başlıyor...")
             try:
                 out = watchdog.run_session(
@@ -238,6 +265,7 @@ def watch_box() -> None:
                     ai=bool(use_ai and pipeline.has_api_key()),
                     progress=lambda m, p_: bar.progress(min(max(p_, 0.0), 1.0), text=m))
                 st.session_state["watch_last"] = out["rapor"]
+                flash("success", f"{label} tamamlandı; rapor arşive kaydedildi ({out['rapor']}).")
                 if kind == "sabah":
                     st.session_state["last_update"] = datetime.now(config.TR_TZ).strftime("%H:%M")
                     res = out.get("guncelleme") or {}
@@ -245,7 +273,7 @@ def watch_box() -> None:
                         kap_worker.start(force=bool(res.get("kap", {}).get("rate_limited")
                                                     or res.get("takvim_boslugu", {}).get("eklenen")))
             except Exception as e:
-                st.error(f"{label} tamamlanamadı: {e}")
+                flash("error", f"{label} tamamlanamadı: {nice_err(e)}")
             conn.close()
             st.rerun()
         if tm["uyari"]:
@@ -457,6 +485,16 @@ def scenario(r: dict) -> dict:
     return CTX.plan(r)
 
 
+def dash_cells(df, cols, fmt="{:.2f}"):
+    """Boş sayı hücresi tabloda "None" görünmesin: sayılar 2 basamaklı metin, boşlar "—" (2026-11-09 uçtan uca
+    kontrolde bulundu: uygulanamayan senaryo ve açık işlem satırları "None" gösteriyordu)."""
+    df = df.copy()
+    for c in cols:
+        if c in df.columns:
+            df[c] = [("—" if v is None or (isinstance(v, float) and v != v) else fmt.format(v)) for v in df[c]]
+    return df
+
+
 def md(text: str) -> str:
     """Koddan üretilen metni markdown'da güvenli göster: ~ (üstü çizili) ve * _ ` biçimlendirme işaretlerini kaçır."""
     return "".join("\\" + ch if ch in "~*_`" else ch for ch in str(text))
@@ -501,7 +539,8 @@ def entry_block(g: dict) -> None:
                   "Emir": s.get("emir", ""), "Giriş": s.get("giris"), "SL": s.get("sl"), "TP1": s.get("tp1"),
                   "TP2": s.get("tp2"), "Risk/getiri (TP1)": s.get("rr1"), "Risk": s.get("risk_seviyesi", "")}
                  for s in items]
-        st.dataframe(pd.DataFrame(table).round(2), hide_index=True, use_container_width=True)
+        st.dataframe(dash_cells(pd.DataFrame(table), ["Giriş", "SL", "TP1", "TP2", "Risk/getiri (TP1)"]),
+                     hide_index=True, use_container_width=True)
     st.caption("📏 " + entries.BACKTEST_NOTE)
 
 
@@ -743,7 +782,8 @@ with tab_journal:
                         "Giriş": jr["giris"], "SL": jr["sl"], "TP1": jr["tp1"], "TP2": jr["tp2"],
                         "Durum": jr["durum"], "Sonuç": res.get("sonuc", ""), "Alış günü": res.get("giris_gunu", ""),
                         "Net %": res.get("net_getiri_pct", res.get("acik_getiri_%")), "R": res.get("r")})
-        st.dataframe(pd.DataFrame(tbl).round(2), hide_index=True, use_container_width=True)
+        st.dataframe(dash_cells(pd.DataFrame(tbl), ["Giriş", "SL", "TP1", "TP2", "Net %", "R"]),
+                     hide_index=True, use_container_width=True)
         open_auto = [jr for jr in rows_j if jr["kaynak"] == "otomatik" and jr["durum"] in journal.OPEN_STATES]
         if open_auto:
             with st.expander("✍️ Bu işleme girdim (gerçek işleminizi kaydedin)"):
@@ -760,6 +800,9 @@ with tab_journal:
                         st.success("Gerçek işleminiz kaydedildi; aynı seviyelerle ayrıca izlenecek.")
                     except ValueError as e:
                         st.error(f"Kaydedilemedi: {e}")
+                    except Exception as e:   # beklenmeyen hata da paneli çökertmesin
+                        conn.rollback()
+                        st.error(f"Kaydedilemedi: {nice_err(e)}")
     else:
         st.info("Henüz kayıt yok. Panelde uygun giriş senaryosu çıktığında kendiliğinden eklenir.")
 
@@ -825,15 +868,22 @@ with tab_adv:
     if st.button("📅 Takvimi şimdi kontrol et", key="calendar_check"):
         with st.spinner("Resmi sayfalar okunuyor..."):
             try:
-                calendar_sync.check()
+                rep_ = calendar_sync.check()
+                names_ = {"tcmb": "TCMB", "fed": "Fed", "tuik": "TÜİK"}
+                failed_ = [names_[k] for k in names_ if (rep_.get(k) or {}).get("durum") != "güncel"]
+                if failed_:
+                    st.warning(f"{', '.join(failed_)} sayfası okunamadı (internet bağlantısı ya da sayfa değişikliği). "
+                               "Takvim değişmedi: son başarılı kontrolün verisi ve yerleşik takvim kullanılıyor.")
+                else:
+                    st.success("Takvim resmi kaynaklardan kontrol edildi.")
             except Exception as e:
-                st.error(f"Kontrol tamamlanamadı: {e}")
+                st.error(f"Kontrol tamamlanamadı: {nice_err(e)}")
     cal_state = calendar_sync.load()
     st.write(calendar_sync.summary_line())
     cal_rep = cal_state.get("report", {})
     if cal_rep:
         rows_cal = []
-        for key, label in (("tcmb", "TCMB takvimi"), ("fed", "Fed (FOMC) takvimi")):
+        for key, label in (("tcmb", "TCMB takvimi"), ("fed", "Fed (FOMC) takvimi"), ("tuik", "TÜİK TÜFE takvimi")):
             r_ = cal_rep.get(key, {})
             detail = r_.get("neden") or ("; ".join(r_.get("farklar") or []) or "yerleşik takvimle aynı")
             rows_cal.append({"Kaynak": label, "Durum": r_.get("durum", "—"), "Ayrıntı": detail})
@@ -856,12 +906,15 @@ with tab_adv:
         try:
             res = kap_history.fill_gaps(conn, uni)   # yalnız listesi alınmamış günler (taranan günler kaydı)
             started = kap_worker.start(force=True) if not os.environ.get("HALLEY_OFFLINE") else False
-            st.success(f"{res['eklenen']} yeni takvim bildirimi listeye eklendi. "
-                       + ("Olay sayfaları arka planda okunuyor; ilerleme sayfanın üstündeki kutuda."
-                          if started or kap_worker.running() else "Okunacak sayfa kalmadı."))
+            if not res.get("bosluk_gun"):
+                st.success(f"Son {config.KAP_HISTORY_DAYS} günün KAP listesi zaten eksiksiz; eklenecek bildirim yok.")
+            else:
+                st.success(f"{res['bosluk_gun']} eksik günün listesi alındı; {res['eklenen']} yeni takvim bildirimi "
+                           "eklendi. " + ("Olay sayfaları arka planda okunuyor; ilerleme sayfanın üstündeki kutuda."
+                                          if started or kap_worker.running() else "Okunacak yeni sayfa yok."))
         except Exception as e:
             conn.rollback()
-            st.error(f"KAP geçmişi alınamadı: {e}")
+            st.error(f"KAP geçmişi alınamadı: {nice_err(e)}")
 
     st.divider()
     st.markdown("#### 🧪 Ucuz test analizi")
@@ -876,7 +929,7 @@ with tab_adv:
                 try:
                     st.session_state["cheap_test_result"] = analyzer.test_one(conn, uni) or {"bos": True}
                 except Exception as e:
-                    st.session_state["cheap_test_result"] = {"hata": str(e)}
+                    st.session_state["cheap_test_result"] = {"hata": nice_err(e)}
     tr = st.session_state.get("cheap_test_result")
     if tr:
         if tr.get("bos"):
@@ -997,10 +1050,20 @@ with tab_reports:
         f1, f2 = st.columns([1, 3])
         kind_f = f1.radio("Tür", ["Hepsi", "Sabah", "Akşam"], horizontal=False, key="rep_kind")
         shown = [n for n in names if kind_f == "Hepsi" or ("_sabah" in n) == (kind_f == "Sabah")]
-        label = lambda n: (("🌅 " if "_sabah" in n else "🌙 ") + n[:10] + (" sabah" if "_sabah" in n else " akşam")
-                           + (f" ({n.rsplit('_', 1)[1]}. çalıştırma)" if n.rsplit("_", 1)[1].isdigit() else ""))
+        def label(n) -> str:
+            """Arşiv adı → okunur etiket. Beklenmeyen değerde çökmez (2026-11-09 uçtan uca testte bulundu)."""
+            n = str(n or "")
+            m = re.match(r"^(\d{4}-\d{2}-\d{2})_(sabah|aksam)(?:_(\d+))?$", n)
+            if not m:
+                return n
+            return (("🌅 " if m.group(2) == "sabah" else "🌙 ") + m.group(1)
+                    + (" sabah" if m.group(2) == "sabah" else " akşam")
+                    + (f" ({m.group(3)}. çalıştırma)" if m.group(3) else ""))
+
         if shown:
             pick = f2.selectbox(f"Rapor ({len(shown)} kayıt, en yeni üstte)", shown, format_func=label, key="rep_pick")
+            if pick not in shown:          # süzgeç değişince eski seçim listede yoksa ilk rapor gösterilir
+                pick = shown[0]
             path = watchdog.report_dir() / f"{pick}.md"
             d1, d2 = st.columns(2)
             d1.download_button("Raporu indir (.md)", path.read_bytes(), file_name=path.name, key="rep_dl_md")
