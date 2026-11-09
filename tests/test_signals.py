@@ -142,6 +142,8 @@ class PanelWithStockTests(unittest.TestCase):
             at = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "app.py"))
             at.run(timeout=60)
             self.assertEqual(len(at.exception), 0, str(at.exception))
+            at.radio(key="nav").set_value("🔍 Hisse Analizi").run(timeout=60)
+            self.assertEqual(len(at.exception), 0, str(at.exception))
             self.assertTrue(any("Trend gücü (ADX 14)" in d.value.to_string() for d in at.dataframe))   # teknik tablo çizildi
 
 

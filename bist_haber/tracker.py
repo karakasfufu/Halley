@@ -156,17 +156,24 @@ def events(conn, ticker: Optional[str] = None, limit: int = 100) -> List[Dict]:
     return [dict(r) for r in conn.execute(q + " ORDER BY id DESC LIMIT ?", args + [limit])]
 
 
+def scenario_guard(t: Optional[Dict]) -> Optional[str]:
+    """Senaryo üretilmeyecekse nedeni (panel Hisse Analizi ekranı ve bekçi aynı kuralı kullanır)."""
+    if not t:
+        return "Fiyat geçmişi yetersiz (en az 30 işlem günü gerekir); senaryo üretilmedi."
+    if t.get("veri_kritik"):
+        return "Fiyat verisinde kritik sorun var; senaryo üretilmedi."
+    vol = t.get("islem_hacmi_tl")
+    if vol is not None and vol < tradeplan.LIQ_MIN_TL:
+        return f"Likidite çok düşük (günlük {vol / 1e6:.2f} milyon TL); senaryo üretilmedi."
+    return None
+
+
 def refresh_scenarios(conn, ticker: str, today: Optional[date] = None) -> Dict:
     """Hissenin güncel uygulanabilir senaryolarından, aynı türde etkin takibi olmayanları kaydeder."""
     t = technical.for_ticker(conn, ticker, today)
-    if not t:
-        return {"yeni": [], "neden": "Fiyat geçmişi yetersiz (en az 30 işlem günü gerekir); senaryo üretilmedi."}
-    if t.get("veri_kritik"):
-        return {"yeni": [], "teknik": t, "neden": "Fiyat verisinde kritik sorun var; senaryo üretilmedi."}
-    vol = t.get("islem_hacmi_tl")
-    if vol is not None and vol < tradeplan.LIQ_MIN_TL:
-        return {"yeni": [], "teknik": t, "neden": f"Likidite çok düşük (günlük {vol / 1e6:.2f} milyon TL); senaryo "
-                                                  "üretilmedi."}
+    why = scenario_guard(t)
+    if why:
+        return dict({"yeni": [], "neden": why}, **({"teknik": t} if t else {}))
     sc = entries.scenarios(t)
     active = {r["senaryo"] for r in conn.execute(
         f"SELECT senaryo FROM takip_senaryo WHERE ticker=? AND durum IN ({','.join('?' * len(ACTIVE))})",

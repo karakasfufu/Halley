@@ -291,6 +291,7 @@ class PanelButtonTests(unittest.TestCase):
             at_ = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "app.py"))
             at_.run(timeout=60)
             self.assertEqual(len(at_.exception), 0, str(at_.exception))
+            at_.radio(key="nav").set_value("🛡️ Bekçi").run(timeout=60)      # Aşama 3: sabah/akşam Bekçi ekranında
             at_.button(key="watch_sabah").click().run(timeout=60)
             self.assertEqual(len(at_.exception), 0, str(at_.exception))
             self.assertEqual(len(at_.error), 0, [e.value for e in at_.error])

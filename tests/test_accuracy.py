@@ -439,12 +439,17 @@ class PanelTests(unittest.TestCase):
                 at = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "app.py"))
                 at.run(timeout=30)
                 self.assertEqual(len(at.exception), 0, str(at.exception))
-                # Sade düzen: 4 sekme; durum ve geçmiş veri pilotu "Gelişmiş" sekmesinde.
-                self.assertEqual(len(at.tabs), 7)   # + Gelişim (W5), Raporlar (W3), İşlem günlüğü (Parça C2), Takip Listem
-                self.assertTrue(any("İşlem günlüğü" in tab.label for tab in at.tabs))
-                self.assertTrue(any("Gelişmiş" in tab.label for tab in at.tabs))
-                self.assertTrue(any("Geçmiş veri pilotu" in m.value for m in at.markdown))
+                # Aşama 3 (2026-11-09): üstte 9 ekranlı menü; açılışta Dashboard. Pilot ve ayarlar ⚙️ Ayarlar ekranında.
+                pages = at.radio(key="nav").options
+                self.assertEqual(len(pages), 9)
+                self.assertIn("📒 İşlem Günlüğü", pages)
+                self.assertIn("⚙️ Ayarlar", pages)
                 self.assertTrue(any(b.label == "🔄 Haberleri güncelle" for b in at.button))
+                self.assertEqual([m.label for m in at.metric][:5],
+                                 ["BIST 100", "Olumlu haber", "Olumsuz haber", "Uygun fırsat", "Son güncelleme"])
+                at.radio(key="nav").set_value("⚙️ Ayarlar").run(timeout=30)
+                self.assertEqual(len(at.exception), 0, str(at.exception))
+                self.assertTrue(any("Geçmiş veri pilotu" in m.value for m in at.markdown))
                 self.assertTrue(any(b.key == "cheap_test" for b in at.button))
                 self.assertEqual(at.radio(key="analysis_quality").value, "yuksek")  # varsayılan yüksek doğruluk
                 # Ücretsiz deneme: toplama ağ gerektirdiği için sahte; yapay zekâ çağrılırsa test düşer.
@@ -457,7 +462,6 @@ class PanelTests(unittest.TestCase):
                 free.assert_called_once()
                 self.assertEqual(len(at.exception), 0, str(at.exception))
                 self.assertTrue(any("kredi harcanmadı" in i.value for i in at.info))
-                self.assertEqual([m.label for m in at.metric][:3], ["Olumlu haber", "Olumsuz haber", "Son güncelleme"])
                 at.run(timeout=30)
                 self.assertEqual(len(at.exception), 0)
                 del at
@@ -491,6 +495,7 @@ class PanelTests(unittest.TestCase):
                 at = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "app.py"))
                 at.run(timeout=30)
                 self.assertEqual(len(at.exception), 0, str(at.exception))
+                at.radio(key="nav").set_value("⚙️ Ayarlar").run(timeout=30)
                 self.assertTrue(at.button(key="bt_analyze").disabled)
                 # Sayfa açılınca hiçbir indirme dosyası hazırlanmaz; kullanıcı isteyince 5 düğme çıkar.
                 self.assertEqual(len(at.get("download_button")), 0)

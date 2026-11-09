@@ -21,15 +21,16 @@ def _rerun(conn) -> None:
     st.rerun()
 
 
-def follow_button(conn, ticker: str, key: str) -> None:
-    """Hisse kartı ve analiz ekranı için "+ Takibe Al" / "Takipte" düğmesi."""
+def follow_button(conn, ticker: str, key: str, compact: bool = False) -> None:
+    """Hisse kartı ve analiz ekranı için "+ Takibe Al" / "Takipte" düğmesi (compact: liste satırı için kısa yazı)."""
     if tracker.is_watched(conn, ticker):
-        if st.button(f"⭐ {ticker} takipte — takipten çıkar", key=f"unf_{key}",
-                     help="Yeni bildirimler durur; senaryolar ve olay geçmişi silinmez."):
+        if st.button("⭐ Takipte" if compact else f"⭐ {ticker} takipte — takipten çıkar", key=f"unf_{key}",
+                     width="stretch", help="Takipten çıkar: yeni bildirimler durur; senaryolar ve olay geçmişi silinmez."):
             tracker.remove(conn, ticker)
             _flash("info", f"{ticker} takipten çıkarıldı (geçmiş kayıtları duruyor).")
             _rerun(conn)
-    elif st.button(f"+ Takibe Al ({ticker})", key=f"fol_{key}", type="primary",
+    elif st.button("+ Takibe Al" if compact else f"+ Takibe Al ({ticker})", key=f"fol_{key}", type="primary",
+                   width="stretch",
                    help="Senaryoları bekçiye kaydedilir; bekçi koşulları kendisi izler ve Telegram'dan bildirir."):
         _add(conn, ticker)
 
@@ -51,7 +52,7 @@ def _add(conn, ticker: str) -> None:
     _rerun(conn)
 
 
-def watcher_status(conn) -> None:
+def watcher_status(conn, compact: bool = False) -> None:
     st_ = tracker.load_state()
     now = datetime.now(config.TR_TZ)
     beat = st_.get("nabiz")
@@ -73,11 +74,14 @@ def watcher_status(conn) -> None:
         miss = (st_.get(part) or {}).get("veri_yok") or []
         if miss:
             bits.append(f"veri gelmeyen (olay üretilmedi): {', '.join(miss)}")
-    if bits:
+    if bits and not compact:
         st.caption(" · ".join(bits))
     if st_.get("hata"):
         st.warning(f"Bekçinin son hatası ({st_.get('hata_zaman', '')[:16].replace('T', ' ')}): {st_['hata']}")
     tg = notify.configured() and pipeline.load_settings().get("takip_bildirim", True)
+    if compact:
+        st.caption("📨 Telegram: " + ("açık" if tg else "kapalı / ayarlanmamış") + f" · takip: {len(tracker.watched(conn))} hisse")
+        return
     st.caption(("📨 Telegram bildirimleri açık." if tg else
                 "📨 Telegram kapalı ya da ayarlanmamış: olaylar yalnız burada kaydedilir (⚙️ Ayarlar → Telegram).")
                + " Gün içi kontroller ~5 dakikada bir, Yahoo verisi ~15 dakika gecikmelidir; günlük kapanış "
@@ -131,14 +135,7 @@ def render(conn) -> None:
     st.markdown("#### 🛡️ Bekçi olayları")
     events_table(conn)
     st.markdown("#### 🏁 Takip senaryolarının sonuçları")
-    perf = tracker.performance(conn)
-    if perf:
-        st.dataframe(pd.DataFrame(perf), hide_index=True, width="stretch")
-        n = sum(p["Giriş olan"] for p in perf)
-        if n < 30:
-            st.caption(f"⚠️ Giriş olan yalnız {n} senaryo var: 30'dan azken oranlar güvenilir değildir.")
-    else:
-        st.caption("Henüz sonuçlanan takip senaryosu yok.")
+    performance_table(conn)
     old = [w for w in tracker.watched(conn, active_only=False) if not w["aktif"]]
     if old:
         st.caption("Takipten çıkarılanlar (geçmişi saklı): " + ", ".join(w["ticker"] for w in old))
@@ -155,3 +152,15 @@ def events_table(conn, limit: int = 100) -> None:
         "Olay": e["mesaj"], "Teyit": "kapanış" if e["kesin"] else "gün içi",
         "Telegram": sent.get(e["gonderildi"], "") + (f" ({e['hata']})" if e.get("hata") else "")} for e in ev]),
         hide_index=True, width="stretch")
+
+
+def performance_table(conn) -> None:
+    perf = tracker.performance(conn)
+    if not perf:
+        st.caption("Henüz sonuçlanan takip senaryosu yok. Senaryolar TP2, SL, başabaş, süre dolması ya da geçersizlikle "
+                   "sonuçlandıkça burada strateji türüne göre birikir.")
+        return
+    st.dataframe(pd.DataFrame(perf), hide_index=True, width="stretch")
+    n = sum(p["Giriş olan"] for p in perf)
+    if n < 30:
+        st.caption(f"⚠️ Giriş olan yalnız {n} senaryo var: 30'dan azken oranlar güvenilir değildir.")

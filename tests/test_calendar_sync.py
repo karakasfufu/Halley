@@ -191,9 +191,11 @@ class PanelTests(Isolated):
             self.assertEqual(len(calls), 1)                    # açılışta otomatik kontrol (günde bir)
             at.run(timeout=30)
             self.assertEqual(len(calls), 1)                    # 24 saat dolmadan tekrar yok
+            at.radio(key="nav").set_value("⚙️ Ayarlar").run(timeout=30)
+            self.assertEqual(len(calls), 1)
             at.button(key="calendar_check").click().run(timeout=30)
             self.assertEqual(len(calls), 2)                    # düğme her zaman kontrol eder
-            self.assertTrue(any("TCMB: güncel" in c.value for c in at.caption))
+            self.assertTrue(any("TCMB: güncel" in c.value for c in list(at.caption) + list(at.markdown)))
             self.assertTrue(any("elle kontrol gerekir" in d.value.to_string() for d in at.dataframe))
 
 

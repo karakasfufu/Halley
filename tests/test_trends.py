@@ -210,6 +210,7 @@ class PanelTrendTabTests(unittest.TestCase):
             at = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "app.py"))
             at.run(timeout=60)
             self.assertEqual(len(at.exception), 0, str(at.exception))
+            at.radio(key="nav").set_value("🏁 Performans").run(timeout=60)
             self.assertTrue(any("Deneme önerisi" in m.value for m in at.markdown))
             at.button(key="sug_ok_1").click().run(timeout=60)
             self.assertEqual(len(at.exception), 0, str(at.exception))

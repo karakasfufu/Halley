@@ -1316,3 +1316,27 @@ motor (Aşama 1–2), sonra arayüz (Aşama 3); haber bildirimi bütçe tavanı 
   Yahoo gün içi verisi 17:55'e kadar geldi; 9 Kasım kapanış kontrolü: THYAO 310,00 kapanışla 20 günlük zirveyi
   (304,75) aştı → tek olay. Gerçek Telegram gönderimi DENENMEDİ (bot anahtarı kullanıcıda).
 - Sınırlar: Yahoo ~15 dk gecikmeli; bekçi yalnız Halley açıkken; gün içi olaylar kapanışla teyit edilmez (öyle yazılır).
+
+## 2026-11-09 — Aşama 3: terminal arayüzü (üstte sabit menü, 9 ekran)
+- app.py yeniden düzenlendi (hesap kodu AYNEN taşındı; yalnız yerleşim): üst bant (Halley, tarih, son güncelleme,
+  🔄 Haberleri güncelle, 🧪 Ücretsiz dene, 🌙 Koyu tema) + yapışkan menü (st.radio key="nav", CSS ile sekme görünümü):
+  📊 Dashboard · 🎯 Fırsatlar · 🔍 Hisse Analizi · ⭐ Takip Listem · 🛡️ Bekçi · 📰 Haberler · 📒 İşlem Günlüğü ·
+  🏁 Performans · ⚙️ Ayarlar. Yalnız seçili ekran çizilir (önceden tüm sekmeler her seferinde hesaplanıyordu).
+- Dashboard kartları: BIST 100 (son iki kapanış), olumlu/olumsuz/uygun fırsat sayıları, piyasa rejimi şeridi, günün
+  fırsatları (🔍 Analiz düğmeli), bekçi durumu + son 6 olay, takip listesindeki aktif senaryolar, açık işlemler,
+  15 günlük piyasa takvimi. Fırsatlar: kısa satırlar (skor, haber, teyit, teknik etiket, 🔍 Analiz, + Takibe Al);
+  ayrıntı ayrı ekranda (Hisse Analizi; "_goto" ile ekran + hisse seçilir). Hisse Analizi: tüm hisseler seçilebilir;
+  haberi olmayan hissede senaryolar yalnız fiyattan (tracker.scenario_guard + entries.scenarios — bekçiyle aynı kural).
+  Bekçi: sabah/akşam analizi + takip bekçisi olayları + rapor arşivi. Performans: takip senaryolarının strateji
+  oranları + Gelişim. Ayarlar: ayarlar/Telegram, 💾 Veri ve gelişmiş, ❓ Kılavuz.
+- Ayarlar artık ayrı ekranda olduğu için KAP gün sayısı, analiz sınırı ve liste penceresi de ayarlar.json'da
+  saklanıyor (kap_gun, panel_analiz_siniri, liste_pencere); diğer ekranlar kayıtlı değeri kullanır.
+- Panelin "uygun" senaryolarını sanal işleme yazma (Parça C1) her ekranda çalışmaya devam ediyor (eskiden Bugünün
+  listesi sekmesi her seferinde çizildiği için).
+- Varsayılan tema koyu (kullanıcı isteği); seçim saklanıyor. Streamlit üst çubuğu gizlendi, genişlik 1440 px.
+- Bulunan ve düzeltilen: Telegram ayar düğmeleri sayfayı yenilerken veritabanı bağlantısını kapatmıyordu.
+- Testler yeni ekranlara göre güncellendi (+ her ekran açılıyor ve 🔍 Analiz yönlendirmesi, ayarlar ekran değişince
+  kaybolmuyor testleri). 438 test geçti, ağ denemesi 0. Görsel kontrol: geliştirme kopyası ağsız kipte (8504) —
+  Dashboard, Fırsatlar, Hisse Analizi.
+- Not: Streamlit'in yerleşik çok sayfalı yapısı (st.navigation) yerine tek dosyada radyo menü seçildi: test
+  edilebilir (AppTest), widget anahtarları korunur, ekranlar arası yönlendirme basit.

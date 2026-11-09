@@ -42,28 +42,58 @@ class PanelFlowTests(unittest.TestCase):
         watchdog.archive(today.isoformat(), "aksam", "# akşam\n", {})
         watchdog.archive(today.isoformat(), "sabah", "# sabah 2\n", {})
 
-    def app(self):
+    def app(self, page=None):
         at = AppTest.from_file(APP, default_timeout=90)
         at.run()
         self.assertEqual(len(at.exception), 0, str(at.exception))
+        if page:
+            self.go(at, page)
         return at
+
+    def go(self, at, page):
+        """Aşama 3: üst menüden ekrana geç."""
+        at.radio(key="nav").set_value(page).run()
+        self.assertEqual(len(at.exception), 0, str(at.exception))
+        return at
+
+    def test_every_page_renders_and_analysis_link_opens_stock(self):
+        at = self.app()
+        self.assertEqual(at.radio(key="nav").value, "📊 Dashboard")
+        for p in at.radio(key="nav").options:
+            self.go(at, p)
+        self.go(at, "🎯 Fırsatlar")
+        at.button(key="an_POS").click().run()                       # 🔍 Analiz → Hisse Analizi, POS seçili
+        self.assertEqual(len(at.exception), 0, str(at.exception))
+        self.assertEqual(at.radio(key="nav").value, "🔍 Hisse Analizi")
+        self.assertEqual(at.selectbox(key="hisse_pick").value, "POS")
+        self.assertTrue(any("Trend gücü (ADX 14)" in d.value.to_string() for d in at.dataframe))
+
+    def test_settings_saved_across_pages(self):
+        at = self.app("⚙️ Ayarlar")
+        at.slider(key="set_window").set_value(12).run()
+        self.assertEqual(len(at.exception), 0, str(at.exception))
+        self.assertEqual(pipeline.load_settings()["liste_pencere"], 12)
+        self.go(at, "📊 Dashboard")
+        self.go(at, "⚙️ Ayarlar")
+        self.assertEqual(at.slider(key="set_window").value, 12)          # ekran değişse de ayar kaybolmaz
 
     def test_dark_mode_toggle_is_saved_and_applies_theme(self):
         from streamlit import config as st_config
         at = self.app()
-        self.assertFalse(at.toggle(key="dark_mode").value)
-        at.toggle(key="dark_mode").set_value(True).run()
-        self.assertEqual(len(at.exception), 0, str(at.exception))
-        self.assertTrue(pipeline.load_settings()["karanlik_mod"])          # seçim saklandı
-        self.assertEqual(st_config.get_option("theme.base"), "dark")
-        self.assertTrue(any("--h-bg:#0D1322" in m.value for m in at.markdown))   # koyu renk takımı çizildi
+        self.assertTrue(at.toggle(key="dark_mode").value)                  # Aşama 3: varsayılan koyu tema
+        self.assertTrue(any("--h-bg:#0D1322" in m.value for m in at.markdown))
         at.toggle(key="dark_mode").set_value(False).run()
-        self.assertFalse(pipeline.load_settings()["karanlik_mod"])
+        self.assertEqual(len(at.exception), 0, str(at.exception))
+        self.assertFalse(pipeline.load_settings()["karanlik_mod"])         # seçim saklandı
         self.assertEqual(st_config.get_option("theme.base"), "light")
         self.assertTrue(any("--h-bg:#F3F5FA" in m.value for m in at.markdown))
+        at.toggle(key="dark_mode").set_value(True).run()
+        self.assertTrue(pipeline.load_settings()["karanlik_mod"])
+        self.assertEqual(st_config.get_option("theme.base"), "dark")
+        self.assertTrue(any("--h-bg:#0D1322" in m.value for m in at.markdown))   # koyu renk takımı çizildi
 
     def test_transfer_section_export_prepares_file(self):
-        at = self.app()
+        at = self.app("⚙️ Ayarlar")
         self.assertTrue(any("💾 Veri aktarma" in m.value for m in at.markdown))
         self.assertFalse(any("Halley yeni kurulmuş" in str(i.value) for i in at.info))     # verisi olan kurulum
         at.button(key="export_prepare").click().run()
@@ -78,7 +108,7 @@ class PanelFlowTests(unittest.TestCase):
                 patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "", "TELEGRAM_CHAT_ID": ""}), \
                 patch.object(notify, "find_chats", lambda: [{"id": "11", "ad": "Ali", "tur": "private"}]), \
                 patch.object(notify, "send", lambda t: sent.append(t) or {"ok": True, "gonderilen": 1, "hatalar": []}):
-            at = self.app()
+            at = self.app("⚙️ Ayarlar")
             self.assertTrue(at.toggle(key="tg_on").disabled)                   # ayarlanmadan açılamaz
             at.text_input(key="tg_token").input("123:ABC").run()
             at.button(key="tg_save_token").click().run()
@@ -103,12 +133,13 @@ class PanelFlowTests(unittest.TestCase):
                 return fn(c, *a, **k)
             finally:
                 c.close()
-        at = self.app()
-        at.button(key="fol_card_POS").click().run()                     # hisse kartındaki "+ Takibe Al"
+        at = self.app("🔍 Hisse Analizi")
+        at.button(key="fol_card_POS").click().run()                     # analiz ekranındaki "+ Takibe Al"
         self.assertEqual(len(at.exception), 0, str(at.exception))
         self.assertTrue(q(tracker.is_watched, "POS"))
         self.assertTrue(any("POS takibe alındı" in str(m.value) for m in list(at.success) + list(at.warning)))
         self.assertTrue(any(b.key == "unf_card_POS" for b in at.button))   # artık "takipte" düğmesi
+        self.go(at, "⭐ Takip Listem")
         at.multiselect(key="tk_types_POS").set_value(["sl", "tp"]).run()   # yalnız SL ve TP bildirimi
         self.assertEqual(len(at.exception), 0, str(at.exception))
         self.assertEqual(q(tracker.watched)[0]["bildirimler"], ["sl", "tp"])
@@ -140,7 +171,7 @@ class PanelFlowTests(unittest.TestCase):
         self.assertFalse(any("Max retries" in e for e in errs))          # teknik İngilizce gösterilmez
 
     def test_report_filter_change_does_not_crash(self):
-        at = self.app()
+        at = self.app("🛡️ Bekçi")
         self.assertEqual(len(at.selectbox(key="rep_pick").options), 3)
         for kind in ("Akşam", "Sabah", "Hepsi"):
             at.radio(key="rep_kind").set_value(kind).run()
@@ -150,19 +181,22 @@ class PanelFlowTests(unittest.TestCase):
 
     def test_tables_show_dash_not_none(self):
         at = self.app()
-        for d in at.dataframe:
-            s = d.value.astype(str)
-            for col in s.columns:
-                self.assertFalse(s[col].isin(["None", "nan"]).any(), f"{col} sütununda None/nan")
+        for p in at.radio(key="nav").options:
+            self.go(at, p)
+            for d in at.dataframe:
+                s = d.value.astype(str)
+                for col in s.columns:
+                    self.assertFalse(s[col].isin(["None", "nan"]).any(), f"{p}: {col} sütununda None/nan")
 
     def test_guide_is_shown_and_names_real_buttons(self):
-        at = self.app()
+        at = self.app("⚙️ Ayarlar")
         guide = next((m.value for m in at.markdown if "Kullanım kılavuzu" in m.value), "")
         self.assertTrue(guide, "kılavuz panelde yok")
         src = Path(APP).read_text(encoding="utf-8")
         for name in ("🌅 Sabah analizi", "🌙 Akşam analizi", "🔄 Haberleri güncelle", "🧪 Ücretsiz dene",
-                     "✍️ Bu işleme girdim", "⚙️ Ayarlar", "📈 Bugünün listesi", "📒 İşlem günlüğü", "📋 Raporlar",
-                     "🧭 Gelişim", "📰 Haberler", "🔧 Gelişmiş", "🤖 Raporu yapay zekâ ile yorumla",
+                     "✍️ Bu işleme girdim", "📊 Dashboard", "🎯 Fırsatlar", "🔍 Hisse Analizi", "⭐ Takip Listem",
+                     "🛡️ Bekçi", "📰 Haberler", "📒 İşlem Günlüğü", "🏁 Performans", "⚙️ Ayarlar",
+                     "💾 Veri ve gelişmiş", "+ Takibe Al", "🔍 Analiz", "🤖 Raporu yapay zekâ ile yorumla",
                      "🤖 Kaçırılan fırsatları yapay zekâ ile açıkla"):
             self.assertIn(name, guide)
             self.assertIn(name, src)        # kılavuzdaki ad panelde gerçekten var
@@ -183,7 +217,7 @@ class PanelFlowTests(unittest.TestCase):
             calls.append((len(rows), k.get("budget_usd")))
             return {"analyzed": len(rows), "filtered_out": 0, "errors": 0}
         with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}), patch.object(analyzer, "analyze", fake_analyze):
-            at = self.app()
+            at = self.app("📰 Haberler")
             self.assertTrue(any("🔬 Haber analizi" in m.value for m in at.markdown))
             self.assertTrue(any("tahmini maliyet" in str(i.value) for i in at.info))
             at.number_input(key="na_n").set_value(2).run()
@@ -210,7 +244,7 @@ class PanelFlowTests(unittest.TestCase):
         self.assertTrue(any("130 haber analiz edildi" in str(x.value) and "2.100 $" in str(x.value) for x in at.success))
 
     def test_double_save_real_trade_warns(self):
-        at = self.app()
+        at = self.app("📒 İşlem Günlüğü")
         at.number_input(key="real_px").set_value(100.5).run()
         at.button(key="real_save").click().run()
         self.assertTrue(any("kaydedildi" in str(s.value) for s in at.success))

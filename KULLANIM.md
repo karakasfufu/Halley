@@ -12,7 +12,8 @@ tavsiyesi değildir.
   **Halley'i kaldır** (verileri saklamayı sorar). Windows ilk açılışta "Windows bilgisayarınızı korudu" derse:
   **Ek bilgi → Yine de çalıştır** (program imzasız olduğu için çıkan olağan uyarı).
 - **Geliştirici klasöründen:** **`baslat.bat`** dosyasına çift tıklayın. Kapatmak için siyah pencereyi kapatın.
-- Üst bantta **🌙 Karanlık mod** düğmesi koyu görünümü açar; seçim saklanır.
+- **Ekranlar:** üstteki sabit menüden seçilir — **📊 Dashboard · 🎯 Fırsatlar · 🔍 Hisse Analizi · ⭐ Takip Listem · 🛡️ Bekçi · 📰 Haberler · 📒 İşlem Günlüğü · 🏁 Performans · ⚙️ Ayarlar**. Her ekran ayrıdır; uzun kaydırma yok.
+- Sağ üstteki **🌙 Koyu tema** düğmesi koyu/açık görünümü değiştirir (varsayılan koyu); seçim saklanır.
 - İlk açılışta üstteki kutuya OpenAI API anahtarını bir kez girin (yalnız bu bilgisayarda saklanır).
 - Arka planda bir "okuyucu" çalışır: KAP sayfalarını kendiliğinden tamamlar. Panelin üstündeki
   **📥 KAP sayfaları** kutusu ilerlemeyi gösterir; bir şey yapmanız gerekmez.
@@ -21,9 +22,9 @@ tavsiyesi değildir.
 
 | Ne zaman | Ne yapılır |
 |---|---|
-| **Sabah, 09:40'tan önce** | **🛡️ Piyasa bekçisi → 🌅 Sabah analizi**. Gece gelen haberler toplanır, tüm BIST'in fiyatı güncellenir, açık işlemler kontrol edilir, günün fırsatları ve takip listesi raporlanır. İlk çalıştırma ~4 dakika, sonrakiler ~1,5 dakika. |
-| Gün içinde (isteğe bağlı) | **🔄 Haberleri güncelle**: yeni haberleri toplar ve analiz eder. |
-| **Akşam, 18:10'dan sonra** | **🌙 Akşam analizi**. Günün fiyatlarıyla işlem günlüğü (TP1/TP2/SL), günlük ve toplam kâr/zarar, kaçırılan fırsatlar ve öneriler raporlanır. |
+| **Sabah, 09:40'tan önce** | **🛡️ Bekçi → 🌅 Sabah analizi**. Gece gelen haberler toplanır, tüm BIST'in fiyatı güncellenir, açık işlemler kontrol edilir, günün fırsatları ve takip listesi raporlanır. İlk çalıştırma ~4 dakika, sonrakiler ~1,5 dakika. |
+| Gün içinde (isteğe bağlı) | Sağ üstteki **🔄 Haberleri güncelle**: yeni haberleri toplar ve analiz eder. Takip listenizdeki hisseleri bekçi kendisi izler. |
+| **Akşam, 18:10'dan sonra** | **🛡️ Bekçi → 🌙 Akşam analizi**. Günün fiyatlarıyla işlem günlüğü (TP1/TP2/SL), günlük ve toplam kâr/zarar, kaçırılan fırsatlar ve öneriler raporlanır. |
 
 - Saat uygun değilse (hafta sonu, tatil, seans açıkken) panel uyarır ama yine de çalıştırır; uyarı rapora yazılır.
 - Yarım günlerde seans 12:40'ta kapanır.
@@ -39,17 +40,19 @@ tavsiyesi değildir.
 - **🧪 Ücretsiz dene**: haberleri toplar ama yapay zekâyı çağırmaz; bir sonraki güncellemenin maliyetini gösterir.
 - Fiyat, takvim ve tüm hesaplar ücretsizdir (yapay zekâ kullanılmaz).
 
-## Sekmeler
+## Ekranlar
 
-| Sekme | İçerik |
+| Ekran | İçerik |
 |---|---|
-| **📈 Bugünün listesi** | Haberi olan hisseler, haber skoru, teknik durum ve giriş senaryoları. Bir hisseye tıklayınca haber, gerekçe, takvim (bilanço, genel kurul, temettü) ve riskler açılır. |
-| **⭐ Takip Listem** | Takibe aldığınız hisseler, senaryoları ve durumları, bildirim türleri, bekçi olayları ve takip senaryolarının sonuçları. |
-| **📒 İşlem günlüğü** | Önerilen senaryolar burada **sanal işlem** olarak izlenir. Gerçekten aldıysanız **✍️ Bu işleme girdim** bölümünden alış günü ve fiyatını kaydedin; gerçek işleminiz ayrıca izlenir. |
-| **📋 Raporlar** | Tüm sabah/akşam raporlarının arşivi. Raporlar sonradan değişmez; .md ve .json olarak indirilebilir. |
-| **🧭 Gelişim** | Strateji, haber kaynağı, olay türü ve risk seviyesine göre başarı; hangi filtrenin sonradan yükselen hisseleri elediği; haftalık performans. **Onayınızı bekleyen öneriler** burada; onay hiçbir ayarı kendiliğinden değiştirmez. |
-| **📰 Haberler** | Son analiz edilen 50 haber: hangi hisseyi hangi yönde etkilediği ve haberin kaynağına bağlantı. |
-| **🔧 Gelişmiş** | Durum bilgisi, 📅 takvimi resmi kaynaklardan kontrol, 📥 KAP geçmişini tamamlama, 🧪 ucuz test, geçmiş veri pilotu. |
+| **📊 Dashboard** | Tek bakışta: BIST 100, olumlu/olumsuz haber sayısı, uygun fırsatlar, piyasa durumu, bekçi durumu ve son olaylar, takip listenizdeki aktif senaryolar, açık işlemler, önümüzdeki 15 işlem gününün piyasa takvimi. |
+| **🎯 Fırsatlar** | Haberi olan hisseler (olumlu / olumsuz / zayıf), haber skoru ve teknik durum. Her satırda **🔍 Analiz** (ayrıntı ekranı) ve **+ Takibe Al**. Detaylı listeyi CSV olarak indirme. |
+| **🔍 Hisse Analizi** | Seçilen hissenin tüm analizi: giriş senaryoları (kırılım, geri çekilme, destekten tepki), referans senaryo, teknik göstergeler, sektör, bilanço ve şirket takvimi, finansal özet, haberler. Haberi olmayan hissede senaryolar yalnız fiyattan hesaplanır. **+ Takibe Al** düğmesi burada da var. |
+| **⭐ Takip Listem** | Takibe aldığınız hisseler, senaryoları ve durumları, senaryo ve bildirim türü seçimleri, son olaylar, takip senaryolarının sonuçları. |
+| **🛡️ Bekçi** | **🌅 Sabah analizi** / **🌙 Akşam analizi** ve yapay zekâ seçenekleri, takip bekçisinin durumu ve tüm olayları (Telegram'a gidip gitmediği), sabah/akşam rapor arşivi (sonradan değişmez; .md ve .json indirilebilir). |
+| **📰 Haberler** | 🔬 Haber analizi (bekleyenleri seçerek analiz, derin yeniden inceleme, tahmini maliyet ve bütçe) ve son analiz edilen 50 haber. |
+| **📒 İşlem Günlüğü** | Önerilen senaryolar **sanal işlem** olarak izlenir. Gerçekten aldıysanız **✍️ Bu işleme girdim** ile alış günü ve fiyatını kaydedin. Portföy/sektör riski, kayma ölçümü. |
+| **🏁 Performans** | Takip senaryolarının strateji türüne göre TP1/TP2/SL oranları; sanal işlemlerin stratejiye, haber kaynağına, olay türüne ve riske göre başarısı; filtre analizi; **onayınızı bekleyen öneriler** (onay hiçbir ayarı kendiliğinden değiştirmez). |
+| **⚙️ Ayarlar** | Ayarlar ve 📨 Telegram; **💾 Veri ve gelişmiş** (veri aktarma, durum, 📅 takvim kontrolü, 📥 KAP geçmişi, 🧪 ucuz test, geçmiş veri pilotu); ❓ Kılavuz (bu metin). |
 
 ## Senaryo kartını okumak
 
@@ -72,7 +75,7 @@ tavsiyesi değildir.
 
 Halley bütün BIST'i taramaya devam eder; ama **Telegram'a yalnız takibe aldığınız hisselerin olayları gider.**
 
-- **Takibe almak:** hisse kartındaki **+ Takibe Al** düğmesi ya da **⭐ Takip Listem** sekmesinde hisse seçip
+- **Takibe almak:** 🎯 Fırsatlar satırındaki ya da 🔍 Hisse Analizi ekranındaki **+ Takibe Al** düğmesi ya da **⭐ Takip Listem** ekranında hisse seçip
   **+ Takibe Al**. Halley o hissenin fiyatını tazeler ve uygun her senaryoyu (kırılım, geri çekilme, destekten
   tepki) **ayrı ayrı** kaydeder. Takip listesindeki hisse için haber şartı yoktur; fiyat verisi sorunluysa ya da
   likidite çok düşükse senaryo üretilmez (nedeni yazılır).
@@ -114,12 +117,12 @@ fırsat sayısı. **Ücretsizdir**, yapay zekâ kullanmaz, emir vermez.
 - Bot anahtarı yalnız bu bilgisayarda (.env) durur; **veri aktarma dosyasına girmez**. Yeni bilgisayarda aynı anahtarı
   yeniden girip alıcıları bulun (aynı botu iki bilgisayar da kullanabilir).
 
-## Başka bilgisayara taşımak (🔧 Gelişmiş → 💾 Veri aktarma)
+## Başka bilgisayara taşımak (⚙️ Ayarlar → 💾 Veri ve gelişmiş)
 
 1. **Eski bilgisayarda:** **📦 Veri dosyasını hazırla** → **⬇️ Veri dosyasını indir**. `halley_veri_….zip` dosyası
    İndirilenler klasörüne kaydedilir (haberler, analizler, fiyatlar, işlem günlüğü, raporlar, pilot, ayarlar).
 2. Dosyayı USB ile yeni bilgisayara taşıyın. Yeni bilgisayara Halley'i **Halley_Kurulum.exe** ile kurun.
-3. **Yeni bilgisayarda:** Halley'i açın, OpenAI API anahtarını girin → **🔧 Gelişmiş → 💾 Veri aktarma → İçe aktar**:
+3. **Yeni bilgisayarda:** Halley'i açın, OpenAI API anahtarını girin → **⚙️ Ayarlar → 💾 Veri ve gelişmiş → İçe aktar**:
    dosyayı seçin, özeti kontrol edin, **Anladım** kutusunu işaretleyip **📥 İçe aktar** deyin.
 - API anahtarı dosyaya girmez; her bilgisayarda ayrı girilir. İçe aktarmadan önce o bilgisayardaki veriler
   `data\yedek` klasörüne otomatik yedeklenir. Bozuk ya da değiştirilmiş dosya içe aktarılmaz.
