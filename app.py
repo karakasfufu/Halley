@@ -430,7 +430,8 @@ def timeline_block(ticker: str) -> None:
         st.caption("Bu dönemde kayıtlı olay yok.")
     else:
         st.dataframe(pd.DataFrame([{"Tarih": f"{x['tarih'][8:10]}.{x['tarih'][5:7]}.{x['tarih'][:4]}",
-                                    "Kaç işlem günü sonra": x["is_gunu_sonra"] if x["is_gunu_sonra"] else "—",
+                                    # hep metin: sayı ve "—" karışınca tablo dönüştürme hatası veriyordu (09.11)
+                                    "Kaç işlem günü sonra": str(x["is_gunu_sonra"]) if x["is_gunu_sonra"] else "—",
                                     "Kapsam": x["kapsam"], "Olay": x["olay"], "Ayrıntı": x["ayrinti"]}
                                    for x in tl["olaylar"]]), hide_index=True, use_container_width=True)
     notes = [n for n in ([("Takvimi henüz bilinmeyen: " + ", ".join(tl["bilinmeyen"])) if tl["bilinmeyen"] else None,

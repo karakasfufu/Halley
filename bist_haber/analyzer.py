@@ -216,13 +216,56 @@ def _save(conn, news_id, stage, model, result: BaseModel, tin, tout):
     )
 
 
+PRIORITY_LIQ_TL = 2e6        # tradeplan.LIQ_MIN_TL ile aynı: altında senaryo üretilmez
+PRICE_COVERAGE_MIN = 200     # "fiyatı yok = borsada işlem görmüyor" sonucu yalnız evrenin fiyatı indirilmişse
+PRIORITY_LABELS = {0: "açık/bekleyen işlem", 1: "likit hisse", 2: "sığ hisse", 3: "fiyatı olmayan şirket"}
+
+
+def priority_context(conn) -> Dict:
+    """Analiz sırası için hisse sınıfları (yapay zekâ yok, yalnız kayıtlı fiyat ve işlem günlüğü)."""
+    last = conn.execute("SELECT MAX(date) FROM prices").fetchone()[0]
+    liq, priced = {}, set()
+    if last:
+        rows = conn.execute("SELECT ticker, AVG(close*COALESCE(volume,0)) FROM prices WHERE date>date(?, '-30 day') "
+                            "GROUP BY ticker", (last,)).fetchall()
+        liq = {r[0]: r[1] or 0 for r in rows}
+        priced = {r[0] for r in conn.execute("SELECT DISTINCT ticker FROM prices")}
+    held = {r[0] for r in conn.execute("SELECT DISTINCT ticker FROM trade_journal WHERE durum IN "
+                                       "('bekliyor','açık','açık (TP1 görüldü)')")}
+    return {"liq": liq, "priced": priced, "held": held, "coverage": len(priced) >= PRICE_COVERAGE_MIN}
+
+
+def priority(row, ctx: Dict) -> int:
+    """0 açık/bekleyen işlemi olan hisse · 1 likit · 2 sığ · 3 fiyatı hiç olmayan (yalnız evren fiyatı varsa).
+    Bilinmeyen (fiyatı henüz indirilmemiş) hisse geri plana atılmaz: likit sayılır."""
+    cands = [c for c in (row["candidates"] or "").split(",") if c]
+    if any(c in ctx["held"] for c in cands):
+        return 0
+    if not cands:
+        return 1                      # eşleşmesiz (ör. makro/sektör haberi): ön eleme karar verir
+    best = 3
+    for c in cands:
+        if c not in ctx["priced"]:
+            best = min(best, 3 if ctx["coverage"] else 1)
+        elif ctx["liq"].get(c, 0) >= PRIORITY_LIQ_TL:
+            best = min(best, 1)
+        else:
+            best = min(best, 2)
+    return best
+
+
 def pending(conn, limit: Optional[int] = None) -> List:
     # body NULL: KAP metni henüz alınamadı → metin gelene kadar bekle.
-    # En yeni haber önce (2026-11-06, kullanıcı isteği): swing için taze haber daha değerli; güncelleme başına
-    # adet sınırı olduğundan eski haberler sırada bekleyebilir (çok eskiler zaten RSS_MAX_AGE_DAYS ile atlanır).
+    # Sıra (2026-11-09): önce açık/bekleyen işlemi olan hisseler, sonra likit, sığ, fiyatı olmayan; her grupta en yeni
+    # haber önce (2026-11-06 kullanıcı isteği: taze haber daha değerli). Neden: güncelleme başına 10 haber sınırı var ve
+    # bilanço sezonunda kuyruk yüzlerce haber (ölçüm 08.11: 961 bekleyen, 887'si likit hisse) — sınırlı analiz
+    # işlem yapılabilecek hisselere gitsin. Maliyet değişmez (aynı adet).
     sql = ("SELECT * FROM news WHERE status='new' AND body IS NOT NULL "
            "AND LENGTH(TRIM(body, char(9)||char(10)||char(13)||' '))>0 ORDER BY published_at DESC, id")
-    return conn.execute(sql + (f" LIMIT {int(limit)}" if limit else "")).fetchall()
+    rows = conn.execute(sql).fetchall()
+    ctx = priority_context(conn)
+    rows = sorted(rows, key=lambda r: priority(r, ctx))     # sıralama kararlı: grup içinde en yeni önce kalır
+    return rows[:int(limit)] if limit else rows
 
 
 def estimate(rows) -> Tuple[int, int]:

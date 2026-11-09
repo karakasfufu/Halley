@@ -975,3 +975,17 @@ bir daha denemiyordu → bir sonraki başlatmaya kadar arka plan okuma ve günl�
 var; yeni bekçi taze yabancı kilitte 2 dk'da bir bakarak bekler, kilit bayatlayınca devralır. Test eski kodda
 başarısız, yenide başarılı. Okuma sonucu: 95 sayfanın 90'ı okundu; 5 sayfa KAP'tan boş/hatalı geldi, bir sonraki
 güncellemede yeniden denenir. 371 test, ağsız 0 bağlantı.
+
+## 2026-11-09 — Plan 1.1: analiz sırası önceliği (`analyzer.pending`)
+Ölçüm (08.11): 961 bekleyen haberin 887'si likit hisselere ait (ilk sayımımda canlı veritabanında yalnız 9 hissenin
+fiyatı olduğu için yanlış sınıflandırmıştım — tüm BIST fiyatı ancak ilk "Sabah analizi"nde iner; düzeltilmiş ölçüm test
+kopyasının fiyatlarıyla yapıldı). Güncelleme başına 10 haber sınırıyla bu kuyruk erimiyor.
+**Yeni sıra (maliyet değişmez, aynı adet):** 0 açık/bekleyen işlemi olan hisse → 1 likit (20 gün ort. hacim ≥ 2 mn TL)
+ya da eşleşmesiz haber → 2 sığ → 3 fiyatı hiç olmayan; her grupta en yeni önce. "Fiyatı yok" yalnız evrenin fiyatı
+indirilmişse (≥ 200 hisse) geri plana atılır; aksi hâlde kimse geri itilmez (eski sıra).
+**Gerçek kuyrukta (1.001 bekleyen, tüm BIST fiyatlarıyla):** ilk 10 eski sırada 9 likit + 1 sığ → yeni sırada 10'u da
+açık işlem (SOKM, FROTO, TCELL; FROTO ve SOKM bilançoları dahil 13 haber bekliyordu). İlk 50: eski 48 likit; yeni 13
+açık işlem + 37 likit. Likidite katmanının şimdiki etkisi küçük (bekleyenin %92'si zaten likit); asıl kazanç açık
+işlemler. Kuyruğun kendisi bununla erimez → Plan 2.1 (maliyet tahmini, onay).
+Ayrıca: panel takvim tablosunda "Kaç işlem günü sonra" sütunu sayı + "—" karışıktı (bugün olayı olunca tablo dönüştürme
+uyarısı) → hep metin. 374 test, ağsız 0 bağlantı.
