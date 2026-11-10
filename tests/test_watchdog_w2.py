@@ -152,11 +152,21 @@ class UpdateUniverseTests(unittest.TestCase):
             return prices.update_universe(self.conn, tickers, batch=1)
 
     def test_incremental_full_behind_and_missing(self):
+        self.conn.execute("INSERT INTO prices(ticker,date,close) VALUES('OLD','2025-01-02',1)")   # uzun geçmiş
         self.conn.execute("INSERT INTO prices(ticker,date,close) VALUES('OLD',?,1)", (self.today,))
         r = self.run_u(["OLD", "NEW", "MISS", "OLD", "STALE"])
         self.assertEqual(self.seen, [("1mo", ["OLD"]), ("1y", ["MISS"]), ("1y", ["NEW"]), ("1y", ["STALE"])])
         self.assertEqual((r["hisse"], r["artimli"], r["tam"]), (4, 1, 3))
         self.assertEqual((r["geride"], r["fiyati_yok"]), (["STALE"], ["MISS"]))
+
+    def test_short_recent_history_is_backfilled(self):
+        # 2026-11-10: bir kez 1 aylık indirilen hisse (TUPRS gibi, 22 gün) bir daha tamamlanmıyordu → 1 yıl indirilir
+        from datetime import date as _d, timedelta as _td
+        t0 = _d.fromisoformat(self.today)
+        for i in range(22):
+            self.conn.execute("INSERT INTO prices(ticker,date,close) VALUES('SHORT',?,1)", ((t0 - _td(days=i)).isoformat(),))
+        self.run_u(["SHORT"])
+        self.assertEqual(self.seen, [("1y", ["SHORT"])])
 
     def test_no_data_ticker_skipped_then_retried_after_a_week(self):
         import json as _j

@@ -84,7 +84,12 @@ def update_universe(conn, tickers: Iterable[str], progress=None, batch: int = 10
     tickers = sorted(set(t for t in tickers if t))
     today = datetime.now(config.TR_TZ).date()
     recent = (today - timedelta(days=40)).isoformat()
-    have = {r[0] for r in conn.execute("SELECT ticker FROM prices GROUP BY ticker HAVING MAX(date)>=?", (recent,))}
+    # 2026-11-10 düzeltme: artımlı (1 ay) indirme yalnız GEÇMİŞİ YETERLİ hisseye (≥200 gün ya da ilk fiyatı ~11 ay
+    # önce). Önceden bir kez 1 aylık indirilen hisse (ör. TUPRS) hep 22 günde kalıyor, teknik analiz (≥30 gün) hiç
+    # yapılamıyordu (olumlu haberli 44 hissenin 14'ü "teknik veri yok").
+    old = (today - timedelta(days=330)).isoformat()
+    have = {r[0] for r in conn.execute("SELECT ticker FROM prices GROUP BY ticker HAVING MAX(date)>=? AND "
+                                       "(COUNT(*)>=200 OR MIN(date)<=?)", (recent, old))}
     # Yahoo'da hiç fiyatı olmayanlar (çoğu borsada işlem görmeyen KAP şirketi: faktoring, varlık kiralama...)
     # her sabah boşuna 1 yıllık indirme denenmesin: NO_DATA_RETRY_DAYS günde bir yeniden denenir.
     nd_file = config.DATA / "fiyat_yok.json"

@@ -1477,3 +1477,23 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Gerçek veri (salt okunur + kopya): 44 olumlu haberliden 1 hazır (METEN, mevcut fiyattan, giriş 21,44, azami 21,67,
   SL 19,22, TP1 25,89, TP2 28,11, r/g 1:2,0, teknik 7/10, risk orta); 27'si "koşulu sağlanmış r/g ≥1:2 plan yok",
   14'ü teknik veri yok, 2'si risk yüksek. Kopyada akşam → sabah onay → rapor/Telegram metni doğrulandı.
+
+## 2026-11-10 — Diğer kullanıcı GitHub'dan kuramadı ("Defender kapalıyken bile"): inceleme ve düzeltmeler
+- Depo ÖZEL (private): girişsiz sürüm sayfası ve dosya bağlantısı 404 (doğrulandı). İkinci yetkili hesap:
+  ihtiyarkilicoglu. İndirmek için o hesapla GitHub'a giriş gerekir.
+- GitHub'daki dosya sağlam: indirildi, SHA-256 yereldekiyle aynı (d9813de3…). "İnternetten indirildi" işareti
+  (Zone.Identifier, ZoneId=3) eklenince Windows çalıştırmayı durdurdu ("İşlem kullanıcı tarafından iptal edildi" —
+  SmartScreen onayı); Unblock-File sonrası aynı dosya sorunsuz kuruldu. Defender'ı kapatmak SmartScreen'i kapatmaz;
+  Windows 11 Akıllı Uygulama Denetimi açıksa imzasız program hiç çalışmaz ("Yine de çalıştır" yok). Paketteki
+  python/pythonw (Python Software Foundation) ve WebView2 dosyaları (Microsoft) imzalı; imzasız: Halley_Kurulum.exe,
+  Halley.exe. Kalıcı çözüm kod imzalama (kullanıcı kararı/ücretli).
+- Yapılanlar: KURULUM_YARDIM.md (doğru dosya, giriş, Engellemeyi kaldır, Yine de çalıştır, Akıllı Uygulama Denetimi,
+  günlük dosyası, SHA-256) ve sürüm notuna aynı adımlar; kurulum penceresi kipinde de hata/başarı
+  %TEMP%\halley_kurulum.log'a yazılır (Windows sürümüyle) ve hata penceresi dosya yolunu gösterir.
+- Ayrıca bulunan hata: prices.update_universe son 40 günde fiyatı olan her hissede yalnız 1 ay indiriyordu; bir kez
+  1 aylık inen hisse (TUPRS dahil 14 olumlu haberli hisse) 22 günde kalıp teknik analize (≥30 gün) hiç giremiyordu →
+  artımlı indirme yalnız geçmişi yeterli (≥200 gün ya da ilk fiyatı ~11 ay önce) hisseye; diğerleri 1 yıl. Test eklendi.
+- Hazır fırsat özellik doğrulaması (kullanıcı listesine göre) sohbet yanıtında madde madde; eksik/kısmi: "mevcut seans"
+  girişli kayıtlı öneri yok (yalnız ertesi gün açılışı; gün içi anlık hesap kaydedilmez), açılış fiyatı açılıştan önce
+  bilinemez (kontrol 10:05'ten sonra), sabah kötü haber kontrolü YZ düğmesi kapalıyken yalnız önceden analiz edilmiş
+  haberleri görür (kullanıcı kararı).

@@ -56,6 +56,13 @@ static class Kurulum
 
     static string AppData { get { return Path.Combine(Target, "app\\data"); } }
 
+    public static string LogPath { get { return Path.Combine(Path.GetTempPath(), "halley_kurulum.log"); } }
+
+    static void Log(string text)
+    {
+        try { File.WriteAllText(LogPath, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " " + text); } catch { }
+    }
+
     public static bool IsInstalled() { return File.Exists(Path.Combine(Target, "Halley.exe")); }
 
     public static string InstalledVersion()
@@ -313,6 +320,7 @@ static class Kurulum
                 try
                 {
                     string r = Install(delegate (int p, string m) { BeginInvoke((MethodInvoker)delegate { bar.Value = Math.Min(100, p); info.Text = m; }); });
+                    Log("KURULUM TAMAM: " + Target + "\r\n" + r);
                     BeginInvoke((MethodInvoker)delegate
                     {
                         info.Text = r + "\n\nMasaüstündeki Halley simgesiyle açabilirsiniz.";
@@ -322,9 +330,11 @@ static class Kurulum
                 }
                 catch (Exception e)
                 {
+                    Log("KURULUM HATASI (" + Environment.OSVersion + "): " + e);   // tanı için (pencere kipinde de)
                     BeginInvoke((MethodInvoker)delegate
                     {
-                        MessageBox.Show(this, "Kurulum tamamlanamadı:\n" + e.Message + "\n\nVerileriniz silinmedi.",
+                        MessageBox.Show(this, "Kurulum tamamlanamadı:\n" + e.Message + "\n\nVerileriniz silinmedi.\n" +
+                                        "Ayrıntı: " + LogPath,
                                         "Halley Kurulum", MessageBoxButtons.OK, MessageBoxIcon.Error);
                         cancel.Text = "Kapat"; cancel.Enabled = true;
                     });
