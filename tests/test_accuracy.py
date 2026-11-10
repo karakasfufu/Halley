@@ -446,7 +446,7 @@ class PanelTests(unittest.TestCase):
                 self.assertIn("⚙️ Ayarlar", pages)
                 self.assertTrue(any(b.label == "🔄 Haberleri güncelle" for b in at.button))
                 self.assertEqual([m.label for m in at.metric][:5],
-                                 ["BIST 100", "Olumlu haber", "Olumsuz haber", "Uygun fırsat", "Son güncelleme"])
+                                 ["BIST 100", "Olumlu haber", "Olumsuz haber", "Hazır fırsat", "Son güncelleme"])
                 at.radio(key="nav").set_value("⚙️ Ayarlar").run(timeout=30)
                 self.assertEqual(len(at.exception), 0, str(at.exception))
                 self.assertTrue(any("Geçmiş veri pilotu" in m.value for m in at.markdown))

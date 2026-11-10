@@ -16,7 +16,7 @@ import streamlit as st
 
 from bist_haber import (analyzer, calendar_sync, config, corp_events, db, earnings, entries, journal, kap_history,
                         kap_worker, macro_calendar, pipeline, report, signals, technical, timeline, tradeplan,
-                        trends, watchdog, ai_comment, sectors, transfer, notify, takip_ui, tracker, firsat_log)
+                        trends, watchdog, ai_comment, sectors, transfer, notify, takip_ui, tracker, firsat_log, ready)
 from bist_haber.textutil import tr_fold  # noqa: E402
 
 st.set_page_config(page_title="Halley", page_icon="☄️", layout="wide", initial_sidebar_state="collapsed")
@@ -926,6 +926,119 @@ def _opp_why(tk: str) -> str:
 
 firsat_log.record([tk for tk, _, _ in SUMMARY["uygun"]], _opp_why)
 
+# 2026-11-10 Hazır Fırsatlar: akşam/sabah analizinde kaydedilen planlar (bist_haber/ready.py)
+READY_ROWS = ready.current(conn)
+READY_ACTIVE = [r for r in READY_ROWS if r["durum"] in ("aday", "onaylandi", "giris")]
+NAMES_ALL = {r["ticker"]: r["name"] for r in conn.execute("SELECT ticker, name FROM companies")}
+
+
+def ready_card(r: dict) -> None:
+    tk = r["ticker"]
+    pct = lambda v: f"{(v / r['giris'] - 1) * 100:+.1f}%"
+    with st.container(border=True, key=f"rc_{r['id']}"):
+        h1, h2, h3 = st.columns([4.2, 1.3, 1.5], vertical_alignment="center")
+        when = f"{r['giris_gunu'][8:10]}.{r['giris_gunu'][5:7]} açılış"
+        h1.markdown(f"**{tk}** · {esc(NAMES_ALL.get(tk, ''))}  \n<span class='news-meta'>{esc(ready.TYPE_NAMES.get(r['tur'], r['tur']))}"
+                    f" · {esc(ready.STATE_TR.get(r['durum'], r['durum']))} · giriş: {when}</span>", unsafe_allow_html=True)
+        with h2:
+            go_button("🔍 Analiz", PAGE_HISSE, f"rc_an_{r['id']}", tk, width="stretch")
+        with h3:
+            takip_ui.follow_button(conn, tk, f"ready_{r['id']}", compact=True)
+        c = st.columns(6)
+        c[0].metric("Kapanış", f"{r['kapanis']:.2f}")
+        c[1].metric("Giriş aralığı", f"{r['giris_alt']:.2f}–{r['azami_giris']:.2f}")
+        c[2].metric("Azami giriş", f"{r['azami_giris']:.2f}", "üstünde ALMA", delta_color="off")
+        c[3].metric("Zarar durdur", f"{r['sl']:.2f}", pct(r["sl"]))
+        c[4].metric("TP1", f"{r['tp1']:.2f}", pct(r["tp1"]))
+        c[5].metric("TP2", f"{r['tp2']:.2f}", pct(r["tp2"]))
+        st.caption(f"Risk/getiri **1:{r['rr1']:.1f}** · tahmini getiri TP1 {pct(r['tp1'])}, TP2 {pct(r['tp2'])} · tahmini "
+                   f"tutma {r['vade_lo']}–{r['vade_hi']} işlem günü · haber skoru {r['haber_skoru']:.2f} · teknik skor "
+                   f"{r['teknik_skor']}/10 · risk **{r['risk']}** · geçerlilik: yalnız {when} (açılış azami girişin "
+                   "altındaysa; üstündeyse fırsat iptal olur)"
+                   + (f" · açılış {r['acilis']:.2f}" if r.get("acilis") else ""))
+        st.caption("Neden: " + r["neden"])
+
+
+def ready_when_text() -> str:
+    if not READY_ROWS:
+        return "henüz kayıtlı liste yok"
+    g = READY_ROWS[0]["giris_gunu"]
+    an = "sabah kontrolünden geçti" if any(r["durum"] == "onaylandi" for r in READY_ROWS) else "akşam analizi"
+    return f"giriş günü {g[8:10]}.{g[5:7]} · {an}"
+
+
+def ready_section() -> None:
+    """Hazır Fırsatlar: koşulu sağlanmış, açılışta uygulanabilir planlar (önce gösterilir)."""
+    with st.container(border=True, key="r_box"):
+        section_title("✅", "Hazır Fırsatlar", "pos", len(READY_ACTIVE), ready_when_text())
+        st.caption("Koşulu analiz anında **zaten sağlanmış** planlar: akşam analizi (kapanıştan sonra) ertesi işlem günü "
+                   "için seçer, sabah kontrolü açılıştan önce yeniden değerlendirir (kötü haber, bozulan plan → iptal). "
+                   "**Açılış azami girişin üstündeyse almayın**; bekçi açılıştan sonra kontrol edip Telegram'dan bildirir. "
+                   "En fazla 5 hisse; uygun yoksa liste boş kalır.")
+        if READY_ACTIVE:
+            for r in READY_ACTIVE:
+                ready_card(r)
+        else:
+            st.info("Şu an geçerli hazır fırsat yok. Akşam analizi kapanıştan ~20 dakika sonra (Halley açıksa "
+                    "kendiliğinden) yeni liste hazırlar. Liste sırf dolsun diye hisse önerilmez.")
+        gone = [r for r in READY_ROWS if r["durum"] in ("iptal", "girissiz")]
+        if gone:
+            with st.expander(f"⛔ İptal edilenler ({len(gone)})"):
+                for r in gone:
+                    st.caption(f"**{r['ticker']}** — {r['iptal_nedeni'] or ready.STATE_TR.get(r['durum'])}")
+        b1, b2, b3 = st.columns([1.6, 2.2, 1.8], vertical_alignment="center")
+        if b1.button("🔄 Şimdi yeniden hesapla (kaydetmeden)", key="hz_live", width="stretch",
+                     help="Kayıtlı fiyat ve haberlerle hazır fırsat kuralını şimdi çalıştırır; sonuç yalnız gösterilir, "
+                          "kaydedilmez ve performansa girmez (kayıtlı liste akşam/sabah analizinde oluşur)."):
+            sel = ready.select(conn, CTX, rows)
+            st.session_state["ready_live"] = {"zaman": datetime.now(config.TR_TZ).strftime("%H:%M"),
+                                              "secilen": sel["secilen"], "elenen": sel["elenen"]}
+            conn.close()
+            st.rerun()
+        saved_ = pipeline.load_settings()
+        ai_on = b2.toggle("🤖 Sabah kontrolünde bu hisselerin gece haberlerini yapay zekâyla analiz et", key="hz_ai",
+                          value=bool(saved_.get("hazir_sabah_yz", False)),
+                          help="Varsayılan KAPALI. Açarsanız sabah kontrolü, yalnız hazır listedeki 1–5 hissenin akşamdan "
+                               "bu yana gelen KAP haberlerini analiz eder (haber başına ~0,013 \\$, aylık haber bütçesini "
+                               "aşmaz). Kapalıyken yalnız önceden analiz edilmiş haberler kontrol edilir.")
+        if ai_on != bool(saved_.get("hazir_sabah_yz", False)):
+            pipeline.save_settings(hazir_sabah_yz=ai_on)
+        pend = [r for r in READY_ACTIVE if r["durum"] in ("aday", "onaylandi")]
+        if b3.button("🤖 Yeni haberlerini şimdi analiz et", key="hz_ai_now", width="stretch",
+                     disabled=not (pend and pipeline.has_api_key()),
+                     help="Hazır listedeki hisselerin akşamdan bu yana gelen KAP haberlerini şimdi bir kez analiz eder "
+                          f"(en fazla {len(pend)} hisse; haber başına ~0,013 \\$, bütçe içinde). Olumsuz haber çıkan "
+                          "fırsat iptal edilir."):
+            before = analyzer.month_spend(conn)
+            with st.spinner("Hazır fırsatların yeni haberleri okunuyor ve analiz ediliyor..."):
+                try:
+                    g = ready.news_guard(conn, pend, datetime.now(config.TR_TZ), analyze=True)
+                    an = g.get("analiz") or {}
+                    flash("success", f"Haber kontrolü tamam: {an.get('metin', 0)} yeni metin, "
+                                     f"{(an.get('analiz') or {}).get('analyzed', 0) if isinstance(an.get('analiz'), dict) else 0} analiz, "
+                                     f"maliyet ≈ {analyzer.month_spend(conn) - before:.3f} $."
+                                     + (f" Olumsuz haber nedeniyle iptal: {', '.join(g['iptal'])}." if g["iptal"] else
+                                        " Olumsuz haber çıkmadı."))
+                except Exception as e:
+                    flash("error", f"Haber kontrolü tamamlanamadı: {nice_err(e)}")
+            conn.close()
+            st.rerun()
+        if not pipeline.has_api_key():
+            b3.caption("API anahtarı yok.")
+        live = st.session_state.get("ready_live")
+        if live:
+            st.markdown(f"**Anlık hesap ({live['zaman']}) — kaydedilmedi:** {len(live['secilen'])} hisse hazır görünüyor"
+                        + (": " + ", ".join(p["ticker"] for p in live["secilen"]) if live["secilen"] else "."))
+            if live["secilen"]:
+                st.dataframe(dash_cells(pd.DataFrame([{
+                    "Hisse": p["ticker"], "Tür": ready.TYPE_NAMES[p["tur"]], "Kapanış": p["kapanis"],
+                    "Azami giriş": p["azami_giris"], "SL": p["sl"], "TP1": p["tp1"], "TP2": p["tp2"], "R/G": p["rr1"],
+                    "Teknik": str(p["teknik_skor"]), "Risk": p["risk"]} for p in live["secilen"]]),
+                    ["Kapanış", "Azami giriş", "SL", "TP1", "TP2", "R/G"]), hide_index=True, width="stretch")
+            with st.expander(f"Neden diğerleri hazır değil? ({len(live['elenen'])} hisse)"):
+                st.dataframe(pd.DataFrame([{"Hisse": k, "Neden": v} for k, v in sorted(live["elenen"].items())]),
+                             hide_index=True, width="stretch")
+
 # ---------------- İşlem günlüğü ----------------
 JOURNAL_COLS = {   # tablo başlığının üstüne gelince çıkan açıklamalar
     "Tür": st.column_config.Column(help="Sanal: Halley'in kendi önerisini izlediği işlem (siz almadınız). Gerçek: sizin "
@@ -1151,7 +1264,8 @@ def watch_box() -> None:
                                       "sermaye": capital, "risk_pct": risk_pct, "yz_butce_usd": ai_budget,
                                       "yz_rapor": bool(ai_report and pipeline.has_api_key()),
                                       "yz_kacirilan": bool(ai_missed and pipeline.has_api_key()),
-                                      "telegram": bool(notify.configured() and pipeline.load_settings().get("telegram_acik"))},
+                                      "telegram": bool(notify.configured() and pipeline.load_settings().get("telegram_acik")),
+                                      "hazir_sabah_yz": bool(pipeline.load_settings().get("hazir_sabah_yz", False))},
                     ai=bool(use_ai and pipeline.has_api_key()),
                     progress=lambda m, p_: bar.progress(min(max(p_, 0.0), 1.0), text=m))
                 st.session_state["watch_last"] = out["rapor"]
@@ -1263,6 +1377,15 @@ def settings_panel() -> None:
                            "analizi bütçesini aşmaz). Etkisi 3/5 ve üzeri olumlu/olumsuz haberler bildirilir.")
     if th_on != bool(saved.get("takip_haber_analizi", True)):
         pipeline.save_settings(takip_haber_analizi=th_on)
+    hz_tg = st.toggle("✅ Hazır fırsatların açılış kontrolünü Telegram'a gönder (açılış azami girişin üstündeyse uyarı)",
+                      key="hz_tg_on", value=bool(saved.get("hazir_bildirim", True)), disabled=not notify.configured())
+    if notify.configured() and hz_tg != bool(saved.get("hazir_bildirim", True)):
+        pipeline.save_settings(hazir_bildirim=hz_tg)
+    hz_ai2 = st.toggle("🤖 Sabah kontrolünde hazır fırsatların gece haberlerini yapay zekâyla analiz et (varsayılan kapalı)",
+                       key="hz_ai_set", value=bool(saved.get("hazir_sabah_yz", False)),
+                       help="Yalnız hazır listedeki 1–5 hisse; haber başına ~0,013 \\$, aylık haber bütçesi içinde.")
+    if hz_ai2 != bool(saved.get("hazir_sabah_yz", False)):
+        pipeline.save_settings(hazir_sabah_yz=hz_ai2)
     with st.container(border=True, key="tg_box"):
         st.caption("**Telegram kurulumu**" + (f" — {len(notify.chat_ids())} alıcı ayarlı ✅" if notify.configured()
                                               else " — henüz ayarlanmadı"))
@@ -1656,17 +1779,32 @@ def page_dashboard() -> None:
     for col_, key_, label_, val_, note_ in (
             (m1, "kpi_pos", "Olumlu haber", f"{len(positives)} hisse", f"son {window} günde haber skoru +1,50 ve üstü"),
             (m2, "kpi_neg", "Olumsuz haber", f"{len(negatives)} hisse", f"son {window} günde haber skoru −1,50 ve altı"),
-            (k3, "kpi_opp", "Uygun fırsat", f"{len(SUMMARY['uygun'])} hisse", "olumlu haber + uygun giriş senaryosu"),
+            (k3, "kpi_opp", "Hazır fırsat", f"{len(READY_ACTIVE)} hisse",
+             f"koşulu sağlanmış · bekleyen senaryo: {len(SUMMARY['uygun'])}"),
             (m3, "kpi_upd", "Son güncelleme", last_update_text(), "son haber analizinin saati")):
         with col_.container(key=key_):
             st.metric(label_, val_)
             st.caption(note_)
     regime_strip()
     c1, c2 = st.columns([3, 2])
+    with c1.container(border=True, key="d_ready"):
+        section_title("✅", "Hazır Fırsatlar", "pos", len(READY_ACTIVE), ready_when_text())
+        if READY_ACTIVE:
+            st.dataframe(dash_cells(pd.DataFrame([{
+                "Hisse": r["ticker"], "Tür": ready.TYPE_NAMES.get(r["tur"], r["tur"]), "Giriş aralığı":
+                f"{r['giris_alt']:.2f}–{r['azami_giris']:.2f}", "SL": r["sl"], "TP1": r["tp1"], "TP2": r["tp2"],
+                "R/G": r["rr1"], "Risk": r["risk"], "Durum": ready.STATE_TR.get(r["durum"], r["durum"])}
+                for r in READY_ACTIVE]), ["SL", "TP1", "TP2", "R/G"]), hide_index=True, width="stretch")
+            st.caption("Koşulu sağlanmış, açılışta uygulanabilir planlar. Açılış azami girişin (aralığın üst ucu) "
+                       "üstündeyse alınmaz. Ayrıntı ve gerekçe Fırsatlar ekranında.")
+        else:
+            st.caption("Şu an geçerli hazır fırsat yok (uygun yoksa liste boş kalır). Akşam analizi kapanıştan sonra "
+                       "kendiliğinden yeni liste hazırlar.")
+        go_button("Hazır fırsatların ayrıntısı →", PAGE_FIRSAT, "d_all_ready")
     with c1.container(border=True, key="d_opps"):
-        section_title("🎯", "Günün fırsatları", "pos", len(SUMMARY["uygun"]), "haber + teknik + risk")
+        section_title("⏳", "Bekleyen fırsatlar", "", len(SUMMARY["uygun"]), "koşul bekleyen senaryolar")
         if not SUMMARY["uygun"]:
-            st.caption("Bugün uygun giriş senaryosu yok. Her gün işlem yapmak gerekmez.")
+            st.caption("Bugün koşul bekleyen uygun senaryo yok. Her gün işlem yapmak gerekmez.")
         for tk, name, risk in SUMMARY["uygun"][:8]:
             a, b, c = st.columns([1.3, 4, 1.5], vertical_alignment="center")
             a.markdown(f"**{tk}**")
@@ -1676,7 +1814,7 @@ def page_dashboard() -> None:
         if SUMMARY["uygun"]:
             st.caption("Risk, gösterilen senaryonun riskidir (koşul oluşunca alım). Hemen şimdi almanın riski 🔍 Analiz "
                        "ekranında «Mevcut fiyattan girilirse» bölümünde ayrıca yazar.")
-        go_button("Tüm fırsatlar →", PAGE_FIRSAT, "d_all_opps")
+        go_button("Tüm bekleyen fırsatlar →", PAGE_FIRSAT, "d_all_opps")
     with c2.container(border=True, key="d_watch"):
         section_title("🛡️", "Bekçi")
         takip_ui.watcher_status(conn, compact=True)
@@ -1720,7 +1858,9 @@ def page_dashboard() -> None:
 
 
 def page_firsatlar() -> None:
-    page_head(PAGE_FIRSAT, "Bütün BIST taranır; olumlu/olumsuz haber alan hisseler ve giriş senaryoları. Ayrıntı için 🔍 Analiz.")
+    page_head(PAGE_FIRSAT, "Önce hazır fırsatlar (koşulu sağlanmış), altında koşul bekleyen senaryolar. Ayrıntı için 🔍 Analiz.")
+    ready_section()
+    section_title("⏳", "Bekleyen Fırsatlar", note="henüz giriş koşulu oluşmamış senaryolar (destek/direnç teyidi bekleyen)")
     opportunity_check_box()
     if not rows:
         st.info("Henüz liste yok. Yukarıdaki **Haberleri güncelle** düğmesine basın.")
@@ -1934,6 +2074,12 @@ def page_bekci() -> None:
     page_head(PAGE_BEKCI, "Sabah/akşam analizi, takip bekçisinin olayları ve rapor arşivi.")
     with st.container(border=True, key="watch"):
         watch_box()
+        hs = ready.load_state()
+        st.caption("🤖 Otomatik çalışma (Halley açıkken): akşam analizi kapanıştan ~20 dk sonra, sabah analizi 08:30–09:55 arası (açılıştan önce) "
+                   "itibaren, hazır fırsat açılış kontrolü 10:05'ten itibaren — günde birer kez; elle yaptıysanız "
+                   "yinelenmez. Yapay zekâ ile haber analizi YAPILMAZ (yalnız sabah haber kontrolü düğmesi açıksa). "
+                   f"Son akşam: {hs.get('aksam_gunu', '—')} · son sabah: {hs.get('sabah_gunu', '—')} · son açılış kontrolü: "
+                   f"{hs.get('acilis_gunu', '—')}" + (f" · son hata: {hs['hata']}" if hs.get("hata") else ""))
     with st.container(border=True, key="b_takip"):
         section_title("⭐", "Takip bekçisi", note="takip listenizi arka planda kendisi izler")
         takip_ui.watcher_status(conn)
@@ -2046,6 +2192,33 @@ def page_gunluk() -> None:
 
 def page_performans() -> None:
     page_head(PAGE_PERF, "Hangi strateji gerçekten işe yarıyor? Yalnız kayıtlı sonuçlardan, kodla hesaplanır.")
+    section_title("✅", "Hazır fırsatlar — gerçek sonuçlar", note="bekleyen senaryolardan ayrı ölçülür")
+    pf = ready.performance(conn)
+    st.caption("Giriş = planlanan günün AÇILIŞ fiyatı (açılış azami girişin üstündeyse 'giriş olmadı'); sonra işlem "
+               "günlüğüyle aynı kurallar: TP1'de yarısı satılır, stop girişe çekilir; TP2, SL ya da 30 işlem günü. "
+               "Komisyon ve kayma düşülür.")
+    k = st.columns(5)
+    k[0].metric("Önerilen", pf["onerilen"])
+    k[1].metric("Kapanan", pf["kapanan"])
+    k[2].metric("Açık", pf["acik"])
+    k[3].metric("Giriş olmadı", pf["girissiz"], help="açılış azami girişin üstündeydi")
+    k[4].metric("Sabah iptal", pf["sabah_iptal"], help="kötü haber ya da bozulan plan")
+    if pf["kapanan"]:
+        st.dataframe(pd.DataFrame([{x: pf[x] for x in ("Kazanma %", "TP1 %", "TP2 %", "SL %", "Başabaş %", "Süre doldu %",
+                                                        "Ort. net %", "Ort. işlem günü")}]), hide_index=True, width="stretch")
+        if pf["kapanan"] < 30:
+            st.caption(f"⚠️ Yalnız {pf['kapanan']} kapanan öneri var: 30'dan azken oranlar güvenilir değildir.")
+    hist = ready.rows_for(conn)[:60]
+    if hist:
+        st.dataframe(dash_cells(pd.DataFrame([{
+            "Giriş günü": r["giris_gunu"], "Hisse": r["ticker"], "Analiz": r["analiz"], "Önerilen giriş": r["giris"],
+            "Azami": r["azami_giris"], "Açılış (gerçek giriş)": r.get("acilis"), "Durum": ready.STATE_TR.get(r["durum"], r["durum"]),
+            "Sonuç": r["sonuc"].get("sonuc") or (r.get("iptal_nedeni") or "")[:60], "Net %": r["sonuc"].get("net_getiri_pct"),
+            "İşlem günü": str(r["sonuc"].get("islem_gunu") or "")} for r in hist]),
+            ["Önerilen giriş", "Azami", "Açılış (gerçek giriş)", "Net %"]), hide_index=True, width="stretch")
+    else:
+        st.caption("Henüz kayıtlı hazır fırsat yok; ilk liste ilk akşam analizinde oluşur.")
+    st.divider()
     section_title("🏁", "Takip senaryoları — strateji başarı oranları")
     takip_ui.performance_table(conn)
     st.divider()

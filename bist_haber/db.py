@@ -266,6 +266,34 @@ CREATE TABLE IF NOT EXISTS takip_olay (
     hata        TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_takip_olay_ticker ON takip_olay(ticker, zaman);
+-- 2026-11-10 Hazır Fırsatlar (kullanıcı isteği): akşam/sabah analizinde seçilen, koşulu zaten sağlanmış işlem planları.
+-- Performans bekleyen senaryolardan AYRI ölçülür (giriş = plan günü açılışı, azami girişin üstündeyse giriş yok).
+CREATE TABLE IF NOT EXISTS hazir_firsat (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    olusturuldu   TEXT NOT NULL,
+    analiz        TEXT NOT NULL,          -- aksam | sabah
+    signal_day    TEXT NOT NULL,          -- planın dayandığı son kapanış günü
+    giris_gunu    TEXT NOT NULL,          -- planlanan giriş günü (açılış)
+    ticker        TEXT NOT NULL,
+    tur           TEXT NOT NULL,          -- kirilim_teyitli | geri_cekilme | destek_teyitli | mevcut_fiyat
+    kapanis       REAL NOT NULL,
+    giris         REAL NOT NULL,
+    giris_alt     REAL NOT NULL,
+    azami_giris   REAL NOT NULL,
+    sl            REAL NOT NULL,
+    tp1           REAL NOT NULL,
+    tp2           REAL NOT NULL,
+    rr1           REAL NOT NULL,
+    vade_lo       INTEGER, vade_hi INTEGER,
+    haber_skoru   REAL, teknik_skor INTEGER, risk TEXT,
+    neden         TEXT,
+    durum         TEXT NOT NULL DEFAULT 'aday',   -- aday | onaylandi | iptal | giris | kapandi | girissiz
+    iptal_nedeni  TEXT,
+    acilis        REAL,
+    sonuc_json    TEXT,
+    guncellendi   TEXT,
+    UNIQUE (signal_day, ticker)
+);
 """
 
 

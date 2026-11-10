@@ -397,7 +397,8 @@ def fetch_intraday(tickers: List[str]) -> Dict[str, Dict]:
         last = idx[-1].to_pydatetime()
         today = sub[[i.date() == last.date() for i in idx]]
         out[t] = {"zaman": last, "son": float(today["Close"].iloc[-1]), "yuksek": float(today["High"].max()),
-                  "dusuk": float(today["Low"].min()), "hacim": float(today["Volume"].fillna(0).sum())}
+                  "dusuk": float(today["Low"].min()), "hacim": float(today["Volume"].fillna(0).sum()),
+                  "acilis": float(today["Open"].iloc[0])}
     return out
 
 

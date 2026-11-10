@@ -196,6 +196,30 @@ def data_status_md(out, ds, no) -> str:
     return s
 
 
+def saved_settings() -> Dict:
+    """Panelde kayıtlı ayarlardan bekçi çalıştırma ayarları (otomatik akşam/sabah analizi için)."""
+    from . import ai_comment, journal, notify, pipeline
+    s = pipeline.load_settings()
+    return {"gun": int(s.get("kap_gun", 1)), "analiz_siniri": int(s.get("panel_analiz_siniri", 10)),
+            "analiz_kalitesi": s.get("analiz_kalitesi"), "pencere": int(s.get("liste_pencere", 7)),
+            "komisyon_pct": float(s.get("komisyon_pct", journal.DEFAULT_COMMISSION_PCT)),
+            "kayma_pct": float(s.get("kayma_pct", journal.DEFAULT_SLIPPAGE_PCT)),
+            "sermaye": float(s.get("sermaye", 0.0)), "risk_pct": float(s.get("risk_pct", 0.0)),
+            "yz_butce_usd": float(s.get("yz_butce_usd", ai_comment.DEFAULT_BUDGET_USD)),
+            "yz_rapor": False, "yz_kacirilan": False,
+            "telegram": bool(notify.configured() and s.get("telegram_acik")),
+            "hazir_sabah_yz": bool(s.get("hazir_sabah_yz", False))}
+
+
+def run_auto(conn, kind: str, now: Optional[datetime] = None) -> Dict:
+    """Bekçinin kendiliğinden başlattığı sabah/akşam analizi (2026-11-10 kullanıcı onayı). Yapay zekâ ile HABER ANALİZİ
+    YAPILMAZ (ai=False); yalnız kullanıcı "sabah haber kontrolü" düğmesini açtıysa hazır fırsatların yeni haberleri
+    bütçe içinde analiz edilir. Rapor arşive yazılır, Telegram özeti ayara göre gider."""
+    from . import pipeline
+    out = run_session(conn, pipeline.universe(conn), kind, saved_settings(), ai=False, now=now)
+    return {"rapor": out.get("rapor"), "hazir": len((out.get("hazir") or {}).get("secilen") or [])}
+
+
 def run_session(conn, universe: Dict[str, str], kind: str, settings: Dict, ai: bool = False,
                 progress=None, now: Optional[datetime] = None, steps=None) -> Dict:
     """Sabah ya da akşam analizi. steps: test için adım işlevleri (update/prices) değiştirilebilir."""
@@ -237,8 +261,20 @@ def run_session(conn, universe: Dict[str, str], kind: str, settings: Dict, ai: b
                                   r["fiyat_gunu"], r["haber_skoru"])
         if rid:
             out["yeni_sanal"].append({"id": rid, "hisse": r["ticker"]})
+    # 2026-11-10 Hazır Fırsatlar: akşam ertesi gün listesi, sabah yeniden kontrol (bkz. bist_haber/ready.py)
+    from . import ready
+    say("Hazır fırsatlar seçiliyor..." if kind == "aksam" else "Hazır fırsatlar sabah kontrolünden geçiriliyor...", 0.9)
+    rows_ = report.build(conn, universe, days=int(settings.get("pencere", 7)))
+    if kind == "aksam":
+        out["hazir"] = ready.evening(conn, ctx, rows_, now)
+    else:
+        out["hazir"] = ready.morning(conn, ctx, rows_, now, ai=bool(settings.get("hazir_sabah_yz")),
+                                     news_fn=steps.get("hazir_haber"))
     say("Rapor hazırlanıyor...", 0.95)
     md, data = (morning_report if kind == "sabah" else evening_report)(conn, ctx, out)
+    hz = ready.report_md(out["hazir"])
+    md = md.replace("## 1.", hz + "## 1.", 1) if "## 1." in md else md + hz
+    data["hazir"] = {k: v for k, v in out["hazir"].items() if k in ("secilen", "elenen", "giris_gunu", "haber")}
     md, data = _ai_sections(conn, kind, now, md, data, out, settings, steps.get("llm"), say)
     out["rapor"] = archive(now.date().isoformat(), kind, md, data)
     if settings.get("telegram"):  # 2026-11-09: rapor arşive yazıldıktan SONRA; hata analizi bozmaz

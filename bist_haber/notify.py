@@ -140,6 +140,8 @@ def session_message(kind: str, out: Dict, data: Dict, watch=None) -> str:
         ms = data.get("piyasa") or {}
         if ms.get("xu100") is not None:
             t += f"BIST 100: {_n(ms.get('xu100'))} ({_n(ms.get('xu100_%'), '{:+.2f}')}%)\n"
+    from . import ready          # 2026-11-10: önce hazır fırsatlar (az sayıda; takip listesinden bağımsız gösterilir)
+    t += ready.telegram_text(out.get("hazir"), kind)
     rec = data.get("onerilen") or []
     others = 0
     if watch is not None:

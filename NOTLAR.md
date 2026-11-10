@@ -1440,3 +1440,40 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - İşlem Günlüğü: üstte açık "❓ İşlem Günlüğü nasıl okunur?" (amaç, sanal/gerçek, durumlar, sütunlar, ölçüler,
   portföy riski), ölçülerin altında tanımlar, tablo başlıklarında açıklama (column_config help). KULLANIM.md'ye
   iki bölüm. Test: açıklamaların göründüğü panel testi. 448 test geçti.
+
+## 2026-11-10 — Hazır İşlem Fırsatları katmanı (kullanıcı isteği, onaylandı; sabah YZ kararı kullanıcıda: düğme, varsayılan kapalı)
+- `bist_haber/ready.py` (mevcut motorun ÜSTÜNDE seçme/sıralama): olumlu haberli (skor ≥1,50) her hisse için koşulu
+  bugün sağlanmış planlar: kirilim_teyitli (son kapanış önceki 20 gün zirvesi üstünde + yükselen mum; SL = seviye −
+  1 ATR, hedefler entries._targets), geri_cekilme (giriş fiyata ≤0,5 ATR — zaten bölgede), destek_teyitli (giriş
+  fiyata ≤0,5 ATR + bugün yükselen kapanış), mevcut_fiyat (tradeplan referans SL'si). Giriş = son kapanış. Şart:
+  TP1 r/g ≥ 1:2 (tradeplan.MIN_RR), zarar ≤ %15, ortak risk puanı "yüksek" değil, teknik skor ≥5/10. Azami giriş =
+  min(giriş + 0,3 ATR, TP1 r/g'nin 1:1,5'e düştüğü fiyat). En iyi plan TP1 r/g'ye göre; sıralama: risk, teknik +
+  2×haber + r/g; en fazla 5, 0 olabilir. Teknik skor 0–10 (trend, RSI 45–70, MACD/ADX, hacim/OBV, endekse göre güç;
+  eşit ağırlık). YENİ sabitler sınanmadı (READY_GAP_ATR 0,5, MAX_ENTRY_ATR 0,3, MIN_RR_AT_MAX 1,5, MIN_TECH 5);
+  mevcut eşikler değişmedi.
+- Veritabanı hazir_firsat (aday → onaylandi | iptal → giris | girissiz → kapandi). evening(): eski önerileri
+  değerlendir, seç, ertesi işlem günü için 'aday' kaydet (yeniden hesaplamada düşeni iptal). morning(): akşamdan
+  sonra olumsuz etki (direction<0) gelen → iptal; yeniden hesapla, bozulan → iptal, uygun → 'onaylandi' (seviyeler
+  güncellenir); yeni uygun varsa ekle (toplam ≤5) — 09:55'ten sonra yeni ekleme yok. news_guard(analyze=True) yalnız
+  kullanıcı açtıysa/düğmeye bastıysa: hazır hisselerin yeni KAP bildirimleri (liste, metin, bütçe içinde analiz).
+  opening_check(): Yahoo gün içi verisinin ilk mumu (acilis) azami girişin üstündeyse → iptal. evaluate_all():
+  giriş = giriş günü açılışı (azami üstündeyse girissiz), sonra journal.evaluate (gercek kipte) → TP/SL/başabaş/süre;
+  performance() ayrı ölçüm.
+- Bağlantılar: watchdog.run_session (elle ve otomatik) hazır bölümünü raporun EN ÜSTÜNE ve Telegram özetinin başına
+  ekler; watchdog.run_auto/saved_settings (otomatik çalışma, ai=False). ready.tick (okuyucu döngüsünde): akşam
+  (kapanış+20 dk; kaçırılırsa ertesi sabah 09:30'a kadar), sabah (08:30–09:55), açılış kontrolü (10:05–17:30) —
+  günde birer; elle yapılmış rapor varsa yinelemez; HALLEY_OFFLINE'da başlatmaz. tracker.fetch_intraday 'acilis'.
+- Panel: Dashboard'da önce "✅ Hazır Fırsatlar" kartı, sonra "⏳ Bekleyen fırsatlar"; özet kartı "Hazır fırsat".
+  Fırsatlar: Hazır Fırsatlar bölümü (plan kartları; iptaller; "Şimdi yeniden hesapla (kaydetmeden)" + elenme
+  nedenleri; 🤖 sabah haber kontrolü düğmesi hazir_sabah_yz varsayılan KAPALI; "Yeni haberlerini şimdi analiz et"),
+  sonra "Bekleyen Fırsatlar". Performans: hazır fırsat gerçek sonuçları. Bekçi: otomatik çalışma durumu. Ayarlar:
+  hazır açılış bildirimi (hazir_bildirim) ve YZ düğmesi.
+- Bulunup düzeltilenler: okuyucu testlerinde otomatik analiz ağa çıkıyordu (HALLEY_OFFLINE koruması); kaçırılan akşam
+  analizi seans içinde yarım fiyatla çalışabilirdi (09:30 sınırı); otomatik sabah analizi açılıştan sonra da
+  çalışıyordu (08:30–09:55 sınırı); açılıştan sonraki sabah kontrolü geçmiş açılışa öneri ekleyebilirdi; gerekçe
+  metni cümle ortasında kesiliyordu.
+- Testler: tests/test_ready.py (15) + panel testi (önce hazır, kart, YZ varsayılan kapalı ve saklanıyor, anlık hesap,
+  performans). Tam takım geçti, ağ denemesi 0.
+- Gerçek veri (salt okunur + kopya): 44 olumlu haberliden 1 hazır (METEN, mevcut fiyattan, giriş 21,44, azami 21,67,
+  SL 19,22, TP1 25,89, TP2 28,11, r/g 1:2,0, teknik 7/10, risk orta); 27'si "koşulu sağlanmış r/g ≥1:2 plan yok",
+  14'ü teknik veri yok, 2'si risk yüksek. Kopyada akşam → sabah onay → rapor/Telegram metni doğrulandı.

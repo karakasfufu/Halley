@@ -93,7 +93,7 @@ class PanelFlowTests(unittest.TestCase):
             self.assertRegex(src, rf'\(m[12], "{key}", "{label}"')                     # kart doğru anahtarda
         at = self.app()
         self.assertEqual([m.label for m in at.metric][:5],
-                         ["BIST 100", "Olumlu haber", "Olumsuz haber", "Uygun fırsat", "Son güncelleme"])
+                         ["BIST 100", "Olumlu haber", "Olumsuz haber", "Hazır fırsat", "Son güncelleme"])
 
     def test_opportunity_recheck_and_change_log(self):
         from bist_haber import firsat_log
@@ -148,7 +148,7 @@ class PanelFlowTests(unittest.TestCase):
         """2026-11-09: fırsatlardaki risk (senaryo) ile analizdeki risk (şimdi alım) karışıyordu; İşlem Günlüğü anlaşılmıyordu."""
         at = self.app()
         caps = " ".join(c.value for c in at.caption)
-        for t in ("haber skoru +1,50 ve üstü", "olumlu haber + uygun giriş senaryosu", "son haber analizinin saati"):
+        for t in ("haber skoru +1,50 ve üstü", "koşulu sağlanmış · bekleyen senaryo", "son haber analizinin saati"):
             self.assertIn(t, caps)
         self.go(at, "🔍 Hisse Analizi")
         labels = [m.label for m in at.metric]
@@ -165,6 +165,35 @@ class PanelFlowTests(unittest.TestCase):
         if at.metric:                                  # ölçüler yalnız kapanan işlem varsa çizilir; o zaman açıklaması da olmalı
             self.assertTrue(any("Kâr faktörü: toplam kazanç / toplam zarar" in c.value for c in at.caption))
         self.assertTrue(any("Henüz kapanan işlem yok" in c.value for c in at.caption))
+
+    def test_ready_opportunities_shown_first_and_ai_switch_off_by_default(self):
+        """2026-11-10: Hazır Fırsatlar önce, Bekleyen ayrı; sabah haber kontrolünde yapay zekâ kullanıcı açana dek kapalı."""
+        c = db.connect()
+        today = date.today().isoformat()
+        c.execute("INSERT INTO hazir_firsat(olusturuldu,analiz,signal_day,giris_gunu,ticker,tur,kapanis,giris,giris_alt,"
+                  "azami_giris,sl,tp1,tp2,rr1,vade_lo,vade_hi,haber_skoru,teknik_skor,risk,neden,durum) VALUES("
+                  "'2026-11-09T19:00:00+03:00','aksam','2026-11-09',?,'POS','mevcut_fiyat',100,100,99.4,100.6,96,110,114,2.5,"
+                  "10,14,2.5,7,'orta','Haber: deneme gerekçe','aday')", (today,))
+        c.commit()
+        c.close()
+        at = self.app()
+        self.assertEqual(at.metric[3].label, "Hazır fırsat")
+        self.assertEqual(at.metric[3].value, "1 hisse")
+        self.go(at, "🎯 Fırsatlar")
+        md_ = " ".join(m.value for m in at.markdown)
+        self.assertLess(md_.index("Hazır Fırsatlar"), md_.index("Bekleyen Fırsatlar"))
+        self.assertTrue(any(m.label == "Azami giriş" and m.value == "100.60" for m in at.metric))
+        self.assertTrue(any("Neden: Haber: deneme gerekçe" in c_.value for c_ in at.caption))
+        self.assertFalse(at.toggle(key="hz_ai").value)                    # varsayılan KAPALI
+        self.assertFalse(pipeline.load_settings().get("hazir_sabah_yz", False))
+        at.toggle(key="hz_ai").set_value(True).run()
+        self.assertTrue(pipeline.load_settings()["hazir_sabah_yz"])       # kullanıcı açınca saklanır
+        self.assertTrue(at.button(key="hz_ai_now").disabled)              # API anahtarı yok → elle analiz kapalı
+        at.button(key="hz_live").click().run()
+        self.assertEqual(len(at.exception), 0, str(at.exception))
+        self.assertTrue(any("Anlık hesap" in m.value and "kaydedilmedi" in m.value for m in at.markdown))
+        self.go(at, "🏁 Performans")
+        self.assertTrue(any("Hazır fırsatlar — gerçek sonuçlar" in m.value for m in at.markdown))
 
     def test_settings_saved_across_pages(self):
         at = self.app("⚙️ Ayarlar")

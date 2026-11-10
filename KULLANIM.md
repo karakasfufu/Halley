@@ -49,14 +49,14 @@ tavsiyesi değildir.
 
 | Ekran | İçerik |
 |---|---|
-| **📊 Dashboard** | Tek bakışta: BIST 100, olumlu/olumsuz haber sayısı, uygun fırsatlar, piyasa durumu, bekçi durumu ve son olaylar, takip listenizdeki aktif senaryolar, açık işlemler, önümüzdeki 15 işlem gününün piyasa takvimi. |
-| **🎯 Fırsatlar** | Haberi olan hisseler (olumlu / olumsuz / zayıf), haber skoru ve teknik durum. Her satırda **🔍 Analiz** (ayrıntı ekranı) ve **➕ Takibe Al**. Detaylı listeyi CSV olarak indirme. |
+| **📊 Dashboard** | Tek bakışta: BIST 100, olumlu/olumsuz haber sayısı, **✅ hazır fırsatlar** (önce), bekleyen fırsatlar, piyasa durumu, bekçi durumu ve son olaylar, takip listenizdeki aktif senaryolar, açık işlemler, önümüzdeki 15 işlem gününün piyasa takvimi. |
+| **🎯 Fırsatlar** | Önce **✅ Hazır Fırsatlar** (tam işlem planı kartları, yapay zekâ haber kontrolü düğmeleri), altında **⏳ Bekleyen Fırsatlar**: haberi olan hisseler (olumlu / olumsuz / zayıf), haber skoru ve teknik durum. Her satırda **🔍 Analiz** (ayrıntı ekranı) ve **➕ Takibe Al**. Detaylı listeyi CSV olarak indirme. |
 | **🔍 Hisse Analizi** | Seçilen hissenin tüm analizi: giriş senaryoları (kırılım, geri çekilme, destekten tepki), referans senaryo, teknik göstergeler, sektör, bilanço ve şirket takvimi, finansal özet, haberler. Haberi olmayan hissede senaryolar yalnız fiyattan hesaplanır. **➕ Takibe Al** düğmesi burada da var. |
 | **⭐ Takip Listem** | Takibe aldığınız hisseler, senaryoları ve durumları, senaryo ve bildirim türü seçimleri, son olaylar, takip senaryolarının sonuçları. |
 | **🛡️ Bekçi** | **🌅 Sabah analizi** / **🌙 Akşam analizi** ve yapay zekâ seçenekleri, takip bekçisinin durumu ve tüm olayları (Telegram'a gidip gitmediği), sabah/akşam rapor arşivi (sonradan değişmez; .md ve .json indirilebilir). |
 | **📰 Haberler** | 🔬 Haber analizi (bekleyenleri seçerek analiz, derin yeniden inceleme, tahmini maliyet ve bütçe) ve son analiz edilen 50 haber. |
 | **📒 İşlem Günlüğü** | Önerilen senaryolar **sanal işlem** olarak izlenir. Gerçekten aldıysanız **✍️ Bu işleme girdim** ile alış günü ve fiyatını kaydedin. Portföy/sektör riski, kayma ölçümü. |
-| **🏁 Performans** | Takip senaryolarının strateji türüne göre TP1/TP2/SL oranları; sanal işlemlerin stratejiye, haber kaynağına, olay türüne ve riske göre başarısı; filtre analizi; **onayınızı bekleyen öneriler** (onay hiçbir ayarı kendiliğinden değiştirmez). |
+| **🏁 Performans** | **Hazır fırsatların gerçek sonuçları** (ayrı ölçüm), takip senaryolarının strateji türüne göre TP1/TP2/SL oranları; sanal işlemlerin stratejiye, haber kaynağına, olay türüne ve riske göre başarısı; filtre analizi; **onayınızı bekleyen öneriler** (onay hiçbir ayarı kendiliğinden değiştirmez). |
 | **⚙️ Ayarlar** | Ayarlar ve 📨 Telegram; **💾 Veri ve gelişmiş** (veri aktarma, durum, 📅 takvim kontrolü, 📥 KAP geçmişi, 🧪 ucuz test, geçmiş veri pilotu); ❓ Kılavuz (bu metin). |
 
 ## Fırsat sayısı neden değişir? (🎯 Fırsatlar → üstteki kutu)
@@ -110,6 +110,38 @@ tavsiyesi değildir.
 - **Sermaye ve işlem başına risk (%):** girilirse kartta kaç adet alınabileceği ve azami kayıp, raporlarda TL
   karşılıkları görünür. 0 bırakılırsa bu hesaplar gösterilmez.
 - **Bekçi yapay zekâ yorumu aylık bütçesi ($).**
+
+## ✅ Hazır Fırsatlar (önce bunlar) ve ⏳ Bekleyen Fırsatlar
+
+- **Hazır Fırsat:** giriş koşulu analiz anında **zaten sağlanmış**, son kapanışa yakın fiyattan **ertesi işlem günü
+  açılışında** uygulanabilir plan. Dört tür: *Kırılım (gerçekleşmiş)* · *Geri çekilme (bölgede)* · *Destekten tepki
+  (başlamış)* · *Mevcut fiyattan*. Şartlar: olumlu haber (skor ≥ 1,50), risk/getiri en az 1:2, teknik skor en az
+  5/10, risk seviyesi yüksek değil, fiyat verisi ve likidite sorunsuz. **En fazla 5 hisse; uygun yoksa liste boş
+  kalır** (sırf dolsun diye hisse önerilmez).
+- **Her planda:** kapanış, giriş aralığı, **azami giriş** (bunun üstünde ALMAYIN), zarar durdur, TP1, TP2,
+  risk/getiri, tahmini getiri, tahmini tutma süresi, haber skoru, teknik skor (0–10), risk seviyesi, gerekçe ve
+  geçerlilik (yalnız giriş günü).
+- **Bekleyen Fırsat:** henüz koşulu oluşmamış senaryolar ("şu seviyeyi kırarsa", "desteğe gelirse"). Ayrı bölümde
+  gösterilir; takibe alırsanız bekçi koşulu izler.
+- **Akşam analizi** (kapanıştan ~20 dk sonra, Halley açıksa kendiliğinden): ertesi gün için hazır listeyi hazırlar.
+  Akşam kaçırılırsa ertesi sabah 09:30'a kadar yapılır; seans başladıysa yapılmaz (yarım gün fiyatıyla liste olmaz).
+- **Sabah kontrolü** (08:30–09:55, kendiliğinden): akşam listesini yeniden değerlendirir; akşamdan sonra olumsuz
+  haber gelen ya da planı bozulan fırsatı **iptal eder**, seviyeleri güncel veriyle yeniler, yeni uygun çıkan varsa
+  ekler (toplam en fazla 5). Açılıştan sonra yapılırsa yeni öneri eklenmez.
+- **🤖 Sabah haber kontrolü (varsayılan KAPALI):** açarsanız sabah kontrolü, yalnız hazır listedeki 1–5 hissenin
+  akşamdan bu yana gelen KAP haberlerini yapay zekâyla analiz eder (haber başına ~0,013 $, aylık bütçe içinde).
+  Kapalıyken yalnız önceden analiz edilmiş haberler kontrol edilir. Ayrıca **"Yeni haberlerini şimdi analiz et"**
+  düğmesiyle istediğiniz an bir kez çalıştırabilirsiniz. Düğmeler: 🎯 Fırsatlar → Hazır Fırsatlar ve ⚙️ Ayarlar.
+- **Açılış kontrolü** (10:05'ten sonra, kendiliğinden; Yahoo verisi ~15 dk gecikmeli): açılış fiyatı azami girişin
+  üstündeyse fırsat iptal edilir ve Telegram'dan "eski fiyattan ALMAYIN" uyarısı gelir; altındaysa "plan geçerli".
+  Açılış fiyatı açılıştan önce bilinemez: Midas'ta azami giriş fiyatıyla limitli emir vermek bu riski sınırlar.
+- **"🔄 Şimdi yeniden hesapla (kaydetmeden)":** kuralı o an çalıştırıp sonucu gösterir; kaydedilmez, performansa
+  girmez. "Neden diğerleri hazır değil?" tablosu her hissenin elenme nedenini yazar.
+- **Ölçüm (🏁 Performans):** her önerinin önerildiği fiyat, gerçek giriş (giriş günü açılışı), TP1/TP2/SL sonucu,
+  net getiri ve kaç işlem günü sürdüğü ayrı tabloda; bekleyen senaryolardan ayrı ölçülür. Açılış azami girişin
+  üstündeyse "giriş olmadı" sayılır.
+- Hazır fırsat kuralları **yeni ve henüz sınanmadı**; mevcut eşikler değişmedi. En az 30 kapanmış öneriden önce
+  sonuçlar rastlantı olabilir.
 
 ## ⭐ Takip Listem ve bekçi
 
