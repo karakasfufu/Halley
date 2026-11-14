@@ -1,4 +1,4 @@
-"""Aşama 3 (2026-11-14): Python ön eleme kuralları. Henüz analiz akışına bağlı DEĞİL (kullanıcı onayı bekleniyor)."""
+"""Aşama 3 (2026-11-14): Python ön eleme kuralları ve analiz akışına bağlanması (kullanıcı onayıyla)."""
 import tempfile
 import unittest
 from pathlib import Path
@@ -66,11 +66,36 @@ class Apply(unittest.TestCase):
             self.assertIn("Python ön eleme", conn.execute("SELECT note FROM news WHERE id='kap:1'").fetchone()[0])
             conn.close()
 
-    def test_not_wired_into_analysis_yet(self):
-        from bist_haber import config
-        src = (Path(config.ROOT) / "bist_haber" / "analyzer.py").read_text(encoding="utf-8")
-        self.assertNotIn("prefilter", src)          # kullanıcı onayından sonra bağlanacak
-
+    def test_wired_into_analysis_manual_choice_respected(self):
+        from unittest.mock import patch
+        from bist_haber import analyzer, config
+        from tests.test_accuracy import FakeClient
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "t.db"
+            conn = db.connect(path)
+            conn.execute("INSERT INTO companies VALUES('TEST','Deneme',NULL)")
+            for nid, subj in (("kap:1", "İzahname"), ("kap:2", "Yeni İş İlişkisi"), ("kap:3", "İzahname")):
+                conn.execute("INSERT INTO news(id,source,published_at,effective_date,title,subject,body,candidates,status,"
+                             "fetched_at) VALUES(?,'kap','2026-11-10T10:00:00+03:00','2026-11-10',?,?,?,'TEST','new','f')",
+                             (nid, "Başlık " + nid, subj, "Ayrıntı " * 20 + nid))
+            conn.commit()
+            with patch.object(config, "DB_PATH", path), patch("bist_haber.prices.company_stats", return_value={}):
+                st = analyzer.analyze(conn, {"TEST": "Deneme"}, limit=1, llm=analyzer.LLM("haber_analizi", client=FakeClient()))
+                self.assertEqual((st["analyzed"], st.get("rutin")), (1, 2))      # sınır rutin habere harcanmadı
+                st_ = dict(conn.execute("SELECT id, status FROM news").fetchall())
+                self.assertEqual(st_, {"kap:1": "skipped", "kap:2": "analyzed", "kap:3": "skipped"})
+                # kullanıcı elle seçerse ön eleme uygulanmaz
+                row = conn.execute("SELECT * FROM news WHERE id='kap:1'").fetchone()
+                st2 = analyzer.analyze(conn, {"TEST": "Deneme"}, rows=[row], on_eleme=False,
+                                       llm=analyzer.LLM("haber_analizi", client=FakeClient()))
+                self.assertEqual(st2["analyzed"], 1)
+                # otomatik akışta verilen satırlar (takip/hazır fırsat) da elenir
+                r3 = conn.execute("SELECT * FROM news WHERE id='kap:3'").fetchone()
+                conn.execute("UPDATE news SET status='new' WHERE id='kap:3'")
+                st3 = analyzer.analyze(conn, {"TEST": "Deneme"}, rows=[r3],
+                                       llm=analyzer.LLM("haber_analizi", client=FakeClient()))
+                self.assertEqual((st3["analyzed"], st3.get("rutin")), (0, 1))
+            conn.close()
 
 if __name__ == "__main__":
     unittest.main()

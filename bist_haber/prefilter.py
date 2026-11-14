@@ -11,9 +11,11 @@ Bu kurallar mevcut analiz talimatıyla (analyzer.FILTER_PROMPT / ANALYSIS_PROMPT
 alım satımı ve eşik aşımı nötr; genel kurul çağrısı, denetçi seçimi, rutin rapor önemsiz; geri alım programı önemli.
 """
 import re
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
 from .textutil import tr_fold
+
+NOTE = "Python ön eleme: "
 
 # Konusu gereği yorum gerektirmeyen KAP bildirimleri (süreç, belge, takvim; fiyat bilgisi taşımaz)
 RUTIN_KONU = (
@@ -75,18 +77,24 @@ def classify(row) -> Tuple[str, str]:
     return "rutin", "belirli bir BIST şirketi ya da açıkça etkilenen sektör yok"
 
 
+def split(conn, rows) -> Tuple[List, int]:
+    """Verilen haberlerden rutin olanları işaretler ('skipped'); yapay zekâya gidecekleri döndürür."""
+    kept, n = [], 0
+    for r in rows:
+        karar, neden = classify(r)
+        if karar == "rutin":
+            conn.execute("UPDATE news SET status='skipped', note=? WHERE id=?", (NOTE + neden, r["id"]))
+            n += 1
+        else:
+            kept.append(r)
+    conn.commit()
+    return kept, n
+
+
 def apply(conn, limit_rows=None) -> Dict[str, int]:
     """Analiz sırasındaki (status='new', metni hazır) haberleri sınıflar; 'rutin' olanlar sıradan çıkar
     (status='skipped', not 'Python ön eleme: ...'). Geri alınabilir: not ile işaretlidir."""
     rows = conn.execute("SELECT * FROM news WHERE status='new' AND body IS NOT NULL AND TRIM(body)!=''"
                         + (" LIMIT ?" if limit_rows else ""), ((limit_rows,) if limit_rows else ())).fetchall()
-    out = {"incelenen": len(rows), "rutin": 0, "ai": 0}
-    for r in rows:
-        karar, neden = classify(r)
-        if karar == "rutin":
-            conn.execute("UPDATE news SET status='skipped', note=? WHERE id=?", ("Python ön eleme: " + neden, r["id"]))
-            out["rutin"] += 1
-        else:
-            out["ai"] += 1
-    conn.commit()
-    return out
+    kept, n = split(conn, rows)
+    return {"incelenen": len(rows), "rutin": n, "ai": len(kept)}

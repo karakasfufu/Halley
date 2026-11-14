@@ -1557,3 +1557,18 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Dürüst sınır: rutin sayılan konuların (en çok 211 günlük geri alım raporu) geçmişte YZ etiketi yok; kaçırma oranı bu
   gruplar için ÖLÇÜLEMEDİ. Öneri: ~30 rutin haberlik ücretli doğrulama örneği (≈ 0,4–0,6 $), kullanıcı onayıyla.
 - Testler: tests/test_prefilter.py (7). Tüm paket 483 test OK, ağ denemesi 0.
+
+## 2026-11-14 — Aşama 3 devreye alındı (kullanıcı: "Doğrudan devreye al"; ücretli doğrulama örneği istenmedi)
+- `analyzer.analyze(on_eleme=True)`: sıra kendiliğinden seçiliyorsa önce `prefilter.apply` (bütün sıra; 10 haberlik sınır
+  rutin haberlere harcanmasın), satırlar verildiyse (takip/hazır fırsat) `prefilter.split`. `stats["rutin"]`.
+- Panelde kullanıcının KENDİ seçtiği haberlerde `on_eleme=False` (seçimine saygı). 🔬 analiz bölümüne "ön elemenin atladığı
+  haberleri de göster" kutusu eklendi (🧹 işaretli); atlanan haber elle analiz ettirilebilir → geri dönüş yolu.
+- `pipeline.refresh`: metinler okunduktan sonra API anahtarı olmasa da `prefilter.apply` (bekleyen sayıları doğru görünsün);
+  Haberler sayfasındaki son güncelleme notunda "N rutin haber ... gönderilmedi" yazar.
+- RSS'te YZ ön eleme çağrısı (FILTER_PROMPT) KALDIRILMADI: Python'un geçirdiği RSS haberleri için çok ucuz (≈0,0003 $) ve
+  yarısını eleyip 0,015 $'lık tam analizden kurtarıyor → kaldırmak maliyeti artırırdı. Python artık önünde ilk süzgeç.
+- Canlı DB yedeği: `data/yedek/bist_haber_asama3_oncesi_20261114.db`.
+- Test altyapısı: `prices._fetch_stats` HALLEY_OFFLINE'da ağa çıkmaz. Bulgu: yfinance curl_cffi kullandığı için Python soket
+  engelini aşabiliyordu (tam pakette 4 testte gerçek Yahoo isteği görüldü); run_offline artık curl_cffi isteklerini de sayıyor.
+- Dürüst sınır (değişmedi): rutin sayılan gruplarda (özellikle günlük geri alım raporları) kaçırma oranı ölçülmedi.
+- 483 test OK, ağ denemesi 0 (soket + curl).

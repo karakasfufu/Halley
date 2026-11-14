@@ -114,6 +114,13 @@ tavsiyesi değildir.
 - **Aynı haber bir daha ücretlendirilmez:** içeriği (başlık + metin) daha önce analiz edilmiş bir haber farklı numarayla
   gelse de yapay zekâya gönderilmez; haber sitelerinde aynı başlık 3 gün içinde başka siteden geldiyse de tekrar
   sayılır ("Tekrarlanan haber"). Aynı metni iki farklı şirket yayımladıysa ikisi de analiz edilir.
+- **Rutin haberler yapay zekâya gitmez (Python ön elemesi):** izahname, portföy uyum raporu, denetçi seçimi, finansal
+  takvim, süren geri alım programının günlük raporu, kâr payı/sermaye kararı içermeyen genel kurul bildirimi, borsa
+  açılış/kapanış ve altın/kripto bültenleri gibi yorum gerektirmeyen haberler ücret harcanmadan "Atlandı" olur.
+  Finansal rapor, özel durum açıklaması, yeni iş ilişkisi, pay alım satım (içeriden işlem), temettü ve tanınmayan her
+  konu her zaman yapay zekâya gider. Atlanan biri size önemli görünürse 📰 Haberler → 🔬 analiz bölümünde "Python ön
+  elemesinin rutin sayıp atladığı haberleri de göster" kutusunu işaretleyip (başlığı 🧹 ile başlar) seçerek analiz
+  ettirebilirsiniz.
 
 ## Ayarlar (⚙️ Ayarlar)
 

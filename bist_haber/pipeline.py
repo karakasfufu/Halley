@@ -51,6 +51,8 @@ def update_all(conn, days: int = 1, progress: Optional[Progress] = None, analyze
         # Yarım kalan metinleri arka plan okuyucu KAP sınırına göre bekleyerek tamamlar (kullanıcı tekrar basmaz).
         from . import kap_worker
         kap_worker.note_rate_limited()
+    from . import prefilter        # 2026-11-14 Aşama 3: rutin haberler sıradan çıkar (YZ'siz, anahtar olmasa da)
+    out["rutin"] = prefilter.apply(conn)["rutin"]
     if analyze and has_api_key():
         say("Yapay zekâ haberleri analiz ediyor...", 0.5)
         out["analyze"] = analyzer.analyze(

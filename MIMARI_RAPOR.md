@@ -78,7 +78,7 @@ performans, raporlar, Telegram, veri aktarma, kurulum/güncelleme, arayüz (9 ek
 |---|---|---|
 | 1 | Bu rapor + bekçinin kendiliğinden yaptığı YZ haber analizi (tablo #4) varsayılan **kapalı** | ✅ |
 | 2 | Merkezi YZ servisi (bütün çağrılar; sayı, token, maliyet, modül, hata/tekrar; günlük/aylık ekran) + içerik özeti + tekrarlanan haber ayıklama | ✅ |
-| 3 | Python ön eleme/sınıflandırma (KAP önceliği; RSS ön eleme çağrısının yerini alır) — geçmiş haberlerle kaçırma oranı ölçülerek | 🔶 Kurallar yazıldı ve ölçüldü (148 etiketli haberde 0 kaçırma); **devreye alınması kullanıcı onayı bekliyor** |
+| 3 | Python ön eleme/sınıflandırma (KAP önceliği; RSS ön eleme çağrısının yerini alır) — geçmiş haberlerle kaçırma oranı ölçülerek | ✅ Devrede (kullanıcı onayı 14.11, doğrulama örneği istemeden): 148 etiketli haberde 0 kaçırma; bekleyenlerin ~%37'si YZ'ye gitmez |
 | 4 | Genel fırsat puanı, haber özeti/etkisi, "yalnız teknik" fırsatlar, haftalık rapor | |
 | 5 | Profesyonel grafik + olası fiyat aralığı konisi | |
 | 6 | Kendi tahmin modelimiz (TP1'e SL'den önce ulaşma olasılığı) | |

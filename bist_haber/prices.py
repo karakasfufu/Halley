@@ -42,6 +42,9 @@ def update(conn, tickers: Iterable[str], period: str = "1y") -> int:
 
 
 def _fetch_stats(ticker: str):
+    import os
+    if os.environ.get("HALLEY_OFFLINE"):   # testler: yfinance (curl_cffi) Python soket engelini aşabiliyor
+        return ticker, None, None
     try:
         fi = yf.Ticker(ticker + ".IS").fast_info
         return ticker, float(fi["marketCap"]), float(fi["lastPrice"])

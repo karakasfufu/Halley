@@ -415,6 +415,10 @@ if last:
     if an.get("tekrar"):
         st.caption(f"{an['tekrar']} haber daha önce analiz edilmiş bir haberin tekrarı olduğu için yapay zekâya "
                    "gönderilmedi (ücretlendirilmedi).")
+    if an.get("rutin") or last.get("rutin"):
+        st.caption(f"{an.get('rutin') or last.get('rutin')} rutin haber (izahname, günlük geri alım raporu, piyasa bülteni gibi) Python ön "
+                   "elemesiyle yapay zekâya gönderilmedi (ücretlendirilmedi). Haberler'de 'Atlandı' olarak görünür; "
+                   "önemli bulduğun biri olursa 🔬 analiz bölümünde '🧹' işaretiyle seçip analiz ettirebilirsin.")
     if last.get("rss", {}).get("failed_feeds"):
         st.caption("Bazı haber siteleri okunamadı. Ayrıntı: ⚙️ Ayarlar → Veri ve gelişmiş.")
 
@@ -1095,6 +1099,15 @@ def news_analysis_box() -> None:
                     horizontal=True, key="na_mode")
     if mode.startswith("🆕"):
         pend = analyzer.pending(conn)
+        with_rutin = st.checkbox("Python ön elemesinin rutin sayıp atladığı haberleri de göster", value=False,
+                                 key="na_rutin")
+        st.caption("Ön eleme izahname, günlük geri alım raporu, piyasa bülteni gibi yorum gerektirmeyen haberleri yapay "
+                   "zekâya göndermez (ücret harcanmaz). Önemli olduğunu düşündüğün biri varsa buradan seçip analiz "
+                   "ettirebilirsin.")
+        if with_rutin:
+            pend = pend + [r for r in conn.execute(
+                "SELECT * FROM news WHERE status='skipped' AND note LIKE 'Python ön eleme:%' AND body IS NOT NULL "
+                "AND TRIM(body)!='' ORDER BY published_at DESC").fetchall()]
         if not pend:
             st.info("Analiz bekleyen haber yok.")
             return
@@ -1107,7 +1120,8 @@ def news_analysis_box() -> None:
                           "Tarih": r["published_at"][:16].replace("T", " "), "Yaş (gün)": age,
                           "Hisse": r["candidates"] or "—",
                           "Konu / kaynak": r["subject"] or config.RSS_SOURCE_LABELS.get(r["source"][4:], r["source"]),
-                          "Başlık": (r["title"] or "")[:90], "_id": r["id"]})
+                          "Başlık": ("🧹 " if r["status"] == "skipped" else "") + (r["title"] or "")[:90],
+                          "_id": r["id"]})
         f1, f2, f3 = st.columns([1, 2, 1])
         tk = f1.text_input("Hisse kodu (süz)", key="na_ticker").strip().upper()
         groups = f2.multiselect("Öncelik grubu", list(analyzer.PRIORITY_LABELS.values()),
@@ -1144,7 +1158,7 @@ def news_analysis_box() -> None:
             before = analyzer.month_spend(conn)
             try:
                 res = analyzer.analyze(conn, uni, rows=fit, quality=quality, budget_usd=news_budget, track=True,
-                                       progress=lambda i, n: bar.progress(i / max(n, 1), text=f"Analiz ({i}/{n})..."))
+                                       on_eleme=False, progress=lambda i, n: bar.progress(i / max(n, 1), text=f"Analiz ({i}/{n})..."))
                 cost = analyzer.month_spend(conn) - before
                 flash("success", f"{res.get('analyzed', 0)} haber analiz edildi, {res.get('filtered_out', 0)} haber ön "
                       f"elemede önemsiz bulundu" + (f", {res['errors']} haberde hata" if res.get("errors") else "")

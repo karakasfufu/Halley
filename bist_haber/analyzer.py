@@ -636,20 +636,32 @@ def test_one(conn, universe: Dict[str, str], llm: Optional[LLM] = None) -> Optio
 def analyze(conn, universe: Dict[str, str], limit: Optional[int] = None, llm: Optional[LLM] = None,
             progress: Optional[Callable[[int, int], None]] = None, quality: Optional[str] = None,
             rows=None, budget_usd: Optional[float] = None, max_age_days: Optional[int] = None,
-            track: bool = False, modul: str = "haber_analizi") -> Dict[str, int]:
+            track: bool = False, modul: str = "haber_analizi", on_eleme: bool = True) -> Dict[str, int]:
     """Bekleyen haberleri analiz eder. LLM çağrıları paralel, veritabanı yazımı ana iş parçacığında.
 
     quality: "yuksek" | "dengeli" | "ekonomik" (panel ayarı). Boşsa yüksek doğruluk.
     rows: kullanıcının seçtiği haberler (verilmezse öncelik sırası). budget_usd: aylık bütçe — bu ayın harcaması +
     her haberin ÜST tahmini bütçeyi aşacaksa o haber ve sonrakiler analiz edilmez (2026-11-09).
+    on_eleme (2026-11-14, Aşama 3, kullanıcı onayı): Python ön elemesi rutin haberleri YZ'ye göndermeden 'skipped'
+    yapar. Kullanıcının panelde KENDİ seçtiği haberlerde kapalıdır (seçimine saygı).
     """
     q = quality_profile(quality)
     stats = {"analyzed": 0, "filtered_out": 0, "errors": 0, "impacts": 0, "dropped_tickers": 0,
              "flagged": 0, "input_tokens": 0, "output_tokens": 0}
+    from . import prefilter
     if rows is None:
+        if on_eleme:
+            n = prefilter.apply(conn)["rutin"]        # bütün sıra (ucuz); sınır rutin haberlere harcanmasın
+            if n:
+                stats["rutin"] = n
         rows = pending(conn, limit, max_age_days=max_age_days)
-    elif limit:
-        rows = list(rows)[:limit]
+    else:
+        if on_eleme:
+            rows, n = prefilter.split(conn, rows)
+            if n:
+                stats["rutin"] = n
+        if limit:
+            rows = list(rows)[:limit]
     from .dedupe import filter_duplicates    # 2026-11-14: aynı içerik/başlık bir daha YZ'ye gönderilmez
     rows, dup = filter_duplicates(conn, rows)
     if dup:
