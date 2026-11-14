@@ -1129,7 +1129,9 @@ def news_analysis_box() -> None:
         old_too = f3.checkbox(f"{config.AUTO_ANALYSIS_MAX_AGE_DAYS} günden eski haberler de", value=False, key="na_old")
         view = [x for x in rows_ if (not tk or tk in x["Hisse"].split(",")) and x["Öncelik"] in groups
                 and (old_too or x["Yaş (gün)"] <= config.AUTO_ANALYSIS_MAX_AGE_DAYS)]
-        st.caption(f"Bekleyen {len(pend)} haber · süzgeçten geçen {len(view)} (öncelik sırasıyla; en üstteki önce)")
+        n_rut = sum(1 for r in pend if r["status"] == "skipped")
+        st.caption(f"Bekleyen {len(pend) - n_rut} haber" + (f" + ön elemenin atladığı {n_rut} haber (🧹)" if n_rut else "")
+                   + f" · süzgeçten geçen {len(view)} (öncelik sırasıyla; en üstteki önce)")
         how = st.radio("Hangileri?", ["Listedeki ilk N haber (öncelik sırasıyla)", "Yalnız işaretlediklerim"],
                        horizontal=True, key="na_how")
         if how.startswith("Listedeki"):
