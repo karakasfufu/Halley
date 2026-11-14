@@ -71,6 +71,11 @@ class ChartData(unittest.TestCase):
         vals = sorted(r["ly"] for r in spec["datasets"][texts[0]["data"]["name"]])
         self.assertTrue(all(b - a > 0 for a, b in zip(vals, vals[1:])))
         self.assertIsNone(chart.figure(chart.history(self.conn, "YOK")))
+        # karanlık modda beyaz zemin olmamalı; açık modda yazılar koyu
+        self.assertEqual(spec["config"]["background"], "transparent")
+        self.assertEqual(spec["config"]["axis"]["labelColor"], "#cbd5e1")
+        light = chart.figure(df, c, lv, dark=False).to_dict()
+        self.assertEqual(light["config"]["axis"]["labelColor"], "#334155")
 
 
 if __name__ == "__main__":

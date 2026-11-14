@@ -1647,3 +1647,6 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   4. Fiyatlar eskiyken panel uyarmıyordu → Dashboard, Fırsatlar ve Bekçi'de "Hisse fiyatları güncel değil" uyarısı
      (son kapanmış günün fiyatı olmayan hisse oranı > %30 ise).
 - 498 test OK, ağ 0.
+- Kullanıcı: "grafik karanlık modda beyaz görünüyor" → grafik renkleri Streamlit temasına bırakılmıştı (Halley
+  penceresinde açık temaya düşüyordu). `chart.figure(dark=...)`: saydam zemin, eksen/yazı/ızgara renkleri karanlık mod
+  ayarından; `st.altair_chart(theme=None)`. X ekseninde tarih yazıları seyreltildi. Test eklendi; canlıda görüldü.

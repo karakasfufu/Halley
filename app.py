@@ -566,9 +566,9 @@ def chart_block(tk: str, t=None, scenario_: dict = None, ready_row: dict = None,
         g = scenario_.get("girisler") or scenario_
         best = next((x for x in g.get("senaryolar", []) if x["tur"] == g.get("en_uygun")), None)
     lv = chart.plan_levels(t, best, ready_row)
-    fig = chart.figure(df, cdf, lv)
+    fig = chart.figure(df, cdf, lv, dark=DARK)
     if fig is not None:
-        st.altair_chart(fig, use_container_width=True, theme="streamlit")
+        st.altair_chart(fig, use_container_width=True, theme=None)    # renkler karanlık mod ayarından (chart.figure)
     src = ("hazır fırsat planı" if ready_row else f"en uygun giriş senaryosu ({best['ad']})" if best else
            "plan yok; yalnız destek/direnç")
     c3.caption(f"Seviyeler: {src}. Mavi koni = olası fiyat aralığı (koyu %50, açık %80).")

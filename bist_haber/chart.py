@@ -133,7 +133,7 @@ def plan_levels(t: Optional[Dict] = None, scenario: Optional[Dict] = None, ready
 
 
 def figure(df: pd.DataFrame, cone_df: Optional[pd.DataFrame] = None, levels: Optional[Dict] = None,
-           height: int = 380):
+           height: int = 380, dark: bool = True):
     """Altair katmanlı grafik: üstte mum + EMA + seviyeler + koni, altta hacim. df boşsa None."""
     import altair as alt
     if df is None or df.empty:
@@ -211,4 +211,13 @@ def figure(df: pd.DataFrame, cone_df: Optional[pd.DataFrame] = None, levels: Opt
                 axis=alt.Axis(format="%d.%m", labelAngle=0, grid=False)),
         y=alt.Y("volume:Q", title="Hacim", axis=alt.Axis(format="~s")), color=color,
         tooltip=[alt.Tooltip("Tarih:N"), alt.Tooltip("volume:Q", title="Hacim", format=",.0f")]).properties(height=80)
-    return alt.vconcat(price, vol, spacing=4).resolve_scale(x="shared", color="independent")
+    # 2026-11-15: renkler Halley'in karanlık mod ayarından (Streamlit temasına bırakılınca Halley penceresinde beyaz
+    # zemin görünüyordu). Zemin saydam: kartın rengini alır.
+    fg, grid = ("#cbd5e1", "#334155") if dark else ("#334155", "#e2e8f0")
+    return (alt.vconcat(price, vol, spacing=4).resolve_scale(x="shared", color="independent")
+            .configure(background="transparent")
+            .configure_view(strokeWidth=0, fill="transparent")
+            .configure_axis(labelColor=fg, titleColor=fg, gridColor=grid, domainColor=grid, tickColor=grid,
+                            labelFontSize=11, titleFontSize=11)
+            .configure_axisX(labelOverlap="greedy", labelSeparation=8, tickCount=8)
+            .configure_legend(labelColor=fg, titleColor=fg))
