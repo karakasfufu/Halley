@@ -266,15 +266,15 @@ def run_session(conn, universe: Dict[str, str], kind: str, settings: Dict, ai: b
     say("Hazır fırsatlar seçiliyor..." if kind == "aksam" else "Hazır fırsatlar sabah kontrolünden geçiriliyor...", 0.9)
     rows_ = report.build(conn, universe, days=int(settings.get("pencere", 7)))
     if kind == "aksam":
-        out["hazir"] = ready.evening(conn, ctx, rows_, now)
+        out["hazir"] = ready.evening(conn, ctx, rows_, now, universe=universe)
     else:
         out["hazir"] = ready.morning(conn, ctx, rows_, now, ai=bool(settings.get("hazir_sabah_yz")),
-                                     news_fn=steps.get("hazir_haber"))
+                                     news_fn=steps.get("hazir_haber"), universe=universe)
     say("Rapor hazırlanıyor...", 0.95)
     md, data = (morning_report if kind == "sabah" else evening_report)(conn, ctx, out)
     hz = ready.report_md(out["hazir"])
     md = md.replace("## 1.", hz + "## 1.", 1) if "## 1." in md else md + hz
-    data["hazir"] = {k: v for k, v in out["hazir"].items() if k in ("secilen", "elenen", "giris_gunu", "haber")}
+    data["hazir"] = {k: v for k, v in out["hazir"].items() if k in ("secilen", "elenen", "giris_gunu", "haber", "teknik")}
     md, data = _ai_sections(conn, kind, now, md, data, out, settings, steps.get("llm"), say)
     out["rapor"] = archive(now.date().isoformat(), kind, md, data)
     if settings.get("telegram"):  # 2026-11-09: rapor arşive yazıldıktan SONRA; hata analizi bozmaz

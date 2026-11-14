@@ -10,6 +10,11 @@ Ortak şartlar: olumlu haber (skor ≥ 1,50 — mevcut eşik, değişmedi), fiya
 TP1 risk/getirisi ≥ 1:2 (tradeplan.MIN_RR), zarar mesafesi ≤ %15, risk seviyesi yüksek DEĞİL, teknik skor ≥ 5/10.
 En fazla 5 hisse; uygun yoksa 0 (liste doldurulmaz).
 
+2026-11-14 Aşama 4 (kullanıcı onaylı plan): "📐 Yalnız teknik fırsatlar" — olumlu haberi OLMAYAN likit hisselerden
+aynı "koşulu sağlanmış plan" kuralıyla, daha sıkı teknik şartla (≥ 7/10, yükseliş trendi; son haberleri olumsuz
+olanlar hariç) seçilir; kaynak='teknik' ile kaydedilir, haberlilerden AYRI listelenir ve AYRI ölçülür. Genel fırsat
+puanı (0–100) yalnız bilgi amaçlıdır: seçimi ve sıralamayı değiştirmez, ağırlıkları sınanmadı.
+
 YENİ ve HENÜZ SINANMAMIŞ sabitler (temkinli seçildi; sonuçlar hazir_firsat tablosunda ayrı ölçülüyor):
 READY_GAP_ATR, MAX_ENTRY_ATR, MIN_RR_AT_MAX, MIN_TECH. Hiçbir mevcut eşik değiştirilmedi. Yapay zekâ kullanılmaz
 (isteğe bağlı sabah haber kontrolü hariç — kullanıcı düğmeyle açar, varsayılan KAPALI). Emir vermez.
@@ -25,6 +30,8 @@ MAX_ENTRY_ATR = 0.3     # azami giriş = giriş + 0,3 ATR (açılış bunun üst
 MIN_RR_AT_MAX = 1.5     # azami girişten alınsa bile TP1 risk/getirisi en az 1:1,5 kalmalı
 MIN_TECH = 5            # teknik skor (0–10) en az 5
 MAX_PICKS = 5
+MIN_TECH_ONLY = 7       # yalnız teknik: haber desteği olmadığı için daha sıkı (sınanmadı)
+KAYNAK_TR = {"haber": "📰 Haberli", "teknik": "📐 Yalnız teknik"}
 TYPE_NAMES = {"kirilim_teyitli": "Kırılım (gerçekleşmiş)", "geri_cekilme": "Geri çekilme (bölgede)",
               "destek_teyitli": "Destekten tepki (başlamış)", "mevcut_fiyat": "Mevcut fiyattan"}
 STATE_TR = {"aday": "📝 akşam listesi (sabah kontrolü bekleniyor)", "onaylandi": "✅ sabah kontrolünden geçti",
@@ -167,7 +174,9 @@ def build(conn, ctx, r: Dict) -> Dict:
                      "getiri1_%": (tp1 / e - 1) * 100, "getiri2_%": (best["tp2"] / e - 1) * 100,
                      "zarar_%": (sl / e - 1) * 100, "vade_lo": lo1, "vade_hi": max(hi2, lo1),
                      "haber_skoru": r["score"], "teknik_skor": ts["skor"], "teknik": ts, "risk": risk,
-                     "riskler": plan["riskler"], "neden": reason}}
+                     "riskler": plan["riskler"], "neden": reason, "kaynak": "haber",
+                     "genel_puan": overall_score(r["score"], ts["skor"], best["rr1"], risk)["puan"],
+                     "puan": overall_score(r["score"], ts["skor"], best["rr1"], risk)}}
 
 
 def select(conn, ctx, rows: List[Dict]) -> Dict:
@@ -187,9 +196,98 @@ def select(conn, ctx, rows: List[Dict]) -> Dict:
     return {"secilen": picks[:MAX_PICKS], "elenen": rejected}
 
 
+# ---------------------------------------------------------------- genel fırsat puanı (bilgi amaçlı)
+def overall_score(haber_skoru: Optional[float], teknik_skor: int, rr1: float, risk: str, kaynak: str = "haber") -> Dict:
+    """0–100 = haber (0–30) + teknik (0–30) + risk/getiri (0–20) + risk seviyesi (0–20). Ağırlıklar SINANMADI;
+    yalnız gösterilir (seçim ve sıralama mevcut kurallarla yapılır). Yalnız teknik fırsatın haber puanı 0'dır
+    (en fazla 70) — haber desteği olmadığı açıkça görünsün."""
+    parts = {"haber": 0.0 if kaynak == "teknik" else round(max(0.0, min(haber_skoru or 0, 5.0)) / 5 * 30, 1),
+             "teknik": round(max(0, min(teknik_skor or 0, 10)) / 10 * 30, 1),
+             "risk_getiri": round(max(0.0, min(rr1 or 0, 4.0)) / 4 * 20, 1),
+             "risk": {"düşük": 20.0, "orta": 10.0}.get(risk, 0.0)}
+    return {"puan": round(sum(parts.values())), "parca": parts}
+
+
+def score_text(g: Dict) -> str:
+    p = g["parca"]
+    return (f"genel puan {g['puan']}/100 (haber {p['haber']:.0f}/30 · teknik {p['teknik']:.0f}/30 · risk/getiri "
+            f"{p['risk_getiri']:.0f}/20 · risk {p['risk']:.0f}/20; ağırlıklar sınanmadı, yalnız bilgi)")
+
+
+# ---------------------------------------------------------------- yalnız teknik fırsatlar
+def build_tech(conn, ctx, tk: str, name: str = "") -> Dict:
+    """Olumlu haberi olmayan hisse için koşulu bugün sağlanmış teknik plan ya da elenme nedeni."""
+    from . import corp_events, earnings, tracker
+    t = ctx.tech(tk)
+    why = tracker.scenario_guard(t)
+    if why:
+        return {"neden": why}
+    if not str(t.get("trend") or "").startswith("Yükseliş"):
+        return {"neden": f"trend {str(t.get('trend') or '?').lower()} (yalnız teknikte yükseliş trendi aranır)"}
+    ts = tech_score(t)
+    if ts["skor"] < MIN_TECH_ONLY:
+        return {"neden": f"teknik skor {ts['skor']}/10 (yalnız teknikte en az {MIN_TECH_ONLY})", "teknik": ts}
+    g = entries.scenarios(t)
+    cands = [c for c in candidates(conn, t, {"girisler": g, "_ticker": tk}) if c["rr1"] >= tradeplan.MIN_RR]
+    if not cands:
+        return {"neden": "koşulu bugün sağlanmış, risk/getirisi en az 1:2 olan plan yok", "teknik": ts}
+    order = list(TYPE_NAMES)
+    best = max(cands, key=lambda c: (round(c["rr1"], 2), -order.index(c["tur"])))
+    ev = ctx.corp(tk)
+    news = {"direction": 0, "score": 0, "confidence": None, "flags": "",
+            "bilanco_riski": earnings.window_risk(ctx.earning(tk), ctx.today, 15),
+            "olay_riskleri": corp_events.risk_lines(ev, t.get("son_fiyat")), "makro_riski": ctx.macro_risk()}
+    riskler = tradeplan.risk_factors(t, news) + list(t.get("veri_uyarilari") or [])
+    risk = tradeplan._level(tradeplan._points(riskler))
+    if risk == "yüksek":
+        return {"neden": "risk seviyesi yüksek (" + "; ".join(x[:60] for x in riskler[:3]) + ")", "teknik": ts}
+    atr, e, sl, tp1 = t["atr"], best["giris"], best["sl"], best["tp1"]
+    cap = (tp1 + MIN_RR_AT_MAX * sl) / (1 + MIN_RR_AT_MAX)
+    azami = max(e, min(e + MAX_ENTRY_ATR * atr, cap))
+    strong = [TECH_TR[k] for k, v in ts["parca"].items() if v == 2]
+    reason = (f"Haber yok — yalnız teknik görünüm. Teknik {ts['skor']}/10" + (f" (güçlü: {', '.join(strong)})" if strong else "")
+              + f", trend {t.get('trend', '?').lower()}. Neden şimdi: {best['nasil']}. Risk/getiri 1:{best['rr1']:.1f}. "
+              "Haber desteği olmadığı için temkinli olun.")
+    lo1, hi2 = entries._days(e, tp1, atr), entries._days(e, best["tp2"], atr)
+    gp = overall_score(None, ts["skor"], best["rr1"], risk, "teknik")
+    return {"plan": {"ticker": tk, "ad": name, "tur": best["tur"], "tur_ad": TYPE_NAMES[best["tur"]], "kaynak": "teknik",
+                     "signal_day": t["tarih"], "kapanis": t["son_fiyat"], "giris": e,
+                     "giris_alt": max(sl + 0.5 * (e - sl), e - MAX_ENTRY_ATR * atr), "azami_giris": azami,
+                     "sl": sl, "tp1": tp1, "tp2": best["tp2"], "rr1": best["rr1"],
+                     "getiri1_%": (tp1 / e - 1) * 100, "getiri2_%": (best["tp2"] / e - 1) * 100,
+                     "zarar_%": (sl / e - 1) * 100, "vade_lo": lo1, "vade_hi": max(hi2, lo1),
+                     "haber_skoru": None, "teknik_skor": ts["skor"], "teknik": ts, "risk": risk, "riskler": riskler,
+                     "neden": reason, "genel_puan": gp["puan"], "puan": gp}}
+
+
+def select_tech(conn, ctx, rows: List[Dict], universe: Optional[Dict[str, str]] = None) -> Dict:
+    """Olumlu (≥1,50) ya da olumsuz haberi olan hisseler HARİÇ evrenden en fazla 5 yalnız teknik fırsat."""
+    if universe is None:
+        from .universe import load_universe
+        universe = load_universe(conn)
+    skip = {r["ticker"] for r in rows if r["score"] >= 1.5 or r["score"] < 0}
+    picks, rejected = [], {}
+    for tk, name in sorted(universe.items()):
+        if tk in skip:
+            continue
+        b = build_tech(conn, ctx, tk, name)
+        if "plan" in b:
+            picks.append(b["plan"])
+        elif b.get("teknik") and b["teknik"]["skor"] >= MIN_TECH_ONLY:
+            rejected[tk] = b["neden"]           # yalnız teknik skoru yeterli olanların nedeni (liste kısa kalsın)
+    picks.sort(key=lambda p: (RISK_ORDER[p["risk"]], -(p["teknik_skor"] + min(p["rr1"], 4))))
+    for p in picks[MAX_PICKS:]:
+        rejected[p["ticker"]] = "uygun ama ilk 5'e giremedi (sıralama: risk, teknik skor, risk/getiri)"
+    return {"secilen": picks[:MAX_PICKS], "elenen": rejected}
+
+
 # ---------------------------------------------------------------- kayıt ve yaşam döngüsü
-def rows_for(conn, giris_gunu: Optional[str] = None, durum: Optional[List[str]] = None) -> List[Dict]:
+def rows_for(conn, giris_gunu: Optional[str] = None, durum: Optional[List[str]] = None,
+             kaynak: Optional[str] = None) -> List[Dict]:
     q, a = "SELECT * FROM hazir_firsat WHERE 1=1", []
+    if kaynak:
+        q += " AND COALESCE(kaynak,'haber')=?"
+        a.append(kaynak)
     if giris_gunu:
         q += " AND giris_gunu=?"
         a.append(giris_gunu)
@@ -200,6 +298,7 @@ def rows_for(conn, giris_gunu: Optional[str] = None, durum: Optional[List[str]] 
     for r in conn.execute(q + " ORDER BY giris_gunu DESC, id", a):
         d = dict(r)
         d["sonuc"] = json.loads(d["sonuc_json"]) if d.get("sonuc_json") else {}
+        d["kaynak"] = d.get("kaynak") or "haber"
         out.append(d)
     return out
 
@@ -214,8 +313,9 @@ def current(conn, now: Optional[datetime] = None) -> List[Dict]:
 def _store(conn, p: Dict, analiz: str, giris_gunu: str, durum: str, now: datetime) -> None:
     conn.execute(
         "INSERT INTO hazir_firsat(olusturuldu,analiz,signal_day,giris_gunu,ticker,tur,kapanis,giris,giris_alt,azami_giris,"
-        "sl,tp1,tp2,rr1,vade_lo,vade_hi,haber_skoru,teknik_skor,risk,neden,durum,guncellendi) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(signal_day, ticker) DO UPDATE SET "
+        "sl,tp1,tp2,rr1,vade_lo,vade_hi,haber_skoru,teknik_skor,risk,neden,durum,guncellendi,kaynak,genel_puan) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(signal_day, ticker) DO UPDATE SET "
+        "kaynak=excluded.kaynak, genel_puan=excluded.genel_puan, "
         "tur=excluded.tur, giris=excluded.giris, giris_alt=excluded.giris_alt, azami_giris=excluded.azami_giris, "
         "sl=excluded.sl, tp1=excluded.tp1, tp2=excluded.tp2, rr1=excluded.rr1, vade_lo=excluded.vade_lo, "
         "vade_hi=excluded.vade_hi, haber_skoru=excluded.haber_skoru, teknik_skor=excluded.teknik_skor, "
@@ -223,31 +323,34 @@ def _store(conn, p: Dict, analiz: str, giris_gunu: str, durum: str, now: datetim
         "WHERE hazir_firsat.durum IN ('aday','onaylandi','iptal')",
         (_iso(now), analiz, p["signal_day"], giris_gunu, p["ticker"], p["tur"], p["kapanis"], p["giris"], p["giris_alt"],
          p["azami_giris"], p["sl"], p["tp1"], p["tp2"], p["rr1"], p["vade_lo"], p["vade_hi"], p["haber_skoru"],
-         p["teknik_skor"], p["risk"], p["neden"], durum, _iso(now)))
+         p["teknik_skor"], p["risk"], p["neden"], durum, _iso(now), p.get("kaynak", "haber"), p.get("genel_puan")))
 
 
 def _cancel(conn, rid: int, why: str, now: datetime) -> None:
     conn.execute("UPDATE hazir_firsat SET durum='iptal', iptal_nedeni=?, guncellendi=? WHERE id=?", (why, _iso(now), rid))
 
 
-def evening(conn, ctx, rows: List[Dict], now: Optional[datetime] = None) -> Dict:
+def evening(conn, ctx, rows: List[Dict], now: Optional[datetime] = None,
+            universe: Optional[Dict[str, str]] = None) -> Dict:
     """Kapanış sonrası: ertesi işlem günü için hazır liste (durum 'aday'); önce eski önerilerin sonuçları güncellenir."""
     now = now or _now()
     ev = evaluate_all(conn)
     sel = select(conn, ctx, rows)
-    if not sel["secilen"]:
-        out = dict(sel, giris_gunu=None, degerlendirme=ev, analiz="aksam")
+    tech = select_tech(conn, ctx, rows, universe)
+    allp = sel["secilen"] + tech["secilen"]
+    if not allp:
+        out = dict(sel, giris_gunu=None, degerlendirme=ev, analiz="aksam", teknik=tech)
         return out
-    sday = max(p["signal_day"] for p in sel["secilen"])
+    sday = max(p["signal_day"] for p in allp)
     gday = market_calendar.next_trading_day(date.fromisoformat(sday)).isoformat()
-    keep = {p["ticker"] for p in sel["secilen"]}
-    for p in sel["secilen"]:
+    keep = {p["ticker"] for p in allp}
+    for p in allp:
         _store(conn, p, "aksam", gday, "aday", now)
     for r in rows_for(conn, gday, ["aday"]):          # aynı akşam yeniden hesaplanınca listeden düşen
         if r["ticker"] not in keep:
             _cancel(conn, r["id"], "yeniden hesaplamada artık uygun değil", now)
     conn.commit()
-    return dict(sel, giris_gunu=gday, degerlendirme=ev, analiz="aksam")
+    return dict(sel, giris_gunu=gday, degerlendirme=ev, analiz="aksam", teknik=tech)
 
 
 def news_guard(conn, rows: List[Dict], now: datetime, analyze: bool = False, news_fn: Optional[Callable] = None) -> Dict:
@@ -314,7 +417,7 @@ def analyze_news(conn, tickers: List[str], since: str) -> Dict:
 
 
 def morning(conn, ctx, rows: List[Dict], now: Optional[datetime] = None, ai: bool = False,
-            news_fn: Optional[Callable] = None) -> Dict:
+            news_fn: Optional[Callable] = None, universe: Optional[Dict[str, str]] = None) -> Dict:
     """Açılış öncesi: akşam listesini yeniden değerlendir (kötü haber, bozulan plan), uygunları onayla; yeni uygun
     çıkan varsa ekle (toplam en fazla 5)."""
     now = now or _now()
@@ -326,7 +429,11 @@ def morning(conn, ctx, rows: List[Dict], now: Optional[datetime] = None, ai: boo
     by = {r["ticker"]: r for r in rows}
     for o in rows_for(conn, gday, ["aday", "onaylandi"]):
         r = by.get(o["ticker"])
-        b = build(conn, ctx, r) if r else {"neden": "haber listesinden çıktı (haber penceresi dışında)"}
+        if o["kaynak"] == "teknik":
+            b = (build_tech(conn, ctx, o["ticker"]) if not (r and r["score"] < 0)
+                 else {"neden": "akşamdan sonra olumsuz haber skoru"})
+        else:
+            b = build(conn, ctx, r) if r else {"neden": "haber listesinden çıktı (haber penceresi dışında)"}
         if "plan" not in b:
             _cancel(conn, o["id"], "sabah kontrolünde koşul bozuldu: " + b["neden"], now)
             continue
@@ -336,20 +443,27 @@ def morning(conn, ctx, rows: List[Dict], now: Optional[datetime] = None, ai: boo
             continue
         _store(conn, p, o["analiz"], gday, "onaylandi", now)        # seviyeler güncel veriyle yenilenir
     sel = select(conn, ctx, rows)
-    active = {r["ticker"] for r in rows_for(conn, gday, ["onaylandi"])}
+    tech = select_tech(conn, ctx, rows, universe)
     cancelled = {r["ticker"] for r in rows_for(conn, gday, ["iptal"])}
     from datetime import time as _time
     late = gday == today and now.time() >= _time(9, 55)   # açılış geçti: bugünkü açılışa yeni öneri eklenmez
-    for p in ([] if late else sel["secilen"]):
-        if len(active) >= MAX_PICKS:
-            break
-        if p["ticker"] not in active and p["ticker"] not in cancelled:
-            _store(conn, p, "sabah", gday, "onaylandi", now)
-            active.add(p["ticker"])
+    actives = {}
+    for kaynak, picks in (("haber", sel["secilen"]), ("teknik", tech["secilen"])):
+        active = actives[kaynak] = {r["ticker"] for r in rows_for(conn, gday, ["onaylandi"], kaynak)}
+        taken = {r["ticker"] for r in rows_for(conn, gday, ["onaylandi"])}
+        for p in ([] if late else picks):
+            if len(active) >= MAX_PICKS:
+                break
+            if p["ticker"] not in taken and p["ticker"] not in cancelled:
+                _store(conn, p, "sabah", gday, "onaylandi", now)
+                active.add(p["ticker"])
+                taken.add(p["ticker"])
     conn.commit()
     return {"analiz": "sabah", "giris_gunu": gday, "gec": late,
-            "secilen": [p for p in sel["secilen"] if p["ticker"] in active],
+            "secilen": [p for p in sel["secilen"] if p["ticker"] in actives["haber"]],
             "elenen": sel["elenen"], "haber": guard, "degerlendirme": ev,
+            "teknik": {"secilen": [p for p in tech["secilen"] if p["ticker"] in actives["teknik"]],
+                       "elenen": tech["elenen"]},
             "liste": rows_for(conn, gday)}
 
 
@@ -408,8 +522,8 @@ def evaluate_all(conn) -> Dict:
     return {"degerlendirilen": n, "degisen": changed}
 
 
-def performance(conn) -> Dict:
-    rows = rows_for(conn)
+def performance(conn, kaynak: Optional[str] = None) -> Dict:
+    rows = rows_for(conn, kaynak=kaynak)
     res = {"onerilen": len(rows), "sabah_iptal": sum(r["durum"] == "iptal" for r in rows),
            "girissiz": sum(r["durum"] == "girissiz" for r in rows), "acik": sum(r["durum"] == "giris" for r in rows),
            "bekleyen": sum(r["durum"] in ("aday", "onaylandi") for r in rows)}
@@ -433,8 +547,9 @@ def plan_lines(p: Dict, when: str) -> str:
     return (f"{p['ticker']} — {TYPE_NAMES.get(p['tur'], p['tur'])} · {when}\n"
             f"   giriş {p['giris']:.2f} (aralık {p['giris_alt']:.2f}–{p['azami_giris']:.2f}; azami {p['azami_giris']:.2f} "
             f"üstünde ALMA) · SL {p['sl']:.2f} · TP1 {p['tp1']:.2f} · TP2 {p['tp2']:.2f} · r/g 1:{p['rr1']:.1f}\n"
-            f"   haber {p['haber_skoru']:.2f} · teknik {p['teknik_skor']}/10 · risk {p['risk']} · vade ~{p['vade_lo']}–"
-            f"{p['vade_hi']} işlem günü")
+            + (f"   haber {p['haber_skoru']:.2f}" if p.get("haber_skoru") is not None else "   haber yok (yalnız teknik)")
+            + f" · teknik {p['teknik_skor']}/10 · risk {p['risk']} · vade ~{p['vade_lo']}–{p['vade_hi']} işlem günü"
+            + (f" · genel puan {p['genel_puan']}/100" if p.get("genel_puan") is not None else ""))
 
 
 def report_md(res: Optional[Dict]) -> str:
@@ -449,13 +564,14 @@ def report_md(res: Optional[Dict]) -> str:
     else:
         md = head + ("Koşulu analiz anında sağlanmış planlar (ertesi işlem günü açılışında değerlendirilebilir). "
                      "**Açılış azami girişin üstündeyse alım yapılmaz.**\n\n")
-        md += "| Hisse | Tür | Kapanış | Giriş aralığı | Azami | SL | TP1 | TP2 | R/G | Getiri TP1/TP2 | Vade | Haber | Teknik | Risk |\n"
-        md += "|" + "---|" * 14 + "\n"
+        md += ("| Hisse | Tür | Kapanış | Giriş aralığı | Azami | SL | TP1 | TP2 | R/G | Getiri TP1/TP2 | Vade | Haber | "
+               "Teknik | Risk | Genel puan |\n")
+        md += "|" + "---|" * 15 + "\n"
         for p in picks:
             md += (f"| {p['ticker']} | {TYPE_NAMES[p['tur']]} | {p['kapanis']:.2f} | {p['giris_alt']:.2f}–{p['azami_giris']:.2f} | "
                    f"{p['azami_giris']:.2f} | {p['sl']:.2f} | {p['tp1']:.2f} | {p['tp2']:.2f} | 1:{p['rr1']:.1f} | "
                    f"%{p['getiri1_%']:+.1f} / %{p['getiri2_%']:+.1f} | {p['vade_lo']}–{p['vade_hi']} gün | "
-                   f"{p['haber_skoru']:.2f} | {p['teknik_skor']}/10 | {p['risk']} |\n")
+                   f"{p['haber_skoru']:.2f} | {p['teknik_skor']}/10 | {p['risk']} | {p.get('genel_puan', '—')}/100 |\n")
         md += "\n" + "".join(f"- **{p['ticker']}:** {p['neden']}\n" for p in picks) + "\n"
     if res.get("gec"):
         md += ("- ⏰ Sabah kontrolü açılıştan sonra yapıldı: bugünkü açılışa yeni hazır fırsat eklenmedi (yalnız akşam "
@@ -466,8 +582,23 @@ def report_md(res: Optional[Dict]) -> str:
     cancelled = [r for r in res.get("liste") or [] if r["durum"] == "iptal"]
     if cancelled:
         md += "".join(f"- ⛔ {r['ticker']} iptal: {r['iptal_nedeni']}\n" for r in cancelled) + "\n"
-    md += ("_Hazır fırsat kuralları yeni ve henüz sınanmadı (son kapanışa ≤0,5 ATR, r/g ≥1:2, teknik ≥5/10, risk yüksek "
-           "değil); sonuçlar ayrıca ölçülüyor (🏁 Performans). Yatırım tavsiyesi değildir._\n\n")
+    tech = (res.get("teknik") or {}).get("secilen") or []
+    md += "### 📐 Yalnız teknik fırsatlar (haber desteği yok)\n"
+    if not tech:
+        md += "_Bugün yalnız teknik görünümle seçilecek kadar güçlü (teknik ≥7/10, yükseliş trendi) hisse yok._\n\n"
+    else:
+        md += ("Olumlu haberi olmayan, yalnız fiyat verisiyle seçilen planlar. Haberlilerden **ayrı ölçülür**; haber "
+               "desteği olmadığı için daha temkinli olun.\n\n")
+        md += "| Hisse | Tür | Kapanış | Giriş aralığı | SL | TP1 | TP2 | R/G | Teknik | Risk | Genel puan |\n"
+        md += "|" + "---|" * 11 + "\n"
+        for p in tech:
+            md += (f"| {p['ticker']} | {TYPE_NAMES[p['tur']]} | {p['kapanis']:.2f} | {p['giris_alt']:.2f}–{p['azami_giris']:.2f} | "
+                   f"{p['sl']:.2f} | {p['tp1']:.2f} | {p['tp2']:.2f} | 1:{p['rr1']:.1f} | {p['teknik_skor']}/10 | "
+                   f"{p['risk']} | {p.get('genel_puan', '—')}/100 |\n")
+        md += "\n"
+    md += ("_Hazır fırsat kuralları yeni ve henüz sınanmadı (son kapanışa ≤0,5 ATR, r/g ≥1:2, teknik ≥5/10 — yalnız "
+           "teknikte ≥7/10 ve yükseliş trendi —, risk yüksek değil); sonuçlar ayrıca ölçülüyor (🏁 Performans). Genel "
+           "puan yalnız bilgi amaçlıdır, ağırlıkları sınanmadı. Yatırım tavsiyesi değildir._\n\n")
     return md
 
 
@@ -478,9 +609,13 @@ def telegram_text(res: Optional[Dict], kind: str) -> str:
     gday = res.get("giris_gunu") or ""
     when = "ertesi gün açılış" if kind == "aksam" else "bugün açılış"
     t = f"\n✅ Hazır fırsatlar ({len(picks)})" + (f" — giriş {gday[8:10]}.{gday[5:7]}" if gday else "") + ":\n"
-    if not picks:
-        return t + "Bugün yeterince uygun hazır fırsat yok (liste doldurulmaz).\n"
-    return t + "\n".join(plan_lines(p, when) for p in picks) + "\n"
+    t += ("\n".join(plan_lines(p, when) for p in picks) + "\n") if picks else \
+        "Bugün yeterince uygun hazır fırsat yok (liste doldurulmaz).\n"
+    tech = (res.get("teknik") or {}).get("secilen") or []
+    if tech:
+        t += f"\n📐 Yalnız teknik ({len(tech)}, haber desteği yok — temkinli):\n"
+        t += "\n".join(plan_lines(p, when) for p in tech) + "\n"
+    return t
 
 
 # ---------------------------------------------------------------- otomatik çalışma (arka plan bekçisi)
@@ -501,7 +636,7 @@ def _save_state(st: Dict) -> None:
 
 
 def tick(conn, now: Optional[datetime] = None, run_fn: Optional[Callable] = None, quote_fn: Optional[Callable] = None,
-         send: Optional[Callable] = None) -> Dict:
+         send: Optional[Callable] = None, weekly_fn: Optional[Callable] = None) -> Dict:
     """Akşam (kapanış+20 dk) ve sabah (08:30–09:55, günde bir) analizini kendiliğinden çalıştırır; açılıştan sonra
     (10:05–17:30, günde bir) açılış fiyatını azami girişle karşılaştırır. Otomatik sabah analizi yalnız 08:30–09:55
     (açılıştan önce); seans başladıysa yapılmaz (gün içi yarım fiyatla analiz olmasın) — elle her zaman yapılabilir. Kullanıcı aynı analizi elle yaptıysa
@@ -527,6 +662,13 @@ def tick(conn, now: Optional[datetime] = None, run_fn: Optional[Callable] = None
         elif last != today and now.time() >= _time(9, 30):
             out["aksam_atlandi"] = "seans başladı; kaçırılan akşam analizi yapılmadı"
         st["aksam_gunu"] = last.isoformat()
+    # 2026-11-14 Aşama 4: haftanın son işlem gününün akşam analizi yapıldıysa haftalık rapor (bir kez, YZ yok)
+    from . import weekly
+    if last and last == weekly.last_trading_day_of_week(last) and done(last.isoformat(), "aksam")             and not done(last.isoformat(), "haftalik") and st.get("haftalik_gunu") != last.isoformat():
+        try:
+            out["haftalik"] = (weekly_fn or (lambda d: weekly.run(conn, d, send=send)))(last)
+        finally:
+            st["haftalik_gunu"] = last.isoformat()
     elif trading and _time(8, 30) <= now.time() <= _time(9, 55) and st.get("sabah_gunu") != today.isoformat():
         if not done(today.isoformat(), "sabah"):
             out["sabah"] = run("sabah")

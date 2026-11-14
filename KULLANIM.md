@@ -160,6 +160,24 @@ tavsiyesi değildir.
   üstündeyse "giriş olmadı" sayılır.
 - Hazır fırsat kuralları **yeni ve henüz sınanmadı**; mevcut eşikler değişmedi. En az 30 kapanmış öneriden önce
   sonuçlar rastlantı olabilir.
+- **📐 Yalnız teknik fırsatlar:** olumlu haberi **olmayan** likit hisselerden, aynı "koşulu sağlanmış plan"
+  kuralıyla ama daha sıkı şartla seçilir (teknik skor en az 7/10, yükseliş trendi; son haberi olumsuz olan alınmaz).
+  Haber desteği olmadığı için haberli fırsatlardan **sonra**, ayrı bölümde gösterilir; Telegram'da ve raporlarda da
+  ayrı yazar, 🏁 Performans'ta "📐 Yalnız teknik" seçilerek ayrı ölçülür. En fazla 5; uygun yoksa boş kalır.
+- **🧮 Genel fırsat puanı (0–100):** haber (0–30) + teknik (0–30) + risk/getiri (0–20) + risk seviyesi (0–20).
+  Kartta parçalarıyla yazar; olumlu haber listesinde "puan" olarak görünür. **Yalnız bilgidir**: seçimi ve sırayı
+  değiştirmez, ağırlıkları henüz sınanmadı. Yalnız teknik fırsatta haber puanı 0'dır (en fazla 70).
+- **📰 Haber özeti ve etkisi:** her haberli hazır fırsat kartında son yönlü haberin özeti, yönü, etkisi ve güveni yazar
+  (kayıtlı analizden; yapay zekâ çağrılmaz).
+
+## 📅 Haftalık rapor
+
+- Haftanın son işlem gününün akşam analizinden sonra bekçi kendiliğinden oluşturur (Telegram açıksa kısa özeti gelir);
+  🛡️ Bekçi → Rapor arşivi → **"📅 Bu haftanın raporunu şimdi oluştur"** ile istediğiniz an da üretebilirsiniz.
+- İçerik: BIST 100'ün haftalık değişimi · hazır fırsatlar (haberli / yalnız teknik ayrı) ve sonuçları · işlem
+  günlüğünde hafta içinde kapanan işlemler · takip listesi olayları · gelen haber, ön elemeyle ve tekrar diye atlanan
+  haber sayısı, yapay zekâ çağrısı ve maliyeti. Yalnız kayıtlı veriden hesaplanır, **yapay zekâ kullanılmaz**.
+- Arşivde "Tür: Haftalık" seçerek açılır; rapor sonradan değiştirilmez.
 
 ## ⭐ Takip Listem ve bekçi
 

@@ -1572,3 +1572,21 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   engelini aşabiliyordu (tam pakette 4 testte gerçek Yahoo isteği görüldü); run_offline artık curl_cffi isteklerini de sayıyor.
 - Dürüst sınır (değişmedi): rutin sayılan gruplarda (özellikle günlük geri alım raporları) kaçırma oranı ölçülmedi.
 - 483 test OK, ağ denemesi 0 (soket + curl).
+
+## 2026-11-14 — Aşama 4/8: fırsat katmanı ve haftalık rapor (YZ'siz)
+- **Genel fırsat puanı** `ready.overall_score` (0–100 = haber 30 + teknik 30 + r/g 20 + risk 20). YALNIZ BİLGİ: seçim ve
+  sıralama değişmedi (mevcut eşikler aynı; "küçük pilotla eşik değiştirme" kuralı). Kartta parçalarıyla, olumlu haber
+  listesinde "puan" (en uygun giriş senaryosuna göre `pending_score`), Dashboard tablosunda, rapor tablolarında.
+- **Yalnız teknik fırsatlar** `ready.build_tech/select_tech`: skor ≥1,50 ya da <0 haberi olanlar hariç evren; tracker
+  koruması (veri/likidite), yükseliş trendi, teknik ≥ 7/10 (`MIN_TECH_ONLY`, sınanmadı), koşulu sağlanmış plan (kırılım/
+  geri çekilme/destek; "mevcut fiyattan" yok), r/g ≥ 1:2, risk yüksek değil; risk maddeleri haber yönü 0 ile
+  (bilanço/şirket olayı/makro dahil). `hazir_firsat.kaynak` ('haber'|'teknik') + `genel_puan` sütunları (ALTER);
+  akşam/sabah/açılış/sonuç ölçümü aynı yaşam döngüsü, her kaynak için ayrı en fazla 5. Sabahta teknik planın hissesine
+  olumsuz haber geldiyse iptal. Performans ekranında kaynak süzgeci; rapor ve Telegram'da ayrı bölüm.
+  Canlı veride (14.11 kopya) 761 hisse ~10 sn: 1 yalnız teknik (ENERY, kırılım, r/g 1:2, puan 44), 0 haberli.
+- **Haber özeti/etkisi** haberli hazır fırsat kartında (`news_line`, kayıtlı analizden).
+- **Haftalık rapor** `bist_haber/weekly.py`: piyasa, hazır fırsatlar (kaynak ayrı), kapanan günlük işlemleri, takip olayları,
+  haber/ön eleme/tekrar sayıları, YZ çağrı ve maliyeti (ai_calls; 14.11 öncesi analyses tokenlarından). Arşiv
+  `YYYY-AA-GG_haftalik`. `ready.tick`: haftanın son işlem gününün akşam raporu varsa bir kez üretir (Telegram kısa özet,
+  ayar açıksa). Panel: Bekçi → Rapor arşivi "📅 Bu haftanın raporunu şimdi oluştur", "Haftalık" süzgeci.
+- Testler: tests/test_stage4.py (7) + panel akışı (1). Tüm paket 491 OK, ağ 0.

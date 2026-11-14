@@ -195,6 +195,39 @@ class PanelFlowTests(unittest.TestCase):
         self.go(at, "🏁 Performans")
         self.assertTrue(any("Hazır fırsatlar — gerçek sonuçlar" in m.value for m in at.markdown))
 
+    def test_stage4_score_tech_only_section_and_weekly_report(self):
+        """2026-11-14 Aşama 4: genel puan kartta, yalnız teknik ayrı bölümde ve haberlilerden sonra, Performans'ta
+        kaynak süzgeci, haftalık rapor düğmesi arşive yazar ve 'Haftalık' süzgecinde görünür."""
+        c = db.connect()
+        today = date.today().isoformat()
+        for tk, kaynak, hs in (("POS", "haber", 2.5), ("TEK", "teknik", None)):
+            c.execute("INSERT INTO hazir_firsat(olusturuldu,analiz,signal_day,giris_gunu,ticker,tur,kapanis,giris,giris_alt,"
+                      "azami_giris,sl,tp1,tp2,rr1,vade_lo,vade_hi,haber_skoru,teknik_skor,risk,neden,durum,kaynak) VALUES("
+                      "'2026-11-09T19:00:00+03:00','aksam','2026-11-09',?,?,'kirilim_teyitli',100,100,99.4,100.6,96,110,"
+                      "114,2.5,10,14,?,8,'orta','gerekçe','aday',?)", (today, tk, hs, kaynak))
+        c.commit()
+        c.close()
+        at = self.app("🎯 Fırsatlar")
+        self.assertEqual(len(at.exception), 0, str(at.exception))
+        md_ = " ".join(m.value for m in at.markdown)
+        self.assertLess(md_.index("Hazır Fırsatlar"), md_.index("Yalnız teknik fırsatlar"))
+        self.assertLess(md_.index("Yalnız teknik fırsatlar"), md_.index("Bekleyen Fırsatlar"))
+        caps = [c_.value for c_ in at.caption]
+        self.assertTrue(any("Genel fırsat puanı 62/100" in x and "sınanmadı" in x for x in caps), caps)   # 15+24+12,5+10
+        self.assertTrue(any("Genel fırsat puanı 46/100" in x and "en fazla 70" in x for x in caps))      # 0+24+12,5+10
+        self.assertTrue(any("haber yok (yalnız teknik)" in x for x in caps))
+        self.go(at, "🏁 Performans")
+        at.radio(key="pf_kay").set_value("📐 Yalnız teknik").run()
+        self.assertEqual(len(at.exception), 0, str(at.exception))
+        self.assertEqual(next(m.value for m in at.metric if m.label == "Önerilen"), "1")
+        self.go(at, "🛡️ Bekçi")
+        at.button(key="rep_weekly").click().run()
+        self.assertEqual(len(at.exception), 0, str(at.exception))
+        at.radio(key="rep_kind").set_value("Haftalık").run()
+        opts = at.selectbox(key="rep_pick").options
+        self.assertTrue(opts and all("haftalık rapor" in o for o in opts), opts)
+        self.assertTrue(any("Haftalık rapor" in m.value for m in at.markdown))
+
     def test_ai_usage_tab_shows_recorded_calls(self):
         from bist_haber import ai_service
         ai_service.record("haber_analizi", "tam_analiz", "kap:9", "gpt-5-mini", 2000, 800, db_path=config.DB_PATH)
