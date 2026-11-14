@@ -1590,3 +1590,7 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   `YYYY-AA-GG_haftalik`. `ready.tick`: haftanın son işlem gününün akşam raporu varsa bir kez üretir (Telegram kısa özet,
   ayar açıksa). Panel: Bekçi → Rapor arşivi "📅 Bu haftanın raporunu şimdi oluştur", "Haftalık" süzgeci.
 - Testler: tests/test_stage4.py (7) + panel akışı (1). Tüm paket 491 OK, ağ 0.
+- Sürüm: kurulum paketi 5952225 ile yeniden derlendi (147 MB, SHA-256 1e49d13a…). Güncelleme testi: eski (646432d)
+  kurulumun üstüne sessiz güncelleme → 3 veri dosyası birebir korundu, yedek klasörü oluştu, sürüm 5952225, sağlık
+  testi 8507 tamam, --kapat sonrası süreç kalmadı. Defender taraması temiz. GitHub sürümü v2026.11.09 güncellendi
+  ("Halley 2026-11-14 (güncel: 5952225)"); Masaüstü ve dagitim/ kopyaları yenilendi.
