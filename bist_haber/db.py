@@ -309,6 +309,8 @@ def connect(path=None) -> sqlite3.Connection:
     if "flag" not in cols:
         conn.execute("ALTER TABLE impacts ADD COLUMN flag TEXT")  # ör. "çelişkili", "ikinci görüş"
     news_cols = {r[1] for r in conn.execute("PRAGMA table_info(news)")}
+    if "content_hash" not in news_cols:   # 2026-11-14: içerik özeti (aynı içerik yeniden analiz edilmez)
+        conn.execute("ALTER TABLE news ADD COLUMN content_hash TEXT")
     if "donem" not in news_cols:  # finansal raporun ait olduğu dönem, KAP listesinden: "2026/3" (3 = 9 aylık)
         conn.execute("ALTER TABLE news ADD COLUMN donem TEXT")
     price_cols = {r[1] for r in conn.execute("PRAGMA table_info(prices)")}

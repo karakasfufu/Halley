@@ -1507,3 +1507,21 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   KAP listesi/metin okuma (ücretsiz) ve analiz edilmiş haberden önemli haber bildirimi sürer. Ayarlar düğmesi
   "bekçi otomatik analiz etsin (varsayılan kapalı)". Test: varsayılan kapalıyken YZ çağrılmaz, metin okunur.
 - 466 test geçti, ağ denemesi 0.
+
+## 2026-11-14 — Aşama 2/8: merkezi YZ servisi, kullanım ekranı, içerik özeti, tekrar ayıklama
+- `bist_haber/ai_service.py`: LLM sınıfı buraya taşındı (analyzer.LLM aynı sınıf, eski ad korunur). Her çağrı
+  ai_calls tablosuna (zaman, modül, işlem, ref, model, girdi/çıktı token, tahmini $, süre ms, durum ok/hata, hata,
+  parametre-tekrar sayısı); kayıt kendi kısa bağlantısıyla (paralel iş parçacıkları), kayıt hatası çağrıyı bozmaz.
+  Modüller: haber_analizi, takip_haber, hazir_haber, derin_inceleme, ucuz_test, rapor_yorumu, kacirilan_aciklama,
+  pilot. İşlemler: on_eleme, tam_analiz, ikinci_gorus. Pilot (backtest.PilotLLM) kendi bütçe/önbelleğini korur, kaydı
+  servise yazar. Sahte (test) istemcilerin çağrıları kaydedilmez (is_real) — testler 130 sahte kaydı geliştirme
+  veritabanına yazmıştı, silindi ve önlendi. Test: OpenAI() yalnız ai_service ve backtest'te.
+- usage(): bugün/ay/toplam, modül×işlem kırılımı (ay), son 30 gün günlük, son hatalar, son 30 çağrı, kayıt öncesi
+  haber analizi harcaması (analyses). Panel: ⚙️ Ayarlar → 🤖 Yapay zekâ kullanımı. Bütçe denetimi değişmedi.
+- `bist_haber/dedupe.py`: news.content_hash (Türkçe katlanmış başlık + sadeleştirilmiş metin, SHA-256); analyze()
+  YZ'den ÖNCE filter_duplicates: analiz edilmiş aynı içerik → 'duplicate' (not: ilk kayıt), aynı partide tekrar →
+  ilk tutulur, RSS'te aynı başlık ±3 gün → tekrar; aday hisseleri ilk kayıttakilerin içinde değilse tekrar SAYILMAZ.
+  stats['tekrar']. Gelişmiş durum tablosunda "Tekrarlanan haber". Test örneklerinde aynı başlık+metin kullanan
+  add_news başlığa kayıt no eklendi.
+- Gerçek veri (kopya): metni hazır 963 bekleyen haberden 2'si tekrar (TTKOM finansal rapor, LKMNH) — tasarruf bugün
+  küçük; asıl tasarruf Aşama 3'te. Testler: tests/test_ai_service.py (9) + panel. 476 test geçti, ağ denemesi 0.

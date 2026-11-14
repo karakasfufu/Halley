@@ -16,7 +16,7 @@ import streamlit as st
 
 from bist_haber import (analyzer, calendar_sync, config, corp_events, db, earnings, entries, journal, kap_history,
                         kap_worker, macro_calendar, pipeline, report, signals, technical, timeline, tradeplan,
-                        trends, watchdog, ai_comment, sectors, transfer, notify, takip_ui, tracker, firsat_log, ready)
+                        trends, watchdog, ai_comment, sectors, transfer, notify, takip_ui, tracker, firsat_log, ready, ai_service)
 from bist_haber.textutil import tr_fold  # noqa: E402
 
 st.set_page_config(page_title="Halley", page_icon="☄️", layout="wide", initial_sidebar_state="collapsed")
@@ -1497,6 +1497,7 @@ def advanced_panel() -> None:
     counts = dict(conn.execute("SELECT status, COUNT(*) FROM news GROUP BY status").fetchall())
     labels = {"new": "Analiz bekliyor", "analyzed": "Analiz edildi", "filtered_out": "Önemsiz bulundu (ön eleme)",
               "skipped": "Atlandı (rutin/ilgisiz/eski)", "error": "Hata",
+              "duplicate": "Tekrarlanan haber (aynı içerik ya da başlık; yeniden analiz edilmedi)",
               "context": "Takvim için alındı (analiz edilmez)"}
     legacy_empty = conn.execute("SELECT COUNT(*) FROM news WHERE source='kap' AND status='analyzed' "
                                 "AND LENGTH(TRIM(COALESCE(body,''), char(9)||char(10)||char(13)||' '))=0").fetchone()[0]
@@ -2226,9 +2227,52 @@ def page_performans() -> None:
     trend_panel()
 
 
+def ai_usage_panel() -> None:
+    """Merkezi YZ servisinin kaydı (2026-11-14, Aşama 2): her çağrı, token, maliyet, hangi özellik, hatalar."""
+    u = ai_service.usage(conn)
+    st.caption("Halley'in ana işleri (tarama, teknik analiz, fırsatlar, bekçi, raporlar, Telegram) yapay zekâ KULLANMAZ. "
+               "Yapay zekâ yalnız sizin başlattığınız işlemlerde çağrılır: 🔄 Haberleri güncelle, 📰 Haberler → 🔬 analiz, "
+               "isteğe bağlı rapor yorumu, açtığınız haber kontrolü düğmeleri. Aynı içerik bir daha analiz edilmez. "
+               "Maliyetler token sayısından hesaplanan tahmindir; kesin tutar OpenAI hesabınızdadır.")
+    k = st.columns(4)
+    k[0].metric("Bugün", f"{u['bugun']['cagri']} çağrı", f"≈ {u['bugun']['usd']:.3f} $", delta_color="off")
+    k[1].metric("Bu ay", f"{u['ay']['cagri']} çağrı", f"≈ {u['ay']['usd']:.3f} $", delta_color="off")
+    news_spent = analyzer.month_spend(conn)
+    k[2].metric("Haber analizi bütçesi (ay)", f"{news_budget:.2f} $", f"kalan ≈ {max(0.0, news_budget - news_spent):.3f} $",
+                delta_color="off")
+    k[3].metric("Bu ay hata / tekrar", f"{u['ay']['hata']} / {u['ay']['tekrar']}")
+    st.caption(f"Bu ay token: girdi {u['ay']['girdi']:,} · çıktı {u['ay']['cikti']:,}".replace(",", ".")
+               + (f" · kayıt başlamadan önceki haber analizleri: {u['oncesi']['cagri']} çağrı ≈ {u['oncesi']['usd']:.2f} $"
+                  if u["oncesi"]["cagri"] else ""))
+    if u["modul"]:
+        st.markdown("**Bu ay hangi özellik ne kadar kullandı**")
+        st.dataframe(pd.DataFrame(u["modul"]), hide_index=True, width="stretch")
+    else:
+        st.info("Bu ay kayıtlı yapay zekâ çağrısı yok.")
+    if u["gunluk"]:
+        st.markdown("**Son 30 gün (günlük maliyet $)**")
+        st.bar_chart(pd.DataFrame(u["gunluk"]).set_index("Gün")["Maliyet $"], height=180)
+    if u["hatalar"]:
+        with st.expander(f"Son hatalar ({len(u['hatalar'])})"):
+            st.dataframe(pd.DataFrame([{"Zaman": h["zaman"][:16].replace("T", " "),
+                                        "Özellik": ai_service.MODULE_TR.get(h["modul"], h["modul"]),
+                                        "İşlem": ai_service.ISLEM_TR.get(h["islem"], h["islem"] or "—"),
+                                        "Hata": h["hata"]} for h in u["hatalar"]]), hide_index=True, width="stretch")
+    if u["son"]:
+        with st.expander("Son 30 çağrı"):
+            st.dataframe(pd.DataFrame([{"Zaman": c["zaman"][:16].replace("T", " "),
+                                        "Özellik": ai_service.MODULE_TR.get(c["modul"], c["modul"]),
+                                        "İşlem": ai_service.ISLEM_TR.get(c["islem"], c["islem"] or "—"),
+                                        "Kayıt": c["ref"] or "—", "Girdi": c["girdi"], "Çıktı": c["cikti"],
+                                        "Maliyet $": round(c["usd"] or 0, 4), "Durum": c["durum"]} for c in u["son"]]),
+                         hide_index=True, width="stretch")
+
+
 def page_ayarlar() -> None:
     page_head(PAGE_AYAR)
-    t1, t2, t3 = st.tabs(["⚙️ Ayarlar ve bildirim", "💾 Veri ve gelişmiş", "❓ Kılavuz"])
+    t1, t4, t2, t3 = st.tabs(["⚙️ Ayarlar ve bildirim", "🤖 Yapay zekâ kullanımı", "💾 Veri ve gelişmiş", "❓ Kılavuz"])
+    with t4:
+        ai_usage_panel()
     with t1:
         settings_panel()
     with t2:

@@ -522,7 +522,7 @@ def news_check(conn, now: Optional[datetime] = None, collect_fn: Optional[Callab
         todo = [r for r in _watch_rows(conn, tickers, "AND status='new' AND body IS NOT NULL AND TRIM(body)!='' "
                                                        "AND published_at>=?", (since,))]
         if todo:
-            res = (analyze_fn or analyzer.analyze)(
+            res = (analyze_fn or (lambda *a, **k: analyzer.analyze(*a, modul="takip_haber", **k)))(
                 conn, uni, rows=todo, quality=settings.get("analiz_kalitesi"),
                 budget_usd=float(settings.get("haber_butce_usd", config.NEWS_BUDGET_USD)))
             out["analiz"] = {k: res.get(k) for k in ("analyzed", "filtered_out", "errors", "butce_disi") if k in res}

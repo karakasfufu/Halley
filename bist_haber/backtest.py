@@ -330,6 +330,8 @@ class PilotLLM:
                       messages=[{"role": "system", "content": system}, {"role": "user", "content": user}])
         if reasoning_effort:
             kwargs["reasoning_effort"] = reasoning_effort
+        from . import ai_service
+        tin = tout = 0
         try:
             resp = self.client.chat.completions.parse(**kwargs)
             usage = resp.usage
@@ -348,10 +350,16 @@ class PilotLLM:
             self.conn.execute("UPDATE pilot_calls SET state='done',result_json=? WHERE fingerprint=?",
                               (result.model_dump_json(), fingerprint))
             self.conn.commit()
+            if ai_service.is_real(self.client):
+                ai_service.record("pilot", "tam_analiz" if purpose == "primary" else "ikinci_gorus", self.news_id,
+                                  model, tin, tout)
             return result, tin, tout
-        except Exception:
+        except Exception as e:
             self.conn.execute("UPDATE pilot_calls SET state='uncertain' WHERE fingerprint=?", (fingerprint,))
             self.conn.commit()
+            if ai_service.is_real(self.client):
+                ai_service.record("pilot", "tam_analiz" if purpose == "primary" else "ikinci_gorus", self.news_id,
+                                  model, tin, tout, "hata", str(e))
             raise
 
 

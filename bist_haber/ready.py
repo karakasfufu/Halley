@@ -303,7 +303,7 @@ def analyze_news(conn, tickers: List[str], since: str) -> Dict:
         todo = conn.execute(f"SELECT * FROM news WHERE ({like}) AND status='new' AND body IS NOT NULL AND TRIM(body)!='' "
                             "AND published_at>=?", args + (since,)).fetchall()
         if todo:
-            a = analyzer.analyze(conn, uni, rows=todo, quality=settings.get("analiz_kalitesi"),
+            a = analyzer.analyze(conn, uni, rows=todo, quality=settings.get("analiz_kalitesi"), modul="hazir_haber",
                                  budget_usd=float(settings.get("haber_butce_usd", config.NEWS_BUDGET_USD)))
             res["analiz"] = {k: a.get(k) for k in ("analyzed", "filtered_out", "errors", "butce_disi") if k in a}
         else:

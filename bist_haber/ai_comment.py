@@ -154,7 +154,7 @@ def comment_report(conn, kind: str, ref: str, report_md: str, settings: Dict, ll
                                      f"bu çağrı en fazla {est['high']:.3f} $). Bütçe Ayarlar'dan değiştirilebilir."}
     try:
         from .analyzer import LLM
-        llm = llm or LLM()
+        llm = llm or LLM("rapor_yorumu")
         out, tin, tout = llm.parse(config.MODEL_ANALYSIS, REPORT_PROMPT, report_md[:MAX_INPUT_CHARS], ReportComment,
                                    reasoning_effort=REASONING)
     except Exception as e:  # rapor yine de arşivlenir
@@ -254,7 +254,7 @@ def explain_missed(conn, items: List[Dict], settings: Dict, llm=None, limit: int
             break
         try:
             from .analyzer import LLM
-            llm = llm or LLM()
+            llm = llm or LLM("kacirilan_aciklama")
             res_, tin, tout = llm.parse(config.MODEL_ANALYSIS, MISSED_PROMPT, msg, MissedExplain,
                                         reasoning_effort=REASONING)
         except Exception as e:

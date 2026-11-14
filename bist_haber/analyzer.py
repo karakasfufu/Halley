@@ -147,38 +147,8 @@ GÜVEN (guven, 0-1): Metin ne kadar net ve yoruma ne kadar az açık? Belirsiz/s
 "ozet": haberin tek-iki cümlelik Türkçe özeti. "gerekce": o hisse için kısa gerekçe."""
 
 
-class LLM:
-    def __init__(self):
-        self.client = OpenAI()  # OPENAI_API_KEY ortam değişkeninden okunur
-        self._unsupported = set()  # (model, parametre) çiftleri
-
-    def parse(self, model: str, system: str, user: str, schema, reasoning_effort: Optional[str] = None):
-        kwargs = dict(model=model, response_format=schema,
-                      messages=[{"role": "system", "content": system}, {"role": "user", "content": user}])
-        # İsteğe bağlı parametreler; model desteklemiyorsa çıkarılıp tekrar denenir.
-        # temperature=0: tutarlılık (Dipnot 4). reasoning_effort: düşünme miktarı (token/maliyet).
-        optional = {"temperature": 0}
-        if reasoning_effort:
-            optional["reasoning_effort"] = reasoning_effort
-        for k, v in optional.items():
-            if (model, k) not in self._unsupported:
-                kwargs[k] = v
-        while True:
-            try:
-                resp = self.client.chat.completions.parse(**kwargs)
-                break
-            except BadRequestError as e:
-                bad = [k for k in optional if k in kwargs and k in str(e)]
-                if not bad:
-                    raise
-                for k in bad:
-                    self._unsupported.add((model, k))
-                    kwargs.pop(k)
-        msg = resp.choices[0].message
-        if msg.refusal:
-            raise RuntimeError(f"model reddetti: {msg.refusal}")
-        u = resp.usage
-        return msg.parsed, (u.prompt_tokens if u else 0), (u.completion_tokens if u else 0)
+# 2026-11-14 Aşama 2: istemci merkezi YZ servisine taşındı; bütün çağrılar orada kaydedilir.
+from .ai_service import LLM  # noqa: E402,F401  (eski ad: analyzer.LLM)
 
 
 def _fmt_tl(v: Optional[float]) -> str:
@@ -406,8 +376,13 @@ def _work(llm: LLM, row, universe: Dict[str, str], stats: Dict[str, dict], quali
     q = quality or quality_profile()
     res = {"filter": None, "analysis": None, "flags": {}, "article": None, "tokens": [0, 0]}
 
-    def call(model, prompt, msg, schema, effort=None):
-        out, tin, tout = llm.parse(model, prompt, msg, schema, reasoning_effort=effort)
+    from .ai_service import LLM as _ServiceLLM
+
+    def call(model, prompt, msg, schema, effort=None, islem=None):
+        if isinstance(llm, _ServiceLLM):        # merkezi servis: işlem ve haber no kaydedilir
+            out, tin, tout = llm.parse(model, prompt, msg, schema, reasoning_effort=effort, islem=islem, ref=row["id"])
+        else:                                   # testlerdeki sahte istemciler
+            out, tin, tout = llm.parse(model, prompt, msg, schema, reasoning_effort=effort)
         res["tokens"][0] += tin
         res["tokens"][1] += tout
         return out
@@ -420,7 +395,7 @@ def _work(llm: LLM, row, universe: Dict[str, str], stats: Dict[str, dict], quali
     else:
         res["filter"] = call(config.MODEL_FILTER, FILTER_PROMPT,
                              _user_message(row, universe, config.FILTER_BODY_CHARS, stats), FilterResult,
-                             config.FILTER_REASONING_EFFORT)
+                             config.FILTER_REASONING_EFFORT, islem="on_eleme")
         if not res["filter"].onemli:
             return res
         article = fetch_article(row["url"]) if row["url"] else ""  # özet yerine tam metin (adres yoksa denenmez)
@@ -431,9 +406,9 @@ def _work(llm: LLM, row, universe: Dict[str, str], stats: Dict[str, dict], quali
     # Önemli konularda (pay alım teklifi, birleşme...) daha uzun metin okunur; diğerleri varsayılan sınırda.
     body_chars = int(config.reading_limits(row["subject"] or "")["body_chars"] * q["body_factor"])
     msg = _user_message(row, universe, body_chars, stats, body)
-    a = call(config.MODEL_ANALYSIS, ANALYSIS_PROMPT, msg, FullAnalysis, q["reasoning"])
+    a = call(config.MODEL_ANALYSIS, ANALYSIS_PROMPT, msg, FullAnalysis, q["reasoning"], islem="tam_analiz")
     if q["second_opinion"] and _needs_second_opinion(a, q["second_min_impact"]):
-        a2 = call(config.MODEL_ANALYSIS, ANALYSIS_PROMPT, msg, FullAnalysis, q["reasoning"])
+        a2 = call(config.MODEL_ANALYSIS, ANALYSIS_PROMPT, msg, FullAnalysis, q["reasoning"], islem="ikinci_gorus")
         a, res["flags"] = _reconcile(a, a2)
     res["analysis"] = a
     return res
@@ -576,7 +551,7 @@ def reanalyze(conn, universe: Dict[str, str], news_ids, llm: Optional[LLM] = Non
         rows = keep
     if not rows:
         return out
-    llm = llm or LLM()
+    llm = llm or LLM("derin_inceleme")
     spend0 = month_spend(conn)
     st_ = {"_izle": track, "tur": "derin inceleme", "durum": "çalışıyor", "toplam": len(rows), "biten": 0,
            "basladi": datetime.now(config.TR_TZ).isoformat(timespec="seconds")}
@@ -650,7 +625,7 @@ def test_one(conn, universe: Dict[str, str], llm: Optional[LLM] = None) -> Optio
     if not rows:
         return None
     row = rows[0]
-    llm = llm or LLM()
+    llm = llm or LLM("ucuz_test")
     res = _work(llm, row, universe, {}, quality_profile(config.TEST_QUALITY))
     tin, tout = res["tokens"]
     from .pipeline import INPUT_USD_PER_TOKEN, OUTPUT_USD_PER_TOKEN
@@ -661,7 +636,7 @@ def test_one(conn, universe: Dict[str, str], llm: Optional[LLM] = None) -> Optio
 def analyze(conn, universe: Dict[str, str], limit: Optional[int] = None, llm: Optional[LLM] = None,
             progress: Optional[Callable[[int, int], None]] = None, quality: Optional[str] = None,
             rows=None, budget_usd: Optional[float] = None, max_age_days: Optional[int] = None,
-            track: bool = False) -> Dict[str, int]:
+            track: bool = False, modul: str = "haber_analizi") -> Dict[str, int]:
     """Bekleyen haberleri analiz eder. LLM çağrıları paralel, veritabanı yazımı ana iş parçacığında.
 
     quality: "yuksek" | "dengeli" | "ekonomik" (panel ayarı). Boşsa yüksek doğruluk.
@@ -675,13 +650,17 @@ def analyze(conn, universe: Dict[str, str], limit: Optional[int] = None, llm: Op
         rows = pending(conn, limit, max_age_days=max_age_days)
     elif limit:
         rows = list(rows)[:limit]
+    from .dedupe import filter_duplicates    # 2026-11-14: aynı içerik/başlık bir daha YZ'ye gönderilmez
+    rows, dup = filter_duplicates(conn, rows)
+    if dup:
+        stats["tekrar"] = dup
     rows, over = within_budget(conn, rows, budget_usd, quality)
     if over:
         stats["butce_disi"] = over
         stats["butce_kalan_usd"] = round(budget_usd - month_spend(conn), 4)
     if not rows:
         return stats
-    llm = llm or LLM()
+    llm = llm or LLM(modul)
     spend0 = month_spend(conn)
     st_ = {"_izle": track, "tur": "haber analizi", "durum": "çalışıyor", "toplam": len(rows), "biten": 0,
            "basladi": datetime.now(config.TR_TZ).isoformat(timespec="seconds")}

@@ -29,8 +29,10 @@ hazır fırsat otomasyonu (akşam/sabah/açılış). **Yapay zekâ çağırmaz**
 
 ## 2. Bütün yapay zekâ çağrıları
 
-Hepsi `analyzer.LLM.parse` (OpenAI `chat.completions.parse`, yapılandırılmış JSON) üzerinden geçer; tek istisna
-geçmiş veri pilotudur (`backtest.py`, kendi istemcisi).
+Aşama 2'den beri hepsi **merkezi servis** `bist_haber/ai_service.py` (`LLM.parse`, OpenAI `chat.completions.parse`,
+yapılandırılmış JSON) üzerinden geçer ve `ai_calls` tablosuna kaydedilir (modül, işlem, kayıt, token, maliyet, süre,
+durum, hata, tekrar). Geçmiş veri pilotu (`backtest.py`) kendi bütçe/önbellek istemcisini korur ama her çağrısını aynı
+kayda yazar. Kullanım: ⚙️ Ayarlar → 🤖 Yapay zekâ kullanımı.
 
 | # | Dosya / işlev | Tetikleyen kullanıcı işlemi | Sıklık | Gerçekten YZ gerekir mi? | Python ile değişir mi? | Önbellek |
 |---|---|---|---|---|---|---|
@@ -75,7 +77,7 @@ performans, raporlar, Telegram, veri aktarma, kurulum/güncelleme, arayüz (9 ek
 | # | Aşama | Durum |
 |---|---|---|
 | 1 | Bu rapor + bekçinin kendiliğinden yaptığı YZ haber analizi (tablo #4) varsayılan **kapalı** | ✅ |
-| 2 | Merkezi YZ servisi (bütün çağrılar; sayı, token, maliyet, modül, hata/tekrar; günlük/aylık ekran) + içerik özeti + tekrarlanan haber ayıklama | sırada |
+| 2 | Merkezi YZ servisi (bütün çağrılar; sayı, token, maliyet, modül, hata/tekrar; günlük/aylık ekran) + içerik özeti + tekrarlanan haber ayıklama | ✅ |
 | 3 | Python ön eleme/sınıflandırma (KAP önceliği; RSS ön eleme çağrısının yerini alır) — geçmiş haberlerle kaçırma oranı ölçülerek | |
 | 4 | Genel fırsat puanı, haber özeti/etkisi, "yalnız teknik" fırsatlar, haftalık rapor | |
 | 5 | Profesyonel grafik + olası fiyat aralığı konisi | |

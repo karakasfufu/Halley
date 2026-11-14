@@ -195,6 +195,15 @@ class PanelFlowTests(unittest.TestCase):
         self.go(at, "🏁 Performans")
         self.assertTrue(any("Hazır fırsatlar — gerçek sonuçlar" in m.value for m in at.markdown))
 
+    def test_ai_usage_tab_shows_recorded_calls(self):
+        from bist_haber import ai_service
+        ai_service.record("haber_analizi", "tam_analiz", "kap:9", "gpt-5-mini", 2000, 800, db_path=config.DB_PATH)
+        at = self.app("⚙️ Ayarlar")
+        self.assertTrue(any(t.label == "🤖 Yapay zekâ kullanımı" for t in at.tabs))
+        self.assertTrue(any(m.label == "Bu ay" and m.value == "1 çağrı" for m in at.metric))
+        self.assertTrue(any("Haber analizi" in d.value.to_string() and "tam analiz" in d.value.to_string()
+                            for d in at.dataframe))
+
     def test_settings_saved_across_pages(self):
         at = self.app("⚙️ Ayarlar")
         at.slider(key="set_window").set_value(12).run()

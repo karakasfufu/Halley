@@ -22,8 +22,9 @@ def memory_db():
 
 def add_news(conn, nid="kap:1", body=None, published="2026-09-01T12:00:00+03:00", subject="Yeni İş İlişkisi"):
     conn.execute("INSERT INTO news(id,source,published_at,effective_date,title,body,candidates,subject,fetched_at) "
-                 "VALUES(?,'kap',?,?,'Sözleşme',?,'TEST',?,'2026-11-06')",
-                 (nid, published, published[:10], body, subject))
+                 "VALUES(?,'kap',?,?,?,?,'TEST',?,'2026-11-06')",
+                 # başlıkta kayıt no: 2026-11-14 tekrar ayıklaması aynı başlık+metni tek haber sayar
+                 (nid, published, published[:10], f"Sözleşme {nid}", body, subject))
     conn.commit()
 
 

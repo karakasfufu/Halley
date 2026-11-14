@@ -104,6 +104,17 @@ tavsiyesi değildir.
 - **Ölçüler:** kazanma oranı, ortalama net, ortalama R, kâr faktörü (toplam kazanç / toplam zarar; 1'in üstü kârlı),
   maks. düşüş, Sharpe. En az 30 kapanan işlemden önce bu oranlar rastlantı olabilir.
 
+## 🤖 Yapay zekâ kullanımı (⚙️ Ayarlar → 🤖 Yapay zekâ kullanımı)
+
+- Halley'in ana işleri (tarama, teknik analiz, fırsatlar, bekçi, raporlar, Telegram) yapay zekâ kullanmaz. Yapay zekâ
+  yalnız sizin başlattığınız işlemlerde çağrılır (🔄 Haberleri güncelle, 📰 Haberler → 🔬 analiz, isteğe bağlı rapor
+  yorumu, açtığınız haber kontrolü düğmeleri).
+- Bu sekme her çağrıyı gösterir: bugün / bu ay çağrı sayısı ve tahmini maliyet, haber analizi bütçesinden kalan, hangi
+  özelliğin ne kadar kullandığı, son 30 günün günlük maliyeti, hatalar ve son 30 çağrı.
+- **Aynı haber bir daha ücretlendirilmez:** içeriği (başlık + metin) daha önce analiz edilmiş bir haber farklı numarayla
+  gelse de yapay zekâya gönderilmez; haber sitelerinde aynı başlık 3 gün içinde başka siteden geldiyse de tekrar
+  sayılır ("Tekrarlanan haber"). Aynı metni iki farklı şirket yayımladıysa ikisi de analiz edilir.
+
 ## Ayarlar (⚙️ Ayarlar)
 
 - **Komisyon ve kayma:** Midas'ın gerçek oranını girin; net kâr/zarar buna göre hesaplanır.
