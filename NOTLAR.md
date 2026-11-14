@@ -1653,3 +1653,6 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Canlıda doğrulama: durum kaydı sıfırlanınca (yedek: data/yedek/hazir_durum_20261115.json) bekçi kaçırılan Cuma akşam
   analizini 01:02'de kendisi yaptı → 631 hissenin tamamı 13.11 fiyatlı (önce 28), Pazartesi (16.11) için 2 yalnız
   teknik hazır fırsat (BAHKM kırılım r/g 1:3,1, ENERY kırılım r/g 1:2), haberli 0; YZ çağrısı 0; rapor 2026-11-15_aksam.
+- Sürüm: kurulum paketi 42ecf7f (147 MB, SHA-256 b1651209…): güncelleme testi 6b4d2d4 → 42ecf7f veri korundu, sağlık
+  tamam, Defender temiz; GitHub v2026.11.09 "Halley 2026-11-15 (güncel: 42ecf7f)".
+- Aşama 6 planı yazıldı: ASAMA6_PLAN.md (onay bekliyor; YZ maliyeti 0 $, araştırma ~4–6 saat).
