@@ -412,6 +412,9 @@ if last:
         st.error(f"{an['errors']} haber analiz edilemedi. Ayrıntı: ⚙️ Ayarlar → Veri ve gelişmiş.")
     if an.get("waiting"):
         st.caption(f"{an['waiting']} haber bir sonraki güncellemeyi bekliyor.")
+    if an.get("tekrar"):
+        st.caption(f"{an['tekrar']} haber daha önce analiz edilmiş bir haberin tekrarı olduğu için yapay zekâya "
+                   "gönderilmedi (ücretlendirilmedi).")
     if last.get("rss", {}).get("failed_feeds"):
         st.caption("Bazı haber siteleri okunamadı. Ayrıntı: ⚙️ Ayarlar → Veri ve gelişmiş.")
 
@@ -1145,6 +1148,8 @@ def news_analysis_box() -> None:
                 cost = analyzer.month_spend(conn) - before
                 flash("success", f"{res.get('analyzed', 0)} haber analiz edildi, {res.get('filtered_out', 0)} haber ön "
                       f"elemede önemsiz bulundu" + (f", {res['errors']} haberde hata" if res.get("errors") else "")
+                      + (f", {res['tekrar']} haber daha önce analiz edilmiş bir haberin tekrarı olduğu için atlandı "
+                         "(ücretlendirilmedi)" if res.get("tekrar") else "")
                       + f". Gerçek maliyet ≈ {cost:.3f} \\$." + (" OpenAI hesabı/kotası nedeniyle durdu: "
                                                               + res["stopped"] if res.get("stopped") else ""))
             except Exception as e:

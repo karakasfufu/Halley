@@ -304,6 +304,8 @@ def connect(path=None) -> sqlite3.Connection:
     conn = sqlite3.connect(path, timeout=30)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    from .ai_service import SCHEMA as _AI_SCHEMA     # 2026-11-14: YZ çağrı kaydı tablosu
+    conn.executescript(_AI_SCHEMA)
     # Eski veritabanlarına sonradan eklenen sütunlar
     cols = {r[1] for r in conn.execute("PRAGMA table_info(impacts)")}
     if "flag" not in cols:

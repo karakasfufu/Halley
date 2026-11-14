@@ -50,28 +50,39 @@ def filter_duplicates(conn, rows: List) -> Tuple[List, int]:
     for i, t, c, p in conn.execute("SELECT id, title, candidates, published_at FROM news WHERE source LIKE 'rss:%' "
                                    "AND status='analyzed' AND published_at>=?", (since,)):
         titles.setdefault(title_key({"title": t}), (i, _cands({"candidates": c}), p))
+    # Aynı PARTİDEKİ tekrar kalıcı işaretlenmez, yalnız bu tur atlanır (2026-11-14 denetimde bulundu: ilk kayıt hata
+    # alır ya da bütçeye takılırsa ikincisi "analiz edilmiş kaydın tekrarı" sanılıp hiç analiz edilmeyebilirdi).
+    # İlk kayıt gerçekten analiz edilince sonraki turda kalıcı 'duplicate' olur.
+    batch_h: Dict[str, Tuple[str, set]] = {}
+    batch_t: Dict[str, Tuple[str, set, str]] = {}
+
+    def same_title(r, m) -> bool:
+        return abs((datetime.fromisoformat(r["published_at"]) - datetime.fromisoformat(m[2])).days) <= TITLE_WINDOW_DAYS
+
     kept, dup = [], 0
     for r in rows:
         h = content_hash(r)
         mine = _cands(r)
-        match = seen.get(h)
+        rss = str(r["source"]).startswith("rss:")
+        tk = title_key(r) if rss else ""
+        match, m = seen.get(h), titles.get(tk) if tk else None
         why = None
         if match and mine <= match[1]:
             why = f"aynı içerik {match[0]} kaydıyla analiz edildi"
-        elif str(r["source"]).startswith("rss:"):
-            tk = title_key(r)
-            m = titles.get(tk)
-            if tk and m and mine <= m[1] and abs((datetime.fromisoformat(r["published_at"]) -
-                                                   datetime.fromisoformat(m[2])).days) <= TITLE_WINDOW_DAYS:
-                why = f"aynı başlık başka kaynakta ({m[0]}) analiz edildi"
+        elif m and mine <= m[1] and same_title(r, m):
+            why = f"aynı başlık başka kaynakta ({m[0]}) analiz edildi"
         if why:
             conn.execute("UPDATE news SET status='duplicate', note=?, content_hash=? WHERE id=?", (why, h, r["id"]))
             dup += 1
             continue
         conn.execute("UPDATE news SET content_hash=? WHERE id=?", (h, r["id"]))
-        seen.setdefault(h, (r["id"], mine))
-        if str(r["source"]).startswith("rss:"):
-            titles.setdefault(title_key(r), (r["id"], mine, r["published_at"]))
+        bm, bt = batch_h.get(h), batch_t.get(tk) if tk else None
+        if (bm and mine <= bm[1]) or (bt and mine <= bt[1] and same_title(r, bt)):
+            dup += 1            # bu tur atlanır, durumu 'new' kalır
+            continue
+        batch_h.setdefault(h, (r["id"], mine))
+        if tk:
+            batch_t.setdefault(tk, (r["id"], mine, r["published_at"]))
         kept.append(r)
     conn.commit()
     return kept, dup

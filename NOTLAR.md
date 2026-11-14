@@ -1525,3 +1525,14 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   add_news başlığa kayıt no eklendi.
 - Gerçek veri (kopya): metni hazır 963 bekleyen haberden 2'si tekrar (TTKOM finansal rapor, LKMNH) — tasarruf bugün
   küçük; asıl tasarruf Aşama 3'te. Testler: tests/test_ai_service.py (9) + panel. 476 test geçti, ağ denemesi 0.
+
+## 2026-11-14 — Aşama 1–2 denetimi (kullanıcı: "1-2'yi kontrol et")
+- Değişikliklerin tamamı satır satır okundu; paralel çalışma denendi: 5 kanal + ana iş parçacığı yazarken çağrı kaydı
+  kilitlenmedi, kayıp yok (9 haber × 2 çağrı = 18 ok + 1 hata kaydı), kayıt başına ~7 ms; hata alan haber yeniden
+  denenince içerik özeti engellemedi; bütçe yetmeyince çağrı ve kayıt yok.
+- HATA (düzeltildi): aynı partideki tekrar kalıcı 'duplicate' işaretleniyordu; ilk kayıt hata alır/bütçeye takılırsa
+  ikincisi hiç analiz edilmeyebilirdi → parti içi tekrar yalnız o tur atlanır (status 'new' kalır), ilk kayıt analiz
+  edilince sonraki turda kalıcı işaretlenir. Testler eklendi.
+- Küçük: elle analizde tekrar sessiz atlanıyordu → mesajda "X haber tekrar olduğu için atlandı (ücretlendirilmedi)";
+  güncelleme sonucunda da yazılır. ai_calls tablosu db.connect'te oluşur (kullanım sekmesi her çizimde DDL denemesin).
+  MIMARI_RAPOR'da bekçi satırı "varsayılan kapalı" olarak güncellendi. 476 test geçti, ağ denemesi 0.

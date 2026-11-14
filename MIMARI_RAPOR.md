@@ -39,7 +39,7 @@ kayda yazar. Kullanım: ⚙️ Ayarlar → 🤖 Yapay zekâ kullanımı.
 | 1 | `analyzer.analyze` → `_analyze_one` **tam analiz** | 🔄 Haberleri güncelle (ayar: en fazla 10 haber), 📰 Haberler → 🔬 analiz et, sabah analizinde işaretli kutu | Kullanıcı bastıkça | **Evet** (haber yorumu) | Hayır; ama gereksiz haberler hiç gönderilmemeli (Aşama 3) | Var: analiz edilen haber tekrar analiz edilmez (status) |
 | 2 | Aynı yer **RSS ön eleme** çağrısı | Aynı | RSS haberi başına | Hayır | **Evet** (Aşama 3) | — |
 | 3 | Aynı yer **ikinci görüş** | Aynı ("yüksek doğruluk" ayarında, büyük etkili haber) | Nadir | Doğruluk için | Ayara bağlı kalır | — |
-| 4 | `tracker.news_check` (takip listesi haberleri) | **Kendiliğinden — bekçi, 30 dk'da bir** | Otomatik | Hayır (kullanıcı istemedikçe) | — | Var |
+| 4 | `tracker.news_check` (takip listesi haberleri) | Bekçi 30 dk'da bir — **yalnız kullanıcı Ayarlar'da açtıysa** (Aşama 1'den beri varsayılan kapalı) | Otomatik (açıksa) | Hayır (kullanıcı istemedikçe) | — | Var |
 | 5 | `ready.news_guard(analyze=True)` (hazır fırsat haber kontrolü) | 🤖 düğmesi; sabah otomatiği yalnız düğme açıksa (varsayılan **kapalı**) | Elle | Kullanıcı isterse | — | Var |
 | 6 | `analyzer.reanalyze` (derin yeniden inceleme) | 📰 Haberler → 🔁 düğmesi | Elle | Evet | — | Eski sonuç saklanır |
 | 7 | `analyzer.test_one` (ucuz test) | Ayarlar → 🧪 düğmesi | Elle | Deneme | — | Kaydedilmez |

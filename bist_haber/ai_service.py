@@ -134,7 +134,9 @@ class LLM:
 
 # ---------------------------------------------------------------- kullanım özeti (panel)
 def _ensure(conn) -> None:
-    conn.executescript(SCHEMA)
+    # Tablo db.connect'te oluşur; yalnız eski/ayrı bağlantılarda yoksa oluştur (her çizimde yazma denemesi olmasın)
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ai_calls'").fetchone():
+        conn.executescript(SCHEMA)
 
 
 def usage(conn, now: Optional[datetime] = None) -> Dict:

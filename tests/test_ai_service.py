@@ -114,6 +114,13 @@ class DedupeTests(Base):
         b = self.add("kap:2", "Başlık", "Metin.")
         kept, dup = dedupe.filter_duplicates(self.conn, [a, b])
         self.assertEqual(([r["id"] for r in kept], dup), (["kap:1"], 1))
+        # aynı partideki tekrar kalıcı işaretlenmez (ilk kayıt hata alırsa kaybolmasın); ilki analiz edilince işaretlenir
+        self.assertEqual(self.conn.execute("SELECT status FROM news WHERE id='kap:2'").fetchone()[0], "new")
+        self.conn.execute("UPDATE news SET status='analyzed' WHERE id='kap:1'")
+        self.conn.commit()
+        b = self.conn.execute("SELECT * FROM news WHERE id='kap:2'").fetchone()
+        dedupe.filter_duplicates(self.conn, [b])
+        self.assertEqual(self.conn.execute("SELECT status FROM news WHERE id='kap:2'").fetchone()[0], "duplicate")
         self.add("rss:x:1", "Faiz kararı açıklandı!", "kaynak X metni", cands="", source="rss:x", status="analyzed")
         r = self.add("rss:y:1", "Faiz Kararı Açıklandı", "kaynak Y farklı metin", cands="", source="rss:y",
                      pub="2026-11-11T09:00:00+03:00")
@@ -135,6 +142,12 @@ class AnalyzeIntegration(Base):
         with patch("bist_haber.prices.company_stats", return_value={}):
             st = analyzer.analyze(self.conn, {"TEST": "Deneme"}, limit=5, llm=llm)
         self.assertEqual((st["analyzed"], st["tekrar"]), (1, 1))                    # ikincisi YZ'ye gönderilmedi
+        # ilk kayıt hata alsaydı: ikincisi kaybolmaz, sonraki turda analiz edilir
+        self.assertEqual(self.conn.execute("SELECT status FROM news WHERE id='kap:2'").fetchone()[0], "new")
+        with patch("bist_haber.prices.company_stats", return_value={}):
+            st2 = analyzer.analyze(self.conn, {"TEST": "Deneme"}, limit=5, llm=llm)
+        self.assertEqual((st2.get("analyzed"), st2.get("tekrar")), (0, 1))          # artık analiz edilmişin tekrarı
+        self.assertEqual(self.conn.execute("SELECT status FROM news WHERE id='kap:2'").fetchone()[0], "duplicate")
 
 
 if __name__ == "__main__":
