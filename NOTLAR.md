@@ -1536,3 +1536,24 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Küçük: elle analizde tekrar sessiz atlanıyordu → mesajda "X haber tekrar olduğu için atlandı (ücretlendirilmedi)";
   güncelleme sonucunda da yazılır. ai_calls tablosu db.connect'te oluşur (kullanım sekmesi her çizimde DDL denemesin).
   MIMARI_RAPOR'da bekçi satırı "varsayılan kapalı" olarak güncellendi. 476 test geçti, ağ denemesi 0.
+
+## 2026-11-14 — Aşama 3/8: Python ön eleme kuralları (ölçüldü, HENÜZ DEVREDE DEĞİL)
+- Yeni `bist_haber/prefilter.py`: `classify(row) -> ("ai"|"rutin", neden)`, `apply(conn)` (rutinleri `skipped` + not
+  "Python ön eleme: ..." yapar). Yapay zekâ kullanmaz. **analyzer'a bağlanmadı** (test bunu kontrol ediyor); kullanıcı onayı bekleniyor.
+- Kurallar (doğruluk önce, emin olunmayan her şey "ai"):
+  - KAP rutin konular: portföy uyumu, MKK, tipe dönüşüm, ihraç tavanı/belgesi, borçlanma aracı itfa, YK komiteleri,
+    denetçi seçimi, merkez değişikliği, finansal takvim, izahname, fon kullanım raporu, halka arz varsayım raporu,
+    fon kurucusu alım satımı, esas sözleşme, tescil vb.
+  - Geri alım bildirimi: süren programın günlük uygulama raporu ("Güncelleme mi? Evet") rutin; programın başlatılması/
+    kararı/sonu ya da alan bulunamazsa → ai.
+  - Genel kurul: bedelsiz/sermaye/kâr payı/birleşme/bölünme geçiyorsa → ai, yoksa rutin.
+  - **Pay Alım Satım Bildirimi hep ai**: ilk taslakta "rutin" sanılan örneklerin bildirimi yapanı YK üyesi/ortak çıktı
+    (SPK II-15.1 md.12 içeriden işlem) → kural kaldırıldı.
+  - RSS: şirket eşleşmesi varsa ai; yoksa piyasa geneli anahtar kelimesi (faiz, enflasyon, vergi, petrol, savaş/saldırı,
+    SPK/BDDK…) varsa ai; açılış/kapanış/altın/kripto bülteni ve geri kalanı rutin.
+- Ölçüm (canlı veritabanının bellekteki kopyası, salt okunur): 148 YZ etiketli haberin (141 KAP + 7 RSS) **hiçbiri** rutin
+  denmedi → kaçırma 0. YZ'nin RSS ön elemesinde önemsiz dediği 7 haberin 6'sı Python'da da rutin, 1'i ai (güvenli taraf).
+  Bekleyen 963 haberin 352'si (%37; KAP 335, RSS 17) yapay zekâya gitmezdi (≈ 352 × 0,0154 $ ≈ 5,4 $ birikmiş sırada).
+- Dürüst sınır: rutin sayılan konuların (en çok 211 günlük geri alım raporu) geçmişte YZ etiketi yok; kaçırma oranı bu
+  gruplar için ÖLÇÜLEMEDİ. Öneri: ~30 rutin haberlik ücretli doğrulama örneği (≈ 0,4–0,6 $), kullanıcı onayıyla.
+- Testler: tests/test_prefilter.py (7). Tüm paket 483 test OK, ağ denemesi 0.
