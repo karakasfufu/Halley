@@ -1624,3 +1624,6 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   ("📈 Grafik ve olası fiyat aralığı" açılır bölümü). Dönem 3/6/12 ay, koni 5/10/20 işlem günü.
 - Koni bir tahmin modeli DEĞİL (yön yok); Aşama 6–7 modelleri onaylanırsa yanına eklenecek.
 - Testler: tests/test_chart.py (4) + panel (1). 497 test OK, ağ 0. Canlıda görsel kontrol yapıldı.
+- Sürüm: kurulum paketi 6b4d2d4 (147 MB, SHA-256 b5e54db7…). Güncelleme testi 5952225 → 6b4d2d4: veri birebir korundu,
+  yedek oluştu, chart.py pakette, sağlık 8507 tamam, kapatma temiz; Defender temiz. GitHub v2026.11.09 güncellendi
+  ("Halley 2026-11-15 (güncel: 6b4d2d4)"); Masaüstü ve dagitim/ kopyaları yenilendi.
