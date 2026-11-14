@@ -1627,3 +1627,23 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Sürüm: kurulum paketi 6b4d2d4 (147 MB, SHA-256 b5e54db7…). Güncelleme testi 5952225 → 6b4d2d4: veri birebir korundu,
   yedek oluştu, chart.py pakette, sağlık 8507 tamam, kapatma temiz; Defender temiz. GitHub v2026.11.09 güncellendi
   ("Halley 2026-11-15 (güncel: 6b4d2d4)"); Masaüstü ve dagitim/ kopyaları yenilendi.
+
+## 2026-11-15 — 6. aşama öncesi genel doğrulama (kullanıcı: "fiyat modelimizden önce her şeyin doğru çalıştığından emin ol")
+- Canlı kurulum = GitHub HEAD (113 dosya, satır sonu hariç birebir; yalnız NOTLAR farklıydı). Panel sağlıklı, 2 okuyucu.
+- Canlı DB denetimi (salt okunur kopya, `scratchpad/db_denetim.py`): integrity ok; yetim/geçersiz etki 0; hatalı haber 0;
+  tutarsız/çift fiyat 0; işlem günlüğü ve hazır fırsat seviye sırası tutarlı; gönderilemeyen takip bildirimi 0.
+- Teknik göstergeler 40 likit hissede bağımsız pandas hesabıyla karşılaştırıldı (`scratchpad/teknik_bagimsiz.py`):
+  RSI, ATR, MACD hist, ADX/±DI, SMA50/200, Bollinger, destek/direnç → en büyük fark 0,0000.
+- Uçtan uca kopyada akşam → sabah → açılış → sonuç ölçümü → Telegram metni (`scratchpad/e2e_sabah.py`): YZ çağrısı 0.
+- **Bulunan hatalar ve düzeltmeler:**
+  1. **Hafta sonu kaçırılan akşam analizi atlanıyordu** (en önemlisi): kural "ertesi gün 09:30'dan sonra seans
+     başlamıştır" diyordu; Cumartesi/Pazar/tatilde seans yok. Sonuç: 11–13 Kasım akşamları Halley kapalıyken evren
+     fiyatları 10.11'de kaldı (761 hissenin yalnız 28'i güncel — onlar da işlem günlüğü güncellemesinden) ve Pazartesi
+     hazır listesi oluşmadı. Artık seans başlamadıysa (aynı akşam, ertesi işlem günü 09:30 öncesi, hafta sonu/tatil)
+     yapılır. Testler eklendi.
+  2. 4. aşamada haftalık rapor bloğu akşam/sabah `if–elif` zincirinin ortasına girmişti → ayrı bloğa alındı.
+  3. Açılış azami girişin üstündeyse kayıt "iptal" (sabah iptali) sayılıyordu → "girissiz" (giriş olmadı); Performans
+     sayıları doğru kutuya düşer.
+  4. Fiyatlar eskiyken panel uyarmıyordu → Dashboard, Fırsatlar ve Bekçi'de "Hisse fiyatları güncel değil" uyarısı
+     (son kapanmış günün fiyatı olmayan hisse oranı > %30 ise).
+- 498 test OK, ağ 0.

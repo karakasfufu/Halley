@@ -1875,6 +1875,25 @@ def page_head(title: str, sub: str = "") -> None:
                 unsafe_allow_html=True)
 
 
+def price_freshness_warning() -> None:
+    """2026-11-15 denetim: akşam analizi günlerce çalışmayınca evren fiyatları eski kalıyordu ve panel bunu söylemiyordu.
+    Son kapanmış işlem günü fiyatı olmayan hisse oranı %30'u aşarsa uyarı (teknik tarama/yalnız teknik eski fiyatla)."""
+    last_ = tracker.last_closed_day(datetime.now(config.TR_TZ))
+    if not last_:
+        return
+    tot, ok_ = conn.execute("SELECT COUNT(*), SUM(m>=?) FROM (SELECT MAX(date) m FROM prices GROUP BY ticker)",
+                            (last_.isoformat(),)).fetchone()
+    if not tot or (ok_ or 0) >= 0.7 * tot:
+        return
+    common = conn.execute("SELECT m FROM (SELECT MAX(date) m FROM prices GROUP BY ticker) GROUP BY m "
+                          "ORDER BY COUNT(*) DESC LIMIT 1").fetchone()[0]
+    st.warning(f"⚠️ **Hisse fiyatları güncel değil:** {tot} hisseden {tot - (ok_ or 0)} tanesinin son fiyatı "
+               f"{common[8:10]}.{common[5:7]} tarihli; son işlem günü {last_.strftime('%d.%m')}. Akşam analizi o günlerde "
+               "çalışmamış (Halley kapalıydı). Teknik tarama, yalnız teknik fırsatlar ve grafikler eski fiyatla hesaplanıyor. "
+               "Düzeltmek için: 🛡️ Bekçi → **🌙 Akşam analizi** (yapay zekâ kullanmaz, ücretsiz). Halley açıksa bekçi bunu "
+               "seans başlamadan kendisi de yapar.")
+
+
 def regime_strip() -> None:
     _pd_key = conn.execute("SELECT MAX(date) FROM prices WHERE ticker='XU100'").fetchone()[0]
     if st.session_state.get("_regime_key") != _pd_key:      # fiyat günü değişince yeniden hesapla (her çizimde değil)
@@ -1916,6 +1935,7 @@ def page_dashboard() -> None:
         with col_.container(key=key_):
             st.metric(label_, val_)
             st.caption(note_)
+    price_freshness_warning()
     regime_strip()
     c1, c2 = st.columns([3, 2])
     with c1.container(border=True, key="d_ready"):
@@ -1994,6 +2014,7 @@ def page_dashboard() -> None:
 
 def page_firsatlar() -> None:
     page_head(PAGE_FIRSAT, "Önce hazır fırsatlar (koşulu sağlanmış), altında koşul bekleyen senaryolar. Ayrıntı için 🔍 Analiz.")
+    price_freshness_warning()
     ready_section()
     section_title("⏳", "Bekleyen Fırsatlar", note="henüz giriş koşulu oluşmamış senaryolar (destek/direnç teyidi bekleyen)")
     opportunity_check_box()
@@ -2208,6 +2229,7 @@ def page_takip() -> None:
 
 def page_bekci() -> None:
     page_head(PAGE_BEKCI, "Sabah/akşam analizi, takip bekçisinin olayları ve rapor arşivi.")
+    price_freshness_warning()
     with st.container(border=True, key="watch"):
         watch_box()
         hs = ready.load_state()

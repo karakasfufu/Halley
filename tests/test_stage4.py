@@ -143,9 +143,24 @@ class Weekly(Base):
 
     def test_weekly_not_lost_when_friday_evening_missed(self):
         """Denetim: Cuma akşamı Halley kapalıydı; Cumartesi açılınca akşam analizi yapılmaz ama haftalık üretilir."""
-        calls = []
-        ready.tick(self.conn, at("2026-11-14", 12, 0), run_fn=lambda k: "x", weekly_fn=lambda d: calls.append(d))
+        calls, runs = [], []
+        out = ready.tick(self.conn, at("2026-11-14", 12, 0), run_fn=lambda k: runs.append(k) or "x",
+                         weekly_fn=lambda d: calls.append(d))
         self.assertEqual(calls, [date(2026, 11, 13)])
+        # 2026-11-15 denetim: hafta sonu seans yok → kaçırılan Cuma akşam analizi yapılır (Pazartesi listesi + fiyatlar)
+        self.assertEqual(runs, ["aksam"])
+        self.assertNotIn("aksam_atlandi", out)
+
+    def test_missed_evening_skipped_only_when_new_session_started(self):
+        runs = []
+        run = lambda k: runs.append(k) or "x"
+        out = ready.tick(self.conn, at("2026-11-12", 11, 0), run_fn=run, weekly_fn=lambda d: None)  # Perşembe seans içi
+        self.assertEqual(runs, [])
+        self.assertIn("aksam_atlandi", out)
+        ready.tick(self.conn, at("2026-11-12", 18, 30), run_fn=run, weekly_fn=lambda d: None)        # akşam: çalışır
+        self.assertEqual(runs, ["aksam"])
+        ready.tick(self.conn, at("2026-11-13", 9, 0), run_fn=run, weekly_fn=lambda d: None)          # sabah kontrolü
+        self.assertEqual(runs, ["aksam", "sabah"])
 
 
 if __name__ == "__main__":

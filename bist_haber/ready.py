@@ -478,8 +478,12 @@ def opening_check(conn, quotes: Dict[str, Dict], now: Optional[datetime] = None)
             continue
         conn.execute("UPDATE hazir_firsat SET acilis=?, guncellendi=? WHERE id=?", (q["acilis"], _iso(now), r["id"]))
         if q["acilis"] > r["azami_giris"]:
-            _cancel(conn, r["id"], f"açılış {q['acilis']:.2f} TL, azami girişin ({r['azami_giris']:.2f}) üstünde — "
-                                   "eski fiyattan alım önerilmez", now)
+            # 2026-11-15 denetim: bu "giriş olmadı"dır, sabah iptali değil (Performans'ta yanlış kutuya düşüyordu);
+            # evaluate_all ile aynı durum ('girissiz') ve sonuç kaydı.
+            conn.execute("UPDATE hazir_firsat SET durum='girissiz', iptal_nedeni=?, sonuc_json=?, guncellendi=? WHERE id=?",
+                         (f"açılış {q['acilis']:.2f} TL, azami girişin ({r['azami_giris']:.2f}) üstünde — eski fiyattan "
+                          "alım önerilmez", json.dumps({"sonuc": "açılış azami girişin üstünde", "acilis": q["acilis"]},
+                                                       ensure_ascii=False), _iso(now), r["id"]))
             out["iptal"].append((r["ticker"], q["acilis"], r["azami_giris"]))
         else:
             out["uygun"].append((r["ticker"], q["acilis"], r["azami_giris"]))
@@ -655,16 +659,24 @@ def tick(conn, now: Optional[datetime] = None, run_fn: Optional[Callable] = None
     run = run_fn or (lambda kind: watchdog.run_auto(conn, kind, now))
     last = tracker.last_closed_day(now)
     if last and last.isoformat() > st.get("aksam_gunu", ""):
-        # Kaçırılan akşam analizi yalnız ertesi sabah 09:30'a kadar yapılır; seans başladıysa gün içi YARIM fiyatla
-        # "akşam" listesi üretilmez (o günün listesini sabah kontrolü yönetir).
-        if (last == today or now.time() < _time(9, 30)) and not done(last.isoformat(), "aksam"):
+        # Kaçırılan akşam analizi, yeni seans BAŞLAMADIYSA yapılır: aynı akşam, ertesi işlem günü 09:30'dan önce, ya da
+        # hafta sonu/tatil (seans yok, son kapanış kesin). Seans başladıysa gün içi YARIM fiyatla "akşam" listesi
+        # üretilmez (o günün listesini sabah kontrolü yönetir). 2026-11-15 denetim: önceden hafta sonu açılışta da
+        # "seans başladı" sanılıp atlanıyordu → Cuma akşamı kaçırılınca Pazartesi listesi ve evren fiyatları hiç
+        # güncellenmiyordu.
+        session_started = trading and last != today and now.time() >= _time(9, 30)
+        if not session_started and not done(last.isoformat(), "aksam"):
             out["aksam"] = run("aksam")
-        elif last != today and now.time() >= _time(9, 30):
+        elif session_started:
             out["aksam_atlandi"] = "seans başladı; kaçırılan akşam analizi yapılmadı"
         st["aksam_gunu"] = last.isoformat()
-    # 2026-11-14 Aşama 4: haftanın son işlem gününün akşam turu işlendiyse haftalık rapor (bir kez, YZ yok).
-    # Denetim düzeltmesi: kaçırılan akşam analizi ertesi sabah yapılınca rapor o günün tarihini alır; bu yüzden arşiv
-    # adına değil "akşam turu işlendi" bilgisine (aksam_gunu) bakılır — Cuma akşamı Halley kapalıysa da üretilir.
+    elif trading and _time(8, 30) <= now.time() <= _time(9, 55) and st.get("sabah_gunu") != today.isoformat():
+        if not done(today.isoformat(), "sabah"):
+            out["sabah"] = run("sabah")
+        st["sabah_gunu"] = today.isoformat()
+    # 2026-11-14 Aşama 4: haftanın son işlem gününün akşam turu işlendiyse haftalık rapor (bir kez, YZ yok). Arşiv
+    # adına değil "akşam turu işlendi" bilgisine (aksam_gunu) bakılır. (2026-11-15 denetim: bu blok yanlışlıkla
+    # akşam/sabah if–elif zincirinin ortasına girmişti; ayrı bloğa alındı.)
     from . import weekly
     if (last and last == weekly.last_trading_day_of_week(last) and st.get("aksam_gunu") == last.isoformat()
             and not done(last.isoformat(), "haftalik") and st.get("haftalik_gunu") != last.isoformat()):
@@ -672,10 +684,6 @@ def tick(conn, now: Optional[datetime] = None, run_fn: Optional[Callable] = None
             out["haftalik"] = (weekly_fn or (lambda d: weekly.run(conn, d, send=send)))(last)
         finally:
             st["haftalik_gunu"] = last.isoformat()
-    elif trading and _time(8, 30) <= now.time() <= _time(9, 55) and st.get("sabah_gunu") != today.isoformat():
-        if not done(today.isoformat(), "sabah"):
-            out["sabah"] = run("sabah")
-        st["sabah_gunu"] = today.isoformat()
     if trading and _time(10, 5) <= now.time() <= _time(17, 30) and st.get("acilis_gunu") != today.isoformat():
         rows = rows_for(conn, today.isoformat(), ["aday", "onaylandi"])
         if rows:

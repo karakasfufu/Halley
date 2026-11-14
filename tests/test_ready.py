@@ -155,7 +155,11 @@ class LifecycleTests(Base):
         q = {"AAA": {"zaman": at(D1, 10, 0), "acilis": 101.0}}
         o = ready.opening_check(self.conn, q, at(D1, 10, 15))
         self.assertEqual([x[0] for x in o["iptal"]], ["AAA"])
-        self.assertIn("eski fiyattan alım önerilmez", next(r for r in ready.rows_for(self.conn, D1) if r["ticker"] == "AAA")["iptal_nedeni"])
+        aaa = next(r for r in ready.rows_for(self.conn, D1) if r["ticker"] == "AAA")
+        self.assertIn("eski fiyattan alım önerilmez", aaa["iptal_nedeni"])
+        self.assertEqual(aaa["durum"], "girissiz")                       # 2026-11-15: sabah iptali sayılmaz
+        pf = ready.performance(self.conn)
+        self.assertEqual((pf["girissiz"], pf["sabah_iptal"]), (1, 1))     # BBB olumsuz haberle sabah iptali
 
     def test_results_measured_from_open(self):
         ready.evening(self.conn, self.ctx, [row("AAA"), row("BBB")], at(D0, 19))
