@@ -228,6 +228,18 @@ class PanelFlowTests(unittest.TestCase):
         self.assertTrue(opts and all("haftalık rapor" in o for o in opts), opts)
         self.assertTrue(any("Haftalık rapor" in m.value for m in at.markdown))
 
+    def test_stage5_chart_and_cone_on_stock_page(self):
+        """2026-11-15 Aşama 5: Hisse Analizi'nde grafik çizilir, koni açıklaması ve dönem/koni seçimi çalışır."""
+        at = self.app("🔍 Hisse Analizi")
+        self.assertEqual(len(at.exception), 0, str(at.exception))
+        caps = " ".join(c.value for c in at.caption)
+        self.assertIn("yön tahmini değildir", caps)
+        self.assertTrue(at.get("arrow_vega_lite_chart"), "grafik çizilmedi")
+        k = next(r.key for r in at.radio if (r.key or "").startswith("ch_h_"))
+        at.radio(key=k).set_value(20).run()
+        self.assertEqual(len(at.exception), 0, str(at.exception))
+        self.assertTrue(any("20 işlem günü sonra" in c.value for c in at.caption))
+
     def test_ai_usage_tab_shows_recorded_calls(self):
         from bist_haber import ai_service
         ai_service.record("haber_analizi", "tam_analiz", "kap:9", "gpt-5-mini", 2000, 800, db_path=config.DB_PATH)

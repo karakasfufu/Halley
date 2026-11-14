@@ -17,7 +17,7 @@ import streamlit as st
 from bist_haber import (analyzer, calendar_sync, config, corp_events, db, earnings, entries, journal, kap_history,
                         kap_worker, macro_calendar, pipeline, report, signals, technical, timeline, tradeplan,
                         trends, watchdog, ai_comment, sectors, transfer, notify, takip_ui, tracker, firsat_log, ready, ai_service,
-                        weekly)
+                        weekly, chart)
 from bist_haber.textutil import tr_fold  # noqa: E402
 
 st.set_page_config(page_title="Halley", page_icon="☄️", layout="wide", initial_sidebar_state="collapsed")
@@ -546,6 +546,39 @@ def _n(v, fmt="{:.2f}"):
     return "—" if v is None else fmt.format(v)
 
 
+CHART_PERIODS = {"3 ay": 63, "6 ay": 126, "1 yıl": 250}
+
+
+def chart_block(tk: str, t=None, scenario_: dict = None, ready_row: dict = None, key: str = "") -> None:
+    """2026-11-15 Aşama 5: mum grafiği + hacim + EMA + plan seviyeleri + olası fiyat aralığı konisi (YZ yok)."""
+    k = key or tk
+    c1, c2, c3 = st.columns([1.6, 1.6, 3], vertical_alignment="center")
+    per = c1.radio("Dönem", list(CHART_PERIODS), index=1, horizontal=True, key=f"ch_p_{k}")
+    hor = c2.radio("Koni (işlem günü)", [5, 10, 20], index=1, horizontal=True, key=f"ch_h_{k}")
+    df = chart.history(conn, tk, CHART_PERIODS[per])
+    if df.empty or len(df) < 5:
+        st.caption("📈 Grafik için yeterli fiyat geçmişi yok.")
+        return
+    sigma = chart.daily_vol(chart.history(conn, tk, chart.VOL_DAYS + 5))
+    cdf = chart.cone(float(df["close"].iloc[-1]), df["date"].iloc[-1].date(), sigma, int(hor))
+    best = None
+    if not ready_row and scenario_:
+        g = scenario_.get("girisler") or scenario_
+        best = next((x for x in g.get("senaryolar", []) if x["tur"] == g.get("en_uygun")), None)
+    lv = chart.plan_levels(t, best, ready_row)
+    fig = chart.figure(df, cdf, lv)
+    if fig is not None:
+        st.altair_chart(fig, use_container_width=True, theme="streamlit")
+    src = ("hazır fırsat planı" if ready_row else f"en uygun giriş senaryosu ({best['ad']})" if best else
+           "plan yok; yalnız destek/direnç")
+    c3.caption(f"Seviyeler: {src}. Mavi koni = olası fiyat aralığı (koyu %50, açık %80).")
+    st.caption("📈 " + chart.cone_text(chart.cone_summary(cdf), lv)
+               + " Koni **yön tahmini değildir**: yükseliş ya da düşüş varsaymaz, yalnız hissenin kendi geçmiş "
+               "oynaklığından hesaplanır (olağandışı haber/olayda aralık aşılabilir). Mumlar: yeşil yükselen, kırmızı "
+               "düşen gün; çizgiler EMA 20/50/200; kesikli yatay çizgiler giriş, SL, TP1, TP2 ve 20 günlük destek/"
+               "direnç" + ("; gri bant giriş aralığı (üst kenar azami giriş)." if ready_row else "."))
+
+
 def technical_block(t) -> None:
     st.markdown("**📊 Teknik görünüm** <span class='news-meta'>(fiyat verisinden hesaplanır; haber skoruna katılmaz)</span>",
                 unsafe_allow_html=True)
@@ -787,6 +820,8 @@ def stock_details(r: dict) -> None:
     st.caption(f"Haber skoru {r['score']:+.2f} · son 1 gün {pct(r['chg_1d'])} · son 5 gün {pct(r['chg_5d'])} · "
                f"{r['news_count']} haber. Haber skoru: haberlerin yönü, etkisi ve güveninden hesaplanır, haber eskidikçe "
                "azalır (+1,50 ve üstü olumlu sinyal, −1,50 ve altı olumsuz). Emir vermeden önce haberin kendisini okuyun.")
+    rr_ = next((x for x in READY_ACTIVE if x["ticker"] == r["ticker"]), None)
+    chart_block(r["ticker"], tech(r["ticker"]), scenario(r), rr_, key=f"sd_{r['ticker']}")
     scenario_block(scenario(r))
     technical_block(tech(r["ticker"]))
     # D (2026-11-09): sektörüyle birlikte mi, ayrışıyor mu? (KAP sektör listesi; yalnız bilgi)
@@ -877,6 +912,8 @@ def generic_details(ticker: str) -> None:
     st.caption("Bu hissede son günlerde olumlu/olumsuz haber kaydı yok: aşağıdaki giriş senaryoları yalnız fiyat "
                "verisinden hesaplandı (haber skoru şartı aranmadı). Takibe alırsanız bekçi bu senaryoları izler.")
     why = tracker.scenario_guard(t)
+    rr_ = next((x for x in READY_ACTIVE if x["ticker"] == ticker), None)
+    chart_block(ticker, t, None if why or not t else entries.scenarios(t), rr_, key=f"gd_{ticker}")
     if why:
         st.warning(why)
     elif t:
@@ -1004,6 +1041,8 @@ def ready_card(r: dict) -> None:
         if not teknik_:
             st.caption(news_line(tk))
         st.caption("Neden: " + r["neden"])
+        with st.expander("📈 Grafik ve olası fiyat aralığı"):
+            chart_block(tk, tech(tk), None, r, key=f"rc_{r['id']}")
 
 
 def ready_when_text() -> str:

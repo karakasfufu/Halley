@@ -1613,3 +1613,14 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Uyum kontrolü: ön eleme/yalnız teknik/haftalık rapor YZ çağırmaz (Aşama 1 ilkesi); YZ çağıran tek yol hâlâ merkezi
   servis (test_every_ai_entry_point_uses_the_service); ön eleme tekrar ayıklamadan önce çalışır; elle seçimde ön eleme
   yok. 492 test OK, ağ 0.
+
+## 2026-11-15 — Aşama 5/8: profesyonel grafik + olası fiyat aralığı konisi (YZ'siz)
+- Yeni `bist_haber/chart.py`: `history` (OHLCV + EMA 20/50/200; technical.ema ile aynı yöntem — testte birebir),
+  `daily_vol` (60 günlük log-getiri std), `cone` (drift 0, √t, %50/%80; tatiller market_calendar ile atlanır),
+  `cone_summary/cone_text` (TP1/SL koni içinde mi; giriş fiyattan >%1,5 uzaksa yalnız girişin aralıkta olup olmadığı —
+  SL/TP yorumu girişten sonra anlamlı), `plan_levels` (hazır plan > en uygun senaryo; destek/direnç), `figure`
+  (Altair: mum + EMA + seviye çizgileri ve çakışmayan etiketler + azami giriş bandı + koni; altında hacim).
+- Panel: `chart_block` Hisse Analizi'nde (haberli ve haber kaydı olmayan hisseler) ve hazır fırsat kartında
+  ("📈 Grafik ve olası fiyat aralığı" açılır bölümü). Dönem 3/6/12 ay, koni 5/10/20 işlem günü.
+- Koni bir tahmin modeli DEĞİL (yön yok); Aşama 6–7 modelleri onaylanırsa yanına eklenecek.
+- Testler: tests/test_chart.py (4) + panel (1). 497 test OK, ağ 0. Canlıda görsel kontrol yapıldı.

@@ -170,6 +170,18 @@ tavsiyesi değildir.
 - **📰 Haber özeti ve etkisi:** her haberli hazır fırsat kartında son yönlü haberin özeti, yönü, etkisi ve güveni yazar
   (kayıtlı analizden; yapay zekâ çağrılmaz).
 
+## 📈 Grafik ve olası fiyat aralığı (🔍 Hisse Analizi, hazır fırsat kartları)
+
+- **Mum grafiği:** her mum bir işlem günü (yeşil yükselen, kırmızı düşen); altında hacim. Çizgiler EMA 20/50/200.
+  Fareyi mumun üstüne getirince açılış, en yüksek, en düşük, kapanış ve hacim yazar. Dönem: 3 ay / 6 ay / 1 yıl.
+- **Kesikli yatay çizgiler:** giriş, zarar durdur (SL), TP1, TP2 ve 20 günlük destek/direnç. Hazır fırsatta gri bant
+  giriş aralığıdır; üst kenarı **azami giriş** (üstünde almayın). Hazır fırsat yoksa en uygun giriş senaryosunun
+  seviyeleri çizilir.
+- **Mavi koni = olası fiyat aralığı:** hissenin son 60 günlük oynaklığı sürerse 5 / 10 / 20 işlem günü sonra fiyatın
+  %50 (koyu) ve %80 (açık) ihtimalle bulunabileceği aralık. **Yön tahmini değildir**: yükseliş ya da düşüş varsaymaz;
+  olağandışı haberde aralık aşılabilir. Altındaki yazı TP1 ve SL'nin bu aralığın içinde mi dışında mı kaldığını söyler
+  (giriş henüz gerçekleşmediyse girişin aralıkta olup olmadığını). Yapay zekâ kullanılmaz.
+
 ## 📅 Haftalık rapor
 
 - Haftanın son işlem gününün akşam analizinden sonra bekçi kendiliğinden oluşturur (Telegram açıksa kısa özeti gelir);
