@@ -257,6 +257,7 @@ class NewsTests(Base):
 
     def setUp(self):
         super().setUp()
+        pipeline.save_settings(takip_haber_analizi=True)    # bu testler kullanıcı düğmeyi AÇMIŞ gibi çalışır
         self.now = at(D1, 11)
         self.conn.execute("UPDATE watchlist SET eklendi=? WHERE ticker='TST'", (tracker._iso(self.now - timedelta(days=1)),))
         self.news("kap:1", "TST", self.now - timedelta(hours=1))             # takip sonrası, metni yok
@@ -302,6 +303,15 @@ class NewsTests(Base):
         self.assertIn("Olumlu önemli haber (etki 4/5", msg["mesaj"])
         self.assertEqual(self.run_check()["olay"], 0)                       # ikinci tur: tekrar yok, yeniden analiz yok
         self.assertEqual(len(self.analyzed), 1)
+
+    def test_watcher_does_not_call_ai_by_default(self):
+        # 2026-11-14 (kullanıcı isteği): bekçi kullanıcı açmadıkça yapay zekâ çağırmaz; metin yine okunur (ücretsiz)
+        import json as _j
+        pipeline.SETTINGS_FILE.write_text(_j.dumps({}), encoding="utf-8")
+        res = self.run_check()
+        self.assertEqual(self.analyzed, [])
+        self.assertEqual(self.bodies, [1])
+        self.assertIsNone(res["analiz"])
 
     def test_old_or_weak_news_not_alerted_and_switch_off(self):
         for nid, when, mag in (("kap:9", self.now - timedelta(days=2), 5), ("kap:8", self.now - timedelta(hours=2), 2)):

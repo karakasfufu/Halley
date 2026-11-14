@@ -1370,12 +1370,12 @@ def settings_panel() -> None:
     if notify.configured() and tk_on != bool(saved.get("takip_bildirim", True)):
         pipeline.save_settings(takip_bildirim=tk_on)
     # Aşama 4 (kullanıcı onayı 2026-11-09): takip listesindeki hisselerin yeni KAP haberleri bütçe içinde otomatik analiz
-    th_on = st.toggle("📰 Takip listemdeki hisselerin yeni KAP haberlerini otomatik analiz et ve önemliyse bildir",
-                      key="tk_news_on", value=bool(saved.get("takip_haber_analizi", True)),
+    th_on = st.toggle("📰 Takip listemdeki hisselerin yeni KAP haberlerini bekçi otomatik analiz etsin (varsayılan kapalı)",
+                      key="tk_news_on", value=bool(saved.get("takip_haber_analizi", False)),
                       help="Bekçi işlem günlerinde 30 dakikada bir KAP listesine bakar; YALNIZ takip ettiğiniz hisselerin "
                            "yeni bildirimlerini okur ve yapay zekâyla analiz eder (haber başına ~0,013 \\$; aylık haber "
                            "analizi bütçesini aşmaz). Etkisi 3/5 ve üzeri olumlu/olumsuz haberler bildirilir.")
-    if th_on != bool(saved.get("takip_haber_analizi", True)):
+    if th_on != bool(saved.get("takip_haber_analizi", False)):
         pipeline.save_settings(takip_haber_analizi=th_on)
     hz_tg = st.toggle("✅ Hazır fırsatların açılış kontrolünü Telegram'a gönder (açılış azami girişin üstündeyse uyarı)",
                       key="hz_tg_on", value=bool(saved.get("hazir_bildirim", True)), disabled=not notify.configured())

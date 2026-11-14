@@ -517,7 +517,8 @@ def news_check(conn, now: Optional[datetime] = None, collect_fn: Optional[Callab
             conn.execute("UPDATE news SET body=? WHERE id=?", (body, r["id"]))
             conn.commit()
             out["metin"] += 1
-    if settings.get("takip_haber_analizi", True) and pipeline.has_api_key():
+    # 2026-11-14 (kullanıcı isteği: bekçi YZ kullanmadan çalışsın): varsayılan KAPALI, kullanıcı açarsa çalışır
+    if settings.get("takip_haber_analizi", False) and pipeline.has_api_key():
         todo = [r for r in _watch_rows(conn, tickers, "AND status='new' AND body IS NOT NULL AND TRIM(body)!='' "
                                                        "AND published_at>=?", (since,))]
         if todo:

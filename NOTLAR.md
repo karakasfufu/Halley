@@ -1497,3 +1497,13 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   girişli kayıtlı öneri yok (yalnız ertesi gün açılışı; gün içi anlık hesap kaydedilmez), açılış fiyatı açılıştan önce
   bilinemez (kontrol 10:05'ten sonra), sabah kötü haber kontrolü YZ düğmesi kapalıyken yalnız önceden analiz edilmiş
   haberleri görür (kullanıcı kararı).
+
+## 2026-11-14 — Aşama 1/8 (YZ maliyet optimizasyonu ve sadeleştirme planı, kullanıcı onayı)
+- MIMARI_RAPOR.md: çalışma akışı, bütün YZ çağrıları (10 yer; dosya, tetikleyen işlem, sıklık, gerekli mi, Python'a
+  taşınır mı, önbellek), Kasım gerçek kullanımı (148 tam analiz ≈ 2,28 $, RSS ön eleme 7 çağrı ≈ 0 $, rapor yorumu 0),
+  korunacaklar, 8 aşamalı plan. Bulgu: harcamanın neredeyse tamamı tam analiz → en büyük tasarruf gereksiz KAP
+  bildirimlerinin tam analize gönderilmemesi (Aşama 3 odağı) ve içerik özeti (Aşama 2).
+- Bekçinin kendiliğinden YZ haber analizi (tracker.news_check, takip_haber_analizi) varsayılan KAPALI (önceden açık).
+  KAP listesi/metin okuma (ücretsiz) ve analiz edilmiş haberden önemli haber bildirimi sürer. Ayarlar düğmesi
+  "bekçi otomatik analiz etsin (varsayılan kapalı)". Test: varsayılan kapalıyken YZ çağrılmaz, metin okunur.
+- 466 test geçti, ağ denemesi 0.
