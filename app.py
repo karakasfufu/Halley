@@ -1087,7 +1087,7 @@ def ready_section() -> None:
             b3.caption("API anahtarı yok.")
         live = st.session_state.get("ready_live")
         if live:
-            st.markdown(f"**Anlık hesap ({live['zaman']}) — kaydedilmedi:** {len(live['secilen'])} hisse hazır görünüyor"
+            st.markdown(f"**Anlık hesap ({live['zaman']}) — kaydedilmedi:** {len(live['secilen'])} haberli hisse hazır görünüyor"
                         + (": " + ", ".join(p["ticker"] for p in live["secilen"]) if live["secilen"] else "."))
             both = live["secilen"] + live.get("teknik", [])
             if live.get("teknik"):
