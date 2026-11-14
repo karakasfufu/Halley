@@ -1650,3 +1650,6 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Kullanıcı: "grafik karanlık modda beyaz görünüyor" → grafik renkleri Streamlit temasına bırakılmıştı (Halley
   penceresinde açık temaya düşüyordu). `chart.figure(dark=...)`: saydam zemin, eksen/yazı/ızgara renkleri karanlık mod
   ayarından; `st.altair_chart(theme=None)`. X ekseninde tarih yazıları seyreltildi. Test eklendi; canlıda görüldü.
+- Canlıda doğrulama: durum kaydı sıfırlanınca (yedek: data/yedek/hazir_durum_20261115.json) bekçi kaçırılan Cuma akşam
+  analizini 01:02'de kendisi yaptı → 631 hissenin tamamı 13.11 fiyatlı (önce 28), Pazartesi (16.11) için 2 yalnız
+  teknik hazır fırsat (BAHKM kırılım r/g 1:3,1, ENERY kırılım r/g 1:2), haberli 0; YZ çağrısı 0; rapor 2026-11-15_aksam.
