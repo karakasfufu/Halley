@@ -141,6 +141,12 @@ class Weekly(Base):
         ready.tick(self.conn, at("2026-11-12", 18, 30), run_fn=runs, weekly_fn=wk)   # perşembe: haftalık yok
         self.assertEqual(calls, [])
 
+    def test_weekly_not_lost_when_friday_evening_missed(self):
+        """Denetim: Cuma akşamı Halley kapalıydı; Cumartesi açılınca akşam analizi yapılmaz ama haftalık üretilir."""
+        calls = []
+        ready.tick(self.conn, at("2026-11-14", 12, 0), run_fn=lambda k: "x", weekly_fn=lambda d: calls.append(d))
+        self.assertEqual(calls, [date(2026, 11, 13)])
+
 
 if __name__ == "__main__":
     unittest.main()

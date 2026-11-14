@@ -662,9 +662,12 @@ def tick(conn, now: Optional[datetime] = None, run_fn: Optional[Callable] = None
         elif last != today and now.time() >= _time(9, 30):
             out["aksam_atlandi"] = "seans başladı; kaçırılan akşam analizi yapılmadı"
         st["aksam_gunu"] = last.isoformat()
-    # 2026-11-14 Aşama 4: haftanın son işlem gününün akşam analizi yapıldıysa haftalık rapor (bir kez, YZ yok)
+    # 2026-11-14 Aşama 4: haftanın son işlem gününün akşam turu işlendiyse haftalık rapor (bir kez, YZ yok).
+    # Denetim düzeltmesi: kaçırılan akşam analizi ertesi sabah yapılınca rapor o günün tarihini alır; bu yüzden arşiv
+    # adına değil "akşam turu işlendi" bilgisine (aksam_gunu) bakılır — Cuma akşamı Halley kapalıysa da üretilir.
     from . import weekly
-    if last and last == weekly.last_trading_day_of_week(last) and done(last.isoformat(), "aksam")             and not done(last.isoformat(), "haftalik") and st.get("haftalik_gunu") != last.isoformat():
+    if (last and last == weekly.last_trading_day_of_week(last) and st.get("aksam_gunu") == last.isoformat()
+            and not done(last.isoformat(), "haftalik") and st.get("haftalik_gunu") != last.isoformat()):
         try:
             out["haftalik"] = (weekly_fn or (lambda d: weekly.run(conn, d, send=send)))(last)
         finally:

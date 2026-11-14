@@ -1594,3 +1594,22 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   kurulumun üstüne sessiz güncelleme → 3 veri dosyası birebir korundu, yedek klasörü oluştu, sürüm 5952225, sağlık
   testi 8507 tamam, --kapat sonrası süreç kalmadı. Defender taraması temiz. GitHub sürümü v2026.11.09 güncellendi
   ("Halley 2026-11-14 (güncel: 5952225)"); Masaüstü ve dagitim/ kopyaları yenilendi.
+
+## 2026-11-14 — Aşama 3–4 denetimi ve 1–2 ile uyum (kullanıcı: "3 ile 4'ü kontrol et, sonra 1 ve 2 ile düzgün çalışıyorlar mı")
+- Kod incelemesi + canlı DB kopyasında uçtan uca deneme (`scratchpad/e2e_asama1_4.py`, ağ yok, sahte istemci):
+  analyze → ön eleme (20 rutin) → tekrar ayıklama → bütçe → merkezi kayıt (ai_calls) doğru; bekçi akşam analizi
+  (run_session ai=False, 35 sn, YZ çağrısı engellenmişken) **0 YZ çağrısı**, hazır + yalnız teknik (ENERY) kaydı, rapor
+  bölümleri; sabah kontrolü onayladı; haftalık rapor + tick.
+- Bulunan ve düzeltilen:
+  1. Haftalık rapor yalnız arşivde "o günün akşam raporu" varsa üretiliyordu → Cuma akşamı Halley kapalıysa (akşam
+     analizi ertesi gün yapılmaz/başka tarih alır) haftalık hiç oluşmuyordu. Artık `aksam_gunu` (akşam turu işlendi)
+     bilgisine bakılıyor. Test eklendi.
+  2. Bir yama betiği (heredoc) koşul satırını tek satıra birleştirmişti (çalışıyordu, okunaksızdı) → düzeltildi.
+  3. Panelden elle haftalık rapor Telegram'a da gönderiyordu (her tıkta mesaj) → elle üretimde gönderilmez.
+  4. Dashboard "Hazır fırsat" kutusu haberli/teknik ayrımını göstermiyordu → "koşulu sağlanmış (haberli N · 📐 yalnız
+     teknik M)".
+  5. Aşama 2 ekranı Aşama 3 tasarrufunu göstermiyordu → 🤖 Yapay zekâ kullanımı'nda "bu ay YZ'ye gönderilmeyen rutin +
+     tekrar haber ≈ X $" satırı (tahmini, ortalama tam analiz maliyetiyle).
+- Uyum kontrolü: ön eleme/yalnız teknik/haftalık rapor YZ çağırmaz (Aşama 1 ilkesi); YZ çağıran tek yol hâlâ merkezi
+  servis (test_every_ai_entry_point_uses_the_service); ön eleme tekrar ayıklamadan önce çalışır; elle seçimde ön eleme
+  yok. 492 test OK, ağ 0.

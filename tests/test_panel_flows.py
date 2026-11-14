@@ -3,7 +3,7 @@ import math
 import os
 import tempfile
 import unittest
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -148,7 +148,7 @@ class PanelFlowTests(unittest.TestCase):
         """2026-11-09: fırsatlardaki risk (senaryo) ile analizdeki risk (şimdi alım) karışıyordu; İşlem Günlüğü anlaşılmıyordu."""
         at = self.app()
         caps = " ".join(c.value for c in at.caption)
-        for t in ("haber skoru +1,50 ve üstü", "koşulu sağlanmış · bekleyen senaryo", "son haber analizinin saati"):
+        for t in ("haber skoru +1,50 ve üstü", "koşulu sağlanmış (haberli 0 · 📐 yalnız teknik 0) · bekleyen senaryo", "son haber analizinin saati"):
             self.assertIn(t, caps)
         self.go(at, "🔍 Hisse Analizi")
         labels = [m.label for m in at.metric]
@@ -231,7 +231,15 @@ class PanelFlowTests(unittest.TestCase):
     def test_ai_usage_tab_shows_recorded_calls(self):
         from bist_haber import ai_service
         ai_service.record("haber_analizi", "tam_analiz", "kap:9", "gpt-5-mini", 2000, 800, db_path=config.DB_PATH)
+        c = db.connect()          # Aşama 3 ön elemesinin atladığı bir haber: tasarruf satırı görünmeli
+        now_ = datetime.now(config.TR_TZ).isoformat(timespec="seconds")
+        c.execute("INSERT INTO news(id,source,published_at,effective_date,title,body,candidates,status,note,fetched_at) "
+                  "VALUES('kap:77','kap',?,?,'İzahname','metin','POS','skipped','Python ön eleme: rutin KAP konusu',?)",
+                  (now_, now_[:10], now_))
+        c.commit()
+        c.close()
         at = self.app("⚙️ Ayarlar")
+        self.assertTrue(any("1 rutin haber (Python ön eleme)" in c_.value for c_ in at.caption))
         self.assertTrue(any(t.label == "🤖 Yapay zekâ kullanımı" for t in at.tabs))
         self.assertTrue(any(m.label == "Bu ay" and m.value == "1 çağrı" for m in at.metric))
         self.assertTrue(any("Haber analizi" in d.value.to_string() and "tam analiz" in d.value.to_string()

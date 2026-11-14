@@ -1790,12 +1790,12 @@ def reports_panel() -> None:
     if w1.button("📅 Bu haftanın raporunu şimdi oluştur", key="rep_weekly", width="stretch",
                  help="Haftanın piyasası, hazır fırsatlar (haberli / yalnız teknik), kapanan işlemler, takip olayları ve "
                       "yapay zekâ maliyeti. Yalnız kayıtlı veriden, yapay zekâ KULLANILMAZ (ücretsiz)."):
-        name = weekly.run(conn)
+        name = weekly.run(conn, send=lambda _t: None)     # elle üretimde Telegram gönderilmez (tekrar mesaj olmasın)
         flash("success", f"Haftalık rapor oluşturuldu: {name}. Aşağıdaki listede «Haftalık» türünden açabilirsiniz.")
         conn.close()
         st.rerun()
     w2.caption("Haftalık rapor, haftanın son işlem gününün akşam analizinden sonra bekçi tarafından kendiliğinden de "
-               "oluşturulur (Telegram açıksa kısa özeti gelir).")
+               "oluşturulur (Telegram açıksa kısa özeti o zaman gelir; bu düğme Telegram'a göndermez).")
     names = watchdog.list_reports()
     if not names:
         st.info("Henüz bekçi raporu yok. Yukarıdaki **🌅 Sabah analizi** ya da **🌙 Akşam analizi** düğmesiyle ilk raporu "
@@ -1871,7 +1871,8 @@ def page_dashboard() -> None:
             (m1, "kpi_pos", "Olumlu haber", f"{len(positives)} hisse", f"son {window} günde haber skoru +1,50 ve üstü"),
             (m2, "kpi_neg", "Olumsuz haber", f"{len(negatives)} hisse", f"son {window} günde haber skoru −1,50 ve altı"),
             (k3, "kpi_opp", "Hazır fırsat", f"{len(READY_ACTIVE)} hisse",
-             f"koşulu sağlanmış · bekleyen senaryo: {len(SUMMARY['uygun'])}"),
+             f"koşulu sağlanmış (haberli {len(READY_NEWS)} · 📐 yalnız teknik {len(READY_TECH)}) · bekleyen senaryo: "
+             f"{len(SUMMARY['uygun'])}"),
             (m3, "kpi_upd", "Son güncelleme", last_update_text(), "son haber analizinin saati")):
         with col_.container(key=key_):
             st.metric(label_, val_)
@@ -2339,6 +2340,17 @@ def ai_usage_panel() -> None:
     k[2].metric("Haber analizi bütçesi (ay)", f"{news_budget:.2f} $", f"kalan ≈ {max(0.0, news_budget - news_spent):.3f} $",
                 delta_color="off")
     k[3].metric("Bu ay hata / tekrar", f"{u['ay']['hata']} / {u['ay']['tekrar']}")
+    # 2026-11-14 denetim: Aşama 3 ön eleme ve Aşama 2 tekrar ayıklamanın bu ay kazandırdığı (tahmini)
+    ay_ = datetime.now(config.TR_TZ).strftime("%Y-%m")
+    n_rut = conn.execute("SELECT COUNT(*) FROM news WHERE status='skipped' AND note LIKE 'Python ön eleme:%' "
+                         "AND substr(fetched_at,1,7)=?", (ay_,)).fetchone()[0]
+    n_dup = conn.execute("SELECT COUNT(*) FROM news WHERE status='duplicate' AND substr(fetched_at,1,7)=?",
+                         (ay_,)).fetchone()[0]
+    avg_ = conn.execute("SELECT AVG(usd) FROM ai_calls WHERE islem='tam_analiz' AND durum='ok'").fetchone()[0] or 0.0154
+    if n_rut or n_dup:
+        st.caption(f"💰 Bu ay yapay zekâya hiç gönderilmeyen: {n_rut} rutin haber (Python ön eleme) + {n_dup} tekrar haber "
+                   f"→ hepsi analiz edilseydi ≈ {(n_rut + n_dup) * avg_:.2f} $ tutardı (tahmini; haber başına ≈ "
+                   f"{avg_:.4f} $). Elle analiz sınırı olduğu için gerçek tasarruf bundan az olabilir.")
     st.caption(f"Bu ay token: girdi {u['ay']['girdi']:,} · çıktı {u['ay']['cikti']:,}".replace(",", ".")
                + (f" · kayıt başlamadan önceki haber analizleri: {u['oncesi']['cagri']} çağrı ≈ {u['oncesi']['usd']:.2f} $"
                   if u["oncesi"]["cagri"] else ""))
