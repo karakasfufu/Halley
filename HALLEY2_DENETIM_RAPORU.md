@@ -1212,3 +1212,135 @@ Kurallar:
 - testler.
 
 Seçim kuralları, eşikler ve yapay zekâ kullanımı değişmez. Tahmini süre 2,5 gün.
+
+---
+
+# EK C (16.11.2026) — FAZ 1 teknik kesinleştirmeler (kabul kriterlerine eklendi)
+
+Kullanıcının istediği beş ayrıntı aşağıda kesinleştirildi. Bunlar B4'teki kabul ölçütlerine **eklenmiştir**.
+
+## C1. Dondurma: tahmin anında neler saklanır
+
+Tahmin satırı yazıldığı anda aşağıdakilerin hepsi o satıra kopyalanır. Satır bir daha değişmez; veritabanı
+tetikleyicileri güncellemeyi ve silmeyi reddeder. Sonraki analizler yalnız **yeni** satır ekleyebilir.
+
+| Grup | Alanlar | Kaynak (tahmin anında) |
+|---|---|---|
+| Model | `olasilik`, `bant`, `benzer_n`, `benzer_oran`, `model_surum`, `model_dosya` | `tp1_model.predict` / `band` / `similar`; etkin model dosyası |
+| Model girdileri | `girdi_json` (modelin 10 + haber girdisi) | `tp1_model.plan_features` ile aynı hesap |
+| Teknik göstergeler | `teknik_json`: son fiyat ve günü, trend, RSI, MACD histogramı, ADX ve ±DI, ATR ve ATR %, SMA50/200, EMA20/50/200, hacim oranı, OBV eğilimi, 20/60 gün göreli güç, 20 gün destek/direnç, işlem hacmi, teknik skor ve parçaları | `technical.analyze` (sinyal gününe kadarki 250 gün), `ready.tech_score` |
+| Piyasa rejimi | `rejim_json`: trend, oynaklık, genişlik, gün | `regime.regime(conn, signal_day)` |
+| Veri kalitesi | `veri_json`: veri uyarıları, veri kritik mi, gün sayısı, son fiyat günü | `technical.analyze` |
+| İşlem seviyeleri | `tur`, `giris`, `giris_alt`, `azami_giris`, `sl`, `tp1`, `tp2`, `rr1`, `gecerlilik_gun` (=1: yalnız giriş günü açılışı) | hazır fırsat planı |
+| Puanlar | `genel_puan`, `teknik_skor`, `haber_skoru`, `kaynak` (haber / teknik), `risk` | hazır fırsat planı |
+| Sürümler | `ozellik_surum`, `parametre_surum`, `kod_surum`, `kural_surum` | C2 |
+
+Teknik göstergeler ve model girdileri, olasılığın hesaplandığı **aynı** pencereden tek seferde alınır. Böylece
+saklanan olasılık ile saklanan girdiler birbiriyle tutarlıdır.
+
+## C2. Plan imzası: hangi alanlar, ne yeni tahmin sayılır
+
+**Plan imzası** (`plan_imzasi`) şu alanların SHA-256'sıdır. Sayılar 4 basamağa yuvarlanır.
+
+```
+ticker | signal_day | giris_gunu | tur | giris | azami_giris | sl | tp1 | tp2 | gecerlilik_gun
+| model_surum | ozellik_surum | parametre_surum
+```
+
+| Değişen şey | Sonuç | Gerekçe |
+|---|---|---|
+| Aynı plan yeniden hesaplandı: sayfa yenilendi, bekçi ikinci kez çalıştı, elle kontrol yapıldı | **Tekrar** → satır eklenmez (`INSERT OR IGNORE`) | Aynı karar, aynı model |
+| Tür, giriş, azami giriş, SL, TP1, TP2, giriş günü ya da sinyal günü değişti (ör. sabah kontrolü seviyeleri yeniledi) | **Yeni tahmin** → yeni satır; `onceki_tahmin_id` eskisini gösterir | Farklı işlem planı |
+| Model sürümü, özellik listesi ya da karar parametreleri değişti | **Yeni tahmin** | Farklı karar mekanizması; sonuçlar karışmasın (C4) |
+| Plan ve sürümler aynı, yalnız **olasılık** değişti (ör. sinyal gününe ait geç gelen bir haber girdiyi değiştirdi) | **Yeni tahmin değil.** İlk kayıt dondurulmuş hâliyle kalır; tekrar sayılır. | Tahmin, ilk yapıldığı andaki bilgidir. Sonradan gelen bilgi geçmiş tahmini değiştirmemeli. |
+| Plan aynı, yalnız **rejim** ya da **veri kalitesi** değişti | **Yeni tahmin değil**; ilk kayıt kalır | Bunlar sinyal gününe bağlı bağlamdır; plan aynıyken karar aynıdır |
+
+Her `kaydet` çağrısı sonucunu döndürür: `yeni`, `tekrar` ya da `hata`. Testler ve panel bu ayrımı kullanır.
+
+Sürüm parmak izleri:
+
+- **ozellik_surum:** etkin modelin girdi adları listesinin (lojistik girdileri + tablo anahtarları) SHA-256'sının
+  ilk 12 karakteri.
+- **parametre_surum:** karar sabitlerinin (`ready`: READY_GAP_ATR, MAX_ENTRY_ATR, MIN_RR_AT_MAX, MIN_TECH,
+  MIN_TECH_ONLY, MAX_PICKS; `tradeplan`: MIN_RR, MAX_STOP_PCT, ATR_STOP_MULT, LIQ_MIN_TL; haber eşiği 1,50) adı
+  ve değerinin parmak izi.
+- **kod_surum:** kurulu paketin `surum.txt` dosyası. Geliştirme klasöründe "gelistirme".
+- **kural_surum:** sonuçlandırma kuralının sürümü ("s1"; C3).
+
+## C3. Sonuçlandırma kuralları (kural sürümü "s1")
+
+Sonuç yalnız **tahmin satırındaki dondurulmuş seviyelerle**, sinyal gününden **sonraki** günlük mumlarla
+hesaplanır.
+
+1. **Geçerlilik.** Tahmin yalnız giriş günü açılışı için geçerlidir (`gecerlilik_gun = 1`).
+   - Giriş günü mumu yoksa ama sonraki günlerin mumu varsa (hisse o gün işlem görmedi) → `girissiz` ("giriş günü
+     işlem verisi yok").
+   - Henüz hiç mum yoksa tahmin açık kalır.
+2. **Giriş.**
+   - Giriş günü açılışı azami girişin üstündeyse → `girissiz`.
+   - Değilse giriş, giriş günü **açılış** fiyatından yapılır.
+3. **Çıkış.** Mevcut `journal.evaluate` aynen kullanılır; kod kopyalanmaz.
+   - **Giriş günü:** Gün içi sıra bilinmediği için yalnız SL kontrol edilir (düşük ≤ SL → SL). TP o gün sayılmaz.
+   - **Sonraki günler, sırayla:**
+     - (a) Açılış stopun altındaysa → açılış fiyatından çıkış.
+     - (b) Açılış TP1'in üstündeyse → yarısı açılıştan satılır; açılış TP2'nin de üstündeyse tamamı satılır.
+     - (c) Gün içi düşük ≤ stop → stop fiyatından çıkış.
+     - (d) Gün içi yüksek ≥ TP1 → yarısı TP1'den satılır, stop giriş fiyatına çekilir. TP2 aynı gün sayılmaz.
+     - (e) TP1'den sonra yüksek ≥ TP2 → kalan yarı TP2'den satılır.
+   - **Süre:** En fazla 30 işlem günü; sonra son kapanıştan "süre doldu".
+   - **Maliyet:** Komisyon ve kayma Ayarlar'dan alınır (varsayılan %0,20 + %0,10).
+4. **Aynı mumda TP ve SL.** (c) adımı (d)'den önce geldiği için **SL önceliklidir** (muhafazakâr). Ek olarak bir
+   mumda aynı aşamanın stopu ve hedefi birlikte görüldüyse sonuç satırına `ayni_gun_belirsiz = 1` ve
+   `belirsiz_gunler` (tarihler) yazılır. Aynı aşama demek:
+   - TP1'den önce: SL ve TP1,
+   - TP1'den sonra: giriş fiyatı (stop) ve TP2,
+   - giriş günü: SL ve TP1.
+5. **Sonuç alanları.**
+   - `tp1_goruldu`: yarı satış gerçekleşti mi.
+   - `sl_goruldu`: TP1'den önce tam SL.
+   - `cikis_nedeni`: TP2 / başabaş (TP1 sonrası) / SL / süre doldu.
+   - `islem_gunu`, `net_getiri_pct`, `r`.
+   - `mae_r` ve `mfe_r`: giriş mumundan çıkış mumuna kadar en düşük ve en yüksek fiyatın girişe uzaklığı, planlanan
+     risk (giriş − SL) cinsinden.
+6. **Diğer sonuç türleri.**
+   - `iptal`: hazır fırsat giriş gününden önce iptal edildi (sabah haber kontrolü ya da yeniden hesaplamada
+     düştü).
+   - `yerini_aldi`: aynı hisse ve giriş günü için açılıştan önce daha yeni bir tahmin var.
+   - `gec_kayit`: tahmin, giriş günü 09:55'ten sonra kaydedildi.
+
+   Bu üç tür hiçbir isabet ya da getiri hesabına girmez.
+7. **Açık tahmin.** Sonuç satırı olmayan tahmin açıktır ve yalnız "açık" sayısında görünür.
+
+## C4. Filtreleme: model sürümleri karıştırılmaz
+
+- Canlı performans özeti **her zaman tek bir model sürümü** için hesaplanır. Panelde model sürümü seçilir;
+  varsayılan en son sürümdür. "Tümü" seçeneği yoktur; farklı sürümler yan yana ayrı satırlarda gösterilir.
+- Ek filtreler:
+  - kaynak (haberli / yalnız teknik),
+  - senaryo türü,
+  - analiz (akşam / sabah),
+  - bant,
+  - belirsiz mumları dahil et / hariç tut.
+- Aynı model sürümünde özellik ya da parametre sürümü farklı olan tahminler varsa bu panelde açıkça uyarılır ve
+  ayrı satırda gösterilir.
+
+## C5. Veritabanı: yedek, göç ve geri dönüşün gerçek kopyada sınanması
+
+- Göç `db.connect` içinde yalnız `tahmin` tablosu yoksa çalışır.
+- Kullanıcı verisi varsa önce tutarlı bir yedek alınır: `<veri klasörü>/yedek/<dosya>_<zaman>_tahmin_defteri_oncesi.db`.
+  Kullanıcı verisi demek: `news`, `hazir_firsat`, `trade_journal` ya da `watchlist` tablolarından birinde satır
+  olması.
+- Yedekte `PRAGMA integrity_check` sonucu `ok` değilse göç **yapılmaz**. Halley bugünkü gibi çalışmaya devam eder,
+  defter kapalı kalır.
+- Tablolar tek işlemde (transaction) oluşturulur.
+- **Gerçek kopya sınaması (FAZ 1 kabulü):** Canlı veritabanının tutarlı bir kopyası test klasörüne alınır. Sırayla
+  şunlar denenir:
+  1. Göç öncesi bütün tabloların satır sayısı ve içerik özeti alınır.
+  2. Yeni kodla açılır: yedek dosyası, integrity_check ve iki tablo oluşmalı.
+  3. Mevcut tabloların sayıları ve özetleri **birebir aynı** kalmalı.
+  4. Tahmin yazılır; güncelleme ve silme reddedilmeli.
+  5. Eski kodla (FAZ 1 öncesi commit) açılır, sorunsuz çalışmalı.
+  6. Tablolar silinir (geri dönüş 2. seviye); mevcut veriler aynı kalmalı.
+  7. Yedek geri konur (3. seviye); göç öncesi özetlerle birebir aynı olmalı.
+
+  **Canlı veritabanına göç yapılmaz.** FAZ 1 kodu canlı klasöre ancak ayrı onayla konur.
