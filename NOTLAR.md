@@ -1698,3 +1698,8 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   sırayla. KAP her ~80 istekte 5 dk sınır uyguluyor (bekleme süresi düşürülmedi) → ~8–9 saat.
 - Kurlar (USDTRY/EURTRY 5 yıl, Yahoo) araştırma DB'sinde `kur`.
 - `metin_model.py`: E2 / +kurallı / +öğrenen kelime / ikisi; metni eksik planlar çıkarılır. Sonuç indirme bitince.
+- Canlı tek çağrı: `tp1_model.plan_probability(conn, plan)` / `plan_features()` — eğitimle aynı 250 günlük pencere
+  (hisse + endeks) ve haber girdileri; canlı hazır fırsat kayıtlarında salt okunur denendi: BAHKM %32,6 (orta),
+  ENERY %37,3 (yüksek) = elle hesapla birebir. Test: PlanProbability. Panele bağlı DEĞİL.
+- Ara bakış (metinlerin %11'i, 732 plan; kesin değil): kurallı okuma "olumlu" → TP1 %38,7 / +0,40 R (n=124);
+  nötr %26,7 / +0,06 R; "olumsuz" %25,9 / −0,11 R. Metinsiz planlar %29,3. Tam veriyle sınanacak.

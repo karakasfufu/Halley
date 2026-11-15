@@ -7,7 +7,7 @@ import unittest
 from datetime import date, timedelta
 from pathlib import Path
 
-from bist_haber import ready, technical, tp1_model
+from bist_haber import db, ready, technical, tp1_model
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -56,6 +56,32 @@ class Features(unittest.TestCase):
         self.assertTrue(0 < tp1_model.predict(f2, m) < 1)
         self.assertGreater(m["egitim"]["hisse"], 100)
         self.assertIsNone(tp1_model.load("yok.json"))
+
+
+class PlanProbability(unittest.TestCase):
+    def test_live_db_plan_uses_same_window_and_news(self):
+        b, x = bars(320), bars(320, seed=100)
+        with tempfile.TemporaryDirectory() as tmp:
+            conn = db.connect(Path(tmp) / "t.db")
+            for tk, rows in (("AAA", b), ("XU100", x)):
+                conn.executemany("INSERT INTO prices(ticker,date,open,high,low,close,volume) VALUES(?,?,?,?,?,?,?)",
+                                 [(tk, r["date"], r["open"], r["high"], r["low"], r["close"], r["volume"]) for r in rows])
+            day = b[-1]["date"]
+            conn.execute("INSERT INTO news(id,source,published_at,effective_date,title,subject,candidates,status,fetched_at) "
+                         "VALUES('kap:1','kap',?,?,'t','Yeni İş İlişkisi','AAA','new',?)", (day + "T10:00:00+03:00", day, day))
+            conn.commit()
+            t = technical.analyze(b[-250:], date.fromisoformat(day), x[-250:])
+            e = t["son_fiyat"]
+            plan = {"ticker": "AAA", "signal_day": day, "tur": "geri_cekilme", "giris": e, "sl": e - 2 * t["atr"],
+                    "tp1": e + 4 * t["atr"], "rr1": 2.0, "risk": "düşük"}
+            want = tp1_model.predict(tp1_model.features(t, plan, ready.tech_score(t), "düşük",
+                                                        tp1_model.market_features(x[-250:])))
+            res = tp1_model.plan_probability(conn, plan)
+            self.assertAlmostEqual(res["olasilik"], want, places=12)      # canlı = eğitimdeki hesap
+            f = tp1_model.plan_features(conn, plan)
+            self.assertEqual((f["h_is"], f["h_var"]), (1.0, 1.0))
+            self.assertIsNone(tp1_model.plan_probability(conn, dict(plan, signal_day="2020-01-02")))
+            conn.close()
 
 
 class NewsFeatures(unittest.TestCase):

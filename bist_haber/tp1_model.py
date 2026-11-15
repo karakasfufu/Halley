@@ -183,3 +183,38 @@ def band(p: Optional[float], m: Optional[Dict] = None) -> Optional[str]:
         return None
     lo, hi = m["bantlar"]
     return "düşük" if p < lo else ("yüksek" if p >= hi else "orta")
+
+
+# ---------------------------------------------------------------- canlı: kayıtlı bir plan için tek çağrı
+def _window(conn, ticker: str, upto: str) -> List[dict]:
+    rows = conn.execute("SELECT date, open, high, low, close, volume FROM prices WHERE ticker=? AND date<=? "
+                        "ORDER BY date DESC LIMIT ?", (ticker, upto, WIN)).fetchall()
+    return [dict(zip(("date", "open", "high", "low", "close", "volume"), tuple(r))) for r in reversed(rows)]
+
+
+def plan_features(conn, plan: Dict) -> Optional[Dict[str, Optional[float]]]:
+    """plan: hazır fırsat (ticker, signal_day, tur, giris, sl, tp1, rr1, risk). Eğitimle AYNI pencere (son 250 gün,
+    endeks de 250 gün) ve aynı fonksiyonlar. Haber girdileri de eklenir (tp1_v1 kullanmaz; sonraki sürümler için).
+    Fiyat geçmişi yetersizse None."""
+    from . import ready
+    day = plan["signal_day"]
+    bars = _window(conn, plan["ticker"], day)
+    if not bars or bars[-1]["date"] != day:
+        return None
+    bench = _window(conn, technical.BENCHMARK, day)
+    t = technical.analyze(bars, date.fromisoformat(day), bench or None)
+    if not t or not t.get("atr"):
+        return None
+    f = features(t, plan, ready.tech_score(t), plan.get("risk") or "orta", market_features(bench))
+    f.update(news_features(news_items(conn, plan["ticker"], day), day))
+    return f
+
+
+def plan_probability(conn, plan: Dict, m: Optional[Dict] = None) -> Optional[Dict]:
+    """{"olasilik", "bant", "benzer": {"n", "gercek"}, "surum"} — yalnız bilgi; hesaplanamazsa None."""
+    m = m or load()
+    f = plan_features(conn, plan) if m else None
+    if not f:
+        return None
+    p = predict(f, m)
+    return {"olasilik": p, "bant": band(p, m), "benzer": similar(f, m), "surum": m.get("surum")}
