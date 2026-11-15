@@ -1721,3 +1721,9 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   tamam, tp1_model + modeller/tp1_v1.json pakette, Defender temiz; GitHub v2026.11.09 "Halley 2026-11-15 (güncel:
   1e5dab8)"; Masaüstü ve dagitim/ kopyaları yenilendi.
 - metin_indir.py: istek arası 6 sn (KAP sınırına takılmasın, canlı okuyucuya yer kalsın) + hafta içi 08:00–19:00 durur.
+
+## 2026-11-15 — Aşama 7 planı (onay bekliyor): ASAMA7_PLAN.md
+- Adaylar: Kronos-small (finans mumları, olası fiyat yolları; 24,7 M), Chronos-Bolt-small (Apache-2.0, 48 M),
+  TTM-r2 (Apache-2.0, ~0,8 M). Python 3.9 kısıtı: PyTorch 2.9+ ve chronos-forecasting 2.x Python ≥3.10 ister →
+  ayrı araştırma ortamı (Python 3.9, PyTorch 2.8 CPU, chronos-forecasting 1.5.3; requires_python >=3.9 doğrulandı).
+  Halley'e/pakete eklenmez. İndirme ~0,7 GB, disk ~2 GB, YZ 0 $. Taban çizgisi tp1_v1.

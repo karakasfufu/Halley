@@ -82,5 +82,5 @@ performans, raporlar, Telegram, veri aktarma, kurulum/güncelleme, arayüz (9 ek
 | 4 | Genel fırsat puanı, haber özeti/etkisi, "yalnız teknik" fırsatlar, haftalık rapor | ✅ (14.11; puan yalnız bilgi, kurallar sınanmadı) |
 | 5 | Profesyonel grafik + olası fiyat aralığı konisi | ✅ (15.11; koni oynaklıktan, yön tahmini değil) |
 | 6 | Kendi tahmin modelimiz (TP1'e SL'den önce ulaşma olasılığı) | 🔬 başlangıç modeli tp1_v1 eğitildi (bist_haber/modeller); panele bağlı değil (ASAMA6_RAPOR.md) |
-| 7 | Hazır zaman serisi modeli (Kronos / Chronos-Bolt / TinyTimeMixer) — BIST ince ayarı, isteğe bağlı paket | |
+| 7 | Hazır zaman serisi modeli (Kronos / Chronos-Bolt / TinyTimeMixer) — BIST ince ayarı, isteğe bağlı paket | 📝 plan yazıldı, onay bekliyor (ASAMA7_PLAN.md) |
 | 8 | 6 ve 7 işe yararsa birleştirme | |
