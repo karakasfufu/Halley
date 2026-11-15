@@ -1834,3 +1834,10 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   "Güncellemeyi şimdi kontrol et" → 🔄 Güncelle → sıra 2318, "guncellendi", veri korundu. Yeni sürümde her oturum
   açılışında son_kontrol yenileniyor (23:32:03 → 23:32:14). Not: 2200 sürümündeki bir kurulum yeni sürümü en geç
   ~20 saatte kendiliğinden görür (o sürümün kuralı); müşteride henüz 2200 kurulu değil.
+
+## 2026-11-15 — Haber metni sınaması (Python, yapay zekâsız): katkı yok
+- İndirme bitti: 5.649 metnin 5.647'si. metin_model.py: son 12 ay E2 0,605 · R 0,602 · W 0,604 · RW 0,601; 2024 E2 0,612
+  · R 0,610 · W 0,606 · RW 0,607. Fark aralıkları sıfır/altı; Brier iyileşmedi; en yüksek %20 R'si düşmedi-yükselmedi
+  (0,166 → 0,159–0,161). Kelime modeli gürültü öğrendi. Kural tablosu: olumsuz %26,6 / nötr %28,2 / olumlu %31,2 (ara
+  bakıştaki %39 tekrar etmedi). Karar: E3 yok, tp1_v1 kalır. ASAMA6_RAPOR Ek 4, MIMARI aşama 6 satırı güncellendi.
+- Sınır: yapay zekâ haber puanıyla karşılaştırma yapılamadı (geçmişte puan yok); canlı kayıtlarla ölçülecek.

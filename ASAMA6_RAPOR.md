@@ -251,3 +251,38 @@ Kullanıcı kararı: "Yalnız 1. aşama" (yapay zekâ skoru yok).
   - Kurallı okuma ve kelimelerden öğrenen model hazır.
   - Ara bakış (metinlerin %11'i): "olumlu" okunan metinlerde TP1 oranı %39, diğerlerinde %26–27. Kesin değil; sonuç
     tam veriyle eklenecek.
+
+# Ek 4 (15.11.2026): haber metni sınaması — sonuç: katkı yok
+
+**Soru:** KAP Özel Durum metinlerini Python'la (yapay zekâsız) okumak, TP1'in SL'den önce gelip gelmeyeceğini teknik
+modelden (E2 = tp1_v1) daha iyi tahmin ettiriyor mu?
+
+**Veri:** 5.649 metnin 5.647'si indirildi. Sınama: son 12 ay (7.988 plan; 1.253'ünün 5 günlük penceresinde metin var)
+ve 2024 (8.049 plan; 1.208'i metinli). Her dönem, kendinden önceki verilerle eğitildi (45 gün ambargo).
+
+| Model | Son 12 ay AUC | 2024 AUC | Metinli planlarda (son 12 ay / 2024) | En yüksek %20'nin R'si (son 12 ay) |
+|---|---|---|---|---|
+| E2 (yalnız teknik) | **0,605** | **0,612** | 0,601 / 0,613 | **+0,166** |
+| R: + kurallı metin okuma | 0,602 | 0,610 | 0,600 / 0,607 | +0,161 |
+| W: + kelimelerden öğrenen | 0,604 | 0,606 | 0,601 / 0,594 | +0,159 |
+| RW: ikisi | 0,601 | 0,607 | 0,599 / 0,600 | +0,160 |
+
+- Hiçbir metin eklentisi E2'yi geçmedi. Fark aralıkları sıfırda ya da altında (ör. W, 2024 metinli: [−0,034; −0,003]).
+  Olasılık doğruluğu (Brier) da iyileşmedi.
+- Kelimelerden öğrenen model anlamlı sözcük bulamadı: en ağırlıklı kelimeler "şirketi, üyesi, sayılı, kararı, nin"
+  gibi kalıp ifadeler (gürültü).
+- Kurallı okumanın basit tablosu (tüm metinli planlar): olumsuz okunan %26,6 · nötr %28,2 · olumlu **%31,2**. Yön doğru
+  ama küçük; ara bakıştaki %39 tam veride tekrar etmedi.
+- Metinli planların TP1 oranı son 12 ayda metinsizlerden yüksek (%29,6 / %24,9), ama bu fark teknik girdilerde zaten
+  yakalanıyor (m_var eklemek de katkı vermedi).
+
+**Karar:** E3 yapılmadı; canlı model tp1_v1 olarak kalır. Kurallı metin okuma bu haliyle seçim ya da olasılık için
+kullanılmaz.
+
+**Sınır (dürüst not):** Bu sınama "Python'un okuması TP1'i tahmin ediyor mu?" sorusunu cevaplar; "Python, yapay
+zekânın haber puanının yerini tutar mı?" sorusunu cevaplamaz. 5 yıllık geçmiş için yapay zekâ puanı olmadığından
+ikisi karşılaştırılamadı. Bugüne kadarki bulgular (KAP konu başlıkları, genel puan AUC 0,49, metin okuma) haber
+bilgisinin TP1 tahminine ölçülebilir katkı vermediğini gösteriyor. Yapay zekâ puanının katkısı ancak canlı kayıtlar
+biriktikçe (gizli kayıt ve Performans) ölçülebilir.
+
+Tekrar üretmek: `python arastirma/asama6/metin_model.py <repo> <arastirma_5y.db> etiket3.csv sonuc.json`.
