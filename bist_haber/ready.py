@@ -327,6 +327,27 @@ def model_info(conn, p: Dict, now: datetime) -> Optional[str]:
                       ensure_ascii=False)
 
 
+def fill_missing_model(conn, now: Optional[datetime] = None) -> int:
+    """2026-11-15 (müşteri denemesi): model kaydı olmadan oluşmuş AÇIK hazır fırsatlara (ör. güncellemeden önceki akşam
+    listesi) olasılığı sonradan ekler; "sonradan": true işaretlenir. Hesap yalnız sinyal gününe kadarki veriyle yapılır
+    (geleceği görme yok). Kapanmış kayıtlara dokunmaz. Eklenen kayıt sayısını döndürür; hata öneriyi etkilemez."""
+    now = now or _now()
+    n = 0
+    for r in conn.execute("SELECT * FROM hazir_firsat WHERE model_json IS NULL AND "
+                          "durum IN ('aday','onaylandi','giris')").fetchall():
+        p = dict(r)
+        mj = model_info(conn, p, now)
+        if not mj:
+            continue
+        m = json.loads(mj)
+        m["sonradan"] = True
+        conn.execute("UPDATE hazir_firsat SET model_json=? WHERE id=?", (json.dumps(m, ensure_ascii=False), p["id"]))
+        n += 1
+    if n:
+        conn.commit()
+    return n
+
+
 def _store(conn, p: Dict, analiz: str, giris_gunu: str, durum: str, now: datetime) -> None:
     conn.execute(
         "INSERT INTO hazir_firsat(olusturuldu,analiz,signal_day,giris_gunu,ticker,tur,kapanis,giris,giris_alt,azami_giris,"

@@ -95,6 +95,16 @@ class PlanProbability(unittest.TestCase):
                 ready._store(conn, dict(full, ticker="BBB"), "aksam", "2026-11-17", "aday", now)
             mj = json.loads(conn.execute("SELECT model_json FROM hazir_firsat WHERE ticker='BBB'").fetchone()[0])
             self.assertIn("bozuk", mj["hata"])
+            # müşteri denemesi: model kaydı olmadan oluşmuş AÇIK kayda olasılık sonradan eklenir (kapanmışa dokunulmaz)
+            conn.execute("UPDATE hazir_firsat SET model_json=NULL WHERE ticker='AAA'")
+            ready._store(conn, dict(full, ticker="CCC"), "aksam", "2026-11-17", "aday", now)
+            conn.execute("UPDATE hazir_firsat SET model_json=NULL, durum='kapandi' WHERE ticker='CCC'")
+            self.assertEqual(ready.fill_missing_model(conn, now), 1)
+            mj = json.loads(conn.execute("SELECT model_json FROM hazir_firsat WHERE ticker='AAA'").fetchone()[0])
+            self.assertEqual((mj["olasilik"], mj["sonradan"]), (round(want, 4), True))
+            self.assertIsNone(conn.execute("SELECT model_json FROM hazir_firsat WHERE ticker='CCC'").fetchone()[0])
+            self.assertEqual(ready.fill_missing_model(conn, now), 0)                 # ikinci çağrı bir şey yapmaz
+            conn.execute("DELETE FROM hazir_firsat WHERE ticker='CCC'")
             # canlı doğrulama: kapanan önerilerde tahmin ↔ gerçek
             chk = tp1_model.live_check(conn)
             self.assertEqual(chk["kapanan"], 0)

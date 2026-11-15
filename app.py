@@ -985,6 +985,12 @@ def _opp_why(tk: str) -> str:
 firsat_log.record([tk for tk, _, _ in SUMMARY["uygun"]], _opp_why)
 
 # 2026-11-10 Hazır Fırsatlar: akşam/sabah analizinde kaydedilen planlar (bist_haber/ready.py)
+if not st.session_state.get("_model_doldur"):     # 2026-11-15: güncellemeden önceki açık fırsatlara model olasılığı
+    st.session_state["_model_doldur"] = True
+    try:
+        ready.fill_missing_model(conn)
+    except Exception:  # gösterim yardımcısı; panel açılışını asla engellemesin
+        pass
 READY_ROWS = ready.current(conn)
 READY_ACTIVE = [r for r in READY_ROWS if r["durum"] in ("aday", "onaylandi", "giris")]
 READY_NEWS = [r for r in READY_ACTIVE if r["kaynak"] != "teknik"]      # 2026-11-14 Aşama 4

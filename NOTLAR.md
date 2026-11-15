@@ -1772,3 +1772,10 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   ENERY %37,3 yüksek (sinyal günü 13.11; hesap yalnız o güne kadarki veriyle → geleceği görme yok).
 - Panel kontrolü (tarayıcı): Ayarlar'da anahtar görünüyor (kapalı), genel puanın yeni notu Pano'da görünüyor.
   Anahtarı açmak kullanıcıya bırakıldı. Kod değişmedi.
+
+## 2026-11-15 — Müşteri denemesi: açık fırsatlara olasılık kendiliğinden + kurulum dosyası yenilendi
+- Sorun: müşterideki sürümde (1e5dab8) kart anahtarı yok; güncellemeden önce oluşmuş açık fırsatlarda model kaydı da
+  olmayabilir → anahtarı açsa bile satır görmezdi.
+- `ready.fill_missing_model(conn)`: model_json'u boş AÇIK (aday/onaylandi/giris) kayıtlara olasılık ekler,
+  "sonradan": true; kapanmış kayıtlara dokunmaz. Panel her oturumda bir kez çağırır (hata paneli engellemez).
+  Test: test_tp1_model (açık kayda eklenir, kapanmışa eklenmez, ikinci çağrı 0). 510 test OK.
