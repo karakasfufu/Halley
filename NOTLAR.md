@@ -1711,3 +1711,9 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Test: PlanProbability (kayıt + hata durumu). Kopyada akşam→sabah: BAHKM 0,3265 orta, ENERY 0,3728 yüksek yazıldı.
 - Canlı DB yedeği: data/yedek/bist_haber_20261115_gizli_kayit_oncesi.db. Mevcut 2 kayıt Pazartesi sabah analizinde
   dolacak. Ölçüm: birkaç hafta sonra kapanan önerilerde olasılık ↔ gerçek sonuç.
+
+## 2026-11-15 — Hata düzeltmesi: hacmi 0 olan hisse likidite engeline takılmıyordu
+- `technical.analyze`: hacim bilgisi var ama 21 gündür hep 0 ise `islem_hacmi_tl = 0` (önce None = "ölçülemedi" →
+  `scenario_guard` likidite engeli çalışmıyordu; Aşama 6 araştırmasında stop ~%0 planlar böyle çıktı). Hacim bilgisi hiç
+  olmayan seriler (pilot) None kalır. Eşik değişmedi (2 mn TL).
+- Canlıda etkilenen: DUNYH, ISATR, UMPAS → "Likidite çok düşük; senaryo üretilmedi". Test: tests/test_zero_volume.py.

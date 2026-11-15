@@ -277,7 +277,11 @@ def analyze(bars: List[dict], today: Optional[date] = None, bench: Optional[List
     has_volume = all(b.get("volume") is not None for b in bars[-21:]) and any(b.get("volume") for b in bars[-21:])
     obv = obv_series(bars[-21:]) if has_volume else None
     obv_trend = None if not obv else ("artıyor" if obv[-1] > 0 else ("azalıyor" if obv[-1] < 0 else "yatay"))
-    turnover = sum(b["close"] * b["volume"] for b in bars[-20:]) / 20 if has_volume else None
+    # 2026-11-15 düzeltme: hacim bilgisi VAR ama 21 gündür hep 0 ise (işlem görmeyen hisse: DUNYH, ISATR, UMPAS) işlem hacmi
+    # "ölçülemedi" (None) değil 0'dır → likidite engeli çalışır. Hacim bilgisi hiç olmayan seriler (pilot) None kalır.
+    vol_known = all(b.get("volume") is not None for b in bars[-21:])
+    turnover = (sum(b["close"] * b["volume"] for b in bars[-20:]) / 20 if has_volume
+                else 0.0 if vol_known else None)
     rs20, rs60 = relative_strength(bars, bench, 20), relative_strength(bars, bench, 60)
     perf20 = _pct(last, closes[-21]) if len(closes) >= 21 else None
     if ax and ax[0] < 20:
