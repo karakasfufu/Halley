@@ -1824,3 +1824,7 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Özel depodaki v2026.11.09 sürümüne de aynı kurulum dosyası konuldu (başlık "güncel: 0dae4a7").
 - Yeni sürüm yayımlama adımı (bundan sonra): build_package.py --guncelleme-paketi → surum.json'a not → gh release
   create v<sıra> -R karakasfufu/Halley-guncelleme (zip + surum.json + kurulum dosyası).
+
+## 2026-11-15 — Güncelleme kontrolü her açılışta (kullanıcı: "her açılışta güncelleme var mı diye kontrol etsin")
+- update_banner artık `guncelleme.kontrol(zorla=True)` (her panel oturumu başında); ağ zaman aşımı 6 → 4 sn; ağ
+  hatasında son bilinen bilgiyle devam. Ayarlar metni ve KULLANIM.md "🔄 Güncelleme" bölümü eklendi. 522 test OK.

@@ -403,11 +403,12 @@ def update_apply(m: dict) -> None:
 
 
 def update_banner() -> None:
-    """2026-11-15: yeni sürüm varsa üstte bant (günde en fazla bir kez kontrol; ağ hatası paneli engellemez)."""
+    """2026-11-15: yeni sürüm varsa üstte bant. Panel her açıldığında kontrol edilir (kullanıcı isteği); ağ hatası
+    paneli engellemez (en fazla ~4 sn, sonra son bilinen bilgiyle devam)."""
     from bist_haber import guncelleme
     if "_upd" not in st.session_state:
         try:
-            st.session_state["_upd"] = guncelleme.kontrol()
+            st.session_state["_upd"] = guncelleme.kontrol(zorla=True)
         except Exception:
             st.session_state["_upd"] = {"durum": "hata"}
         son = guncelleme.son_islem()
@@ -2584,7 +2585,7 @@ def update_panel() -> None:
                     st.error(f"Geri dönülemedi: {nice_err(e)}")
         else:
             c2.caption("Geri dönülecek önceki sürüm yok (henüz uygulama içinden güncelleme yapılmadı).")
-        st.caption("Halley yeni sürümü günde bir kez kendiliğinden kontrol eder. Güncellemede yalnız uygulama kodu iner; "
+        st.caption("Halley her açılışta yeni sürüm olup olmadığını kendiliğinden kontrol eder. Güncellemede yalnız uygulama kodu iner; "
                    "verileriniz (veritabanı, ayarlar, raporlar) ve API anahtarınız değişmez.")
 
 

@@ -254,6 +254,16 @@ fırsat sayısı. **Ücretsizdir**, yapay zekâ kullanmaz, emir vermez.
 - Bot anahtarı yalnız bu bilgisayarda (.env) durur; **veri aktarma dosyasına girmez**. Yeni bilgisayarda aynı anahtarı
   yeniden girip alıcıları bulun (aynı botu iki bilgisayar da kullanabilir).
 
+## 🔄 Güncelleme
+- Halley **her açılışta** yeni sürüm olup olmadığını kendiliğinden kontrol eder (internet yoksa birkaç saniye bekleyip
+  geçer). Yeni sürüm varsa üstte **🆕 Yeni Halley sürümü var** bandı ve **🔄 Güncelle** düğmesi çıkar.
+- **Güncelle**'ye basınca yalnız uygulama kodu iner (birkaç yüz KB); Halley kapanıp yeni sürümle açılır. Verileriniz,
+  ayarlarınız ve API anahtarınız değişmez.
+- Sorun çıkarsa: ⚙️ Ayarlar → 💾 Veri ve gelişmiş → 🔄 Güncelleme → **↩️ Önceki sürüme dön**. Yeni sürüm hiç açılmazsa
+  Halley önceki sürüme kendiliğinden döner.
+- Nadiren bir sürüm tam kurulum ister; o zaman bant, kurulum dosyasının bağlantısını gösterir
+  (https://github.com/karakasfufu/Halley-guncelleme/releases).
+
 ## Başka bilgisayara taşımak (⚙️ Ayarlar → 💾 Veri ve gelişmiş)
 
 1. **Eski bilgisayarda:** **📦 Veri dosyasını hazırla** → **⬇️ Veri dosyasını indir**. `halley_veri_….zip` dosyası

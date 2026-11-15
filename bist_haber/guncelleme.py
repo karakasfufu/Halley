@@ -1,7 +1,8 @@
 """Uygulama içinden güncelleme (2026-11-15, kullanıcı: "uygulamanın güncel sürümünü takip edecek bir versiyon").
 
 Akış (yalnız kurulum dosyasıyla kurulmuş Halley'de; geliştirme klasöründe kapalı):
-  1. kontrol(): herkese açık güncelleme deposundaki surum.json okunur (günde en fazla bir kez kendiliğinden).
+  1. kontrol(): herkese açık güncelleme deposundaki surum.json okunur (panel her açıldığında; kullanıcı isteği 15.11).
+     İnternet yoksa son okunan bilgiyle devam edilir; panel açılışı en fazla ~4 sn bekler.
   2. hazirla(): güncelleme paketi (yalnız uygulama kodu, derlenmiş) indirilir, SHA-256 doğrulanır, <kök>\\guncelleme\\yeni
      klasörüne açılır, gömülü Python ile içe aktarma denemesi yapılır; <kök>\\guncelleme\\hazir.json yazılır.
   3. yeniden_baslat(): Halley.exe --yeniden-baslat. Dosya değişimini Halley.exe yapar (hiçbir şey çalışmazken): eski kod
@@ -117,7 +118,7 @@ def kontrol(zorla: bool = False, now: Optional[datetime] = None, getter: Callabl
         try:
             if getter is None:
                 import requests
-                getter = lambda u: requests.get(u, timeout=6, headers={"User-Agent": "Halley-guncelleme"})
+                getter = lambda u: requests.get(u, timeout=4, headers={"User-Agent": "Halley-guncelleme"})
             r = getter(SURUM_URL)
             r.raise_for_status()
             m = r.json()
