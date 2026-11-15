@@ -1,0 +1,126 @@
+# Aşama 6 araştırma raporu: "TP1, SL'den önce gelir mi?" (15.11.2026)
+
+**Kısa sonuç:** Modeller zayıf ama gerçek bir ayırt etme gücü gösterdi. Söyledikleri **yüzdeler güvenilir değil** ve
+faydaları dönemden döneme değişti. Plandaki kurala göre (**taban çizgisini açıkça geçemeyen model devreye alınmaz**)
+modeli panele **olasılık yüzdesi olarak eklemiyorum.** Panelde hiçbir şey değişmedi. Seçim ve eşikler aynı.
+
+## Ne yapıldı
+- **Veri:**
+  - 632 hissenin 5 yıllık günlük fiyatı (15.11.2021–13.11.2026) ayrı bir dosyaya indirildi
+    (`data/backtest/arastirma_5y.db`, GitHub'a yüklenmez).
+  - Canlı veritabanı yalnızca okundu. Yapay zekâ maliyeti 0 $.
+- **Etiketleme** (`arastirma/asama6/etiketle.py`):
+  - Halley'in bugünkü "koşulu bugün sağlanmış plan" kuralları kullanıldı (kırılım gerçekleşmiş, geri çekilme bölgede,
+    destekten tepki). Aynı kod (`ready.candidates`, `entries`, `technical`) geçmişin her günü için **o güne kadarki
+    250 günle** çalıştırıldı. Bu, canlıdaki 1 yıllık pencereyle aynıdır.
+  - Giriş ertesi günün açılışı. Açılış azami girişin üstündeyse giriş yok sayıldı.
+  - Çıkış, işlem günlüğünün aynı kurallarıyla yapıldı: TP1'de yarısı satılır, stop girişe çekilir; TP2; SL; 30 gün.
+    Komisyon %0,2, kayma %0,1.
+  - Haber kullanılmadı.
+- **Kapsam:**
+  - 46.053 sinyal üretildi: 6.627'sinde giriş olmadı, 129'u hâlâ açık.
+  - Risk seviyesi "yüksek" olan 4.481 plan çıkarıldı (canlıda önerilmez).
+  - Zarar mesafesi %1'den küçük 151 plan veri hatası sayılıp çıkarıldı (bkz. bulgu 4).
+  - Kalan **34.579 kapanmış plan** kullanıldı (Kasım 2022–Ekim 2026).
+- **Sınama:**
+  - Ana sınama: eğitim Kasım 2022–Eylül 2025 (25.305 plan). Arada 45 günlük boşluk bırakıldı. Model hiç görmediği
+    **son 12 ayda** (12.11.2025–12.11.2026; 7.988 plan, 572 hisse) sınandı.
+  - Ek sınama: 2023 ile eğitilip 2024 yılında sınandı.
+
+## Sonuçlar
+
+### 1. Halley'in kuralları tek başına (model olmadan)
+
+| | Plan sayısı | TP1 SL'den önce | Ortalama sonuç (R) |
+|---|---|---|---|
+| Tüm dönem | 34.665 | %30 | +0,15 R |
+| Son 12 ay | 8.024 | %26 | −0,03 R (maliyet sonrası başabaşa yakın) |
+
+Son 12 ayın senaryo türüne göre dökümü:
+
+| Senaryo türü | Plan sayısı | TP1 SL'den önce | Ortalama sonuç (R) |
+|---|---|---|---|
+| **Kırılım (gerçekleşmiş)** | 2.638 | **%32** | **+0,09 R** |
+| Geri çekilme (bölgede) | 4.594 | %24 | −0,03 R |
+| Destekten tepki | 792 | %18 | −0,40 R |
+
+Tüm dönemde de sıra aynı: kırılım %36 / +0,32 R, geri çekilme %26 / +0,05 R, destek %26 / −0,03 R. Kırılım her iki
+dönemde de açıkça en iyisi.
+
+Canlıdaki "yalnız teknik" süzgecinden (yükseliş trendi, teknik skor ≥ 7) geçenler son 12 ayda %28,5 TP1 ve +0,04 R
+verdi. Yani süzgecin kendisi belirgin bir üstünlük sağlamadı.
+
+### 2. Modeller (son 12 ay, hiç görülmemiş veri)
+
+| | İsabet (AUC; 0,50 = yazı-tura) | Olasılık doğruluğu (tabana göre) | En yüksek %20'nin sonucu |
+|---|---|---|---|
+| Taban: herkese aynı oran (%30,6) | 0,500 | — | −0,03 R (tümü) |
+| Taban: senaryo türüne göre oran | 0,546 (0,52–0,57) | %0,5 daha iyi | +0,09 R |
+| **A: benzer durumlar tablosu** | **0,583 (0,56–0,61)** | %1,3 daha iyi | **+0,10 R** (diğerleri −0,06 R) |
+| B: lojistik regresyon | 0,576 (0,54–0,62) | %1,3 daha iyi | −0,01 R |
+
+Parantez içi değerler %90 güven aralığıdır (aylık bloklarla yeniden örnekleme).
+
+- **Ayırt etme:** İki model de yazı-turadan ve senaryo türü tabanından biraz iyi; aralıklar 0,50'nin üstünde.
+  Ancak 0,58, "zayıf" sayılan bir ayırt etmedir.
+- **Yüzdeler güvenilmez:** Olasılık doğruluğundaki kazanç yalnız %1 civarında.
+  - Benzer durumlar tablosu son 12 ayda olasılıkları **5–9 puan yüksek** söyledi. Örneğin "%41" dediği grupta gerçek
+    oran %35 oldu.
+  - Sebebi piyasanın değişmesi: TP1 oranı 2022'de %38 iken 2026'da %24.
+  - Son 6 aya göre ölçekleme denendi; daha da kötüleştirdi (son 6 ayın oranı %33, sonraki 12 ay %26 çıktı).
+- **Ekonomik fayda dönemden döneme değişti:**
+  - Son 12 ayda tablonun en yüksek %20'si diğerlerinden anlamlı olarak iyiydi (+0,10 R'ye karşı −0,06 R; fark aralığı
+    0,03–0,23).
+  - **2024 sınamasında ise basit "senaryo türü" tabanı iki modelden de iyi sonuç verdi** (+0,36 R'ye karşı +0,19 R).
+    Tablonun 2024'teki farkı anlamlı değil.
+  - Aynı hissenin ardışık günlerdeki tekrar sinyalleri ayıklanınca (hisse başına 14 günde bir) fark küçüldü. 2024'te
+    tamamen kayboldu.
+- **Lojistik regresyon** son 12 ayda ekonomik fayda göstermedi (en yüksek %20'si −0,01 R); 2024'te tablodan biraz iyiydi.
+  Yani hangisinin iyi olduğu da dönemden döneme değişiyor.
+
+### 3. Panelde gösterilen puanlar
+
+| Puan | İsabet (AUC) | Yorum |
+|---|---|---|
+| Genel puan (ağırlıklar sınanmamıştı) | 0,49 | TP1 olasılığını **hiç ayırt etmiyor** |
+| Teknik skor | 0,53 | Çok zayıf |
+
+- Teknik skor 7 ve üstündeki planlar, 6–7 olanlardan daha iyi değil.
+- Risk/getiri oranı yükseldikçe TP1'e ulaşma olasılığı düşüyor (AUC 0,40). Bu beklenen bir sonuç: hedef uzaklaşıyor.
+  Genel puan risk/getiriyi ödüllendirdiği için TP1 olasılığıyla ilişkisiz çıkıyor.
+- Panelde zaten "ağırlıklar sınanmadı, yalnız bilgi" yazıyor. Bu ölçüm o uyarıyı doğruluyor.
+
+### 4. Yan bulgu: işlem görmeyen hisse
+- DUNYH ve ISATR'de fiyat günlerdir kıpırdamıyor ve hacim 0. Bu hisselerde zarar mesafesi sıfıra yakın planlar oluştu.
+- Sebebi: hacim tamamen 0 olunca likidite "ölçülemedi" sayılıyor. Bu yüzden "likidite çok düşük" engeli devreye
+  girmiyor.
+- Bu planlar yükseliş trendinde olmadığı için yalnız teknik listeye girmedi. Haberli listede ise teorik olarak
+  çıkabilir.
+- Küçük bir düzeltme önerisi: hacmi tamamen 0 olan hisse "likidite çok düşük" sayılsın. Onayınla yapılır; bir eşik
+  değişikliği değil, hata düzeltmesidir.
+
+## Bilinen sınırlar
+- **Borsadan çıkmış hisseler** Yahoo'da yok. Sonuçlar biraz iyimser olabilir.
+- Yahoo'da günlerin %14–22'sinde açılış önceki kapanışa tam eşit. Canlı Halley aynı veriyi kullandığı için ölçüm
+  tutarlı, ama gerçek açılış biraz farklı olabilir.
+- 2 milyon TL likidite sınırı bugünkü TL ile. Yüksek enflasyon nedeniyle eski yıllarda daha az hisse bu sınırı geçiyor.
+- Yükseliş ve düşüş dönemleri karışık; 4 yıl tek bir piyasa döngüsü sayılmaz.
+- Haber yok: haberli planların sonucu bu ölçümde yok (haber verisi 4 günlük).
+
+## Öneri
+1. **Modeli panele olasılık yüzdesi olarak eklemeyelim.** Yüzdeler 5–9 puan şaşıyor, faydası da kalıcı değil.
+2. İstersen kartlarda **yalnız sağlam olan bilgiyi** gösterebilirim, eşik ve seçim değişmeden. Örnek: "Bu tür planlar
+   (kırılım) son 4 yılda %36 oranında TP1'e SL'den önce ulaştı (12.174 plan); son 12 ayda %32." Ek iş yaklaşık 1 saat.
+3. Senaryo türü farkı (kırılım iyi, destekten tepki zayıf) seçim kuralını değiştirmek için bir ipucu. Ancak "küçük
+   pilotla eşik değiştirme" kuralı gereği kararı sana bırakıyorum. Değiştirmeden önce haberli planlarla ayrıca
+   bakılmalı.
+4. Aşama 7 (hazır zaman serisi modeli): bu sonuç, yalnız fiyattan tahminin BIST'te zor olduğunu gösteriyor. Aşama 7'ye
+   büyük beklentiyle girmemeyi öneririm; yine de istersen aynı sınama düzeneğiyle ölçebilirim.
+
+## Tekrar üretmek için
+Betikler `arastirma/asama6/` klasöründe. Sırasıyla:
+- `indir.py <repo> <canlı.db> <arastirma.db>` (~4 dk)
+- `etiketle.py <repo> <arastirma.db> <etiket.csv>` (~25 dk, 4 çekirdek)
+- `model.py <etiket.csv> <arastirma.db> <sonuc.json>` (~1 dk)
+
+Hiçbir betik canlı veritabanına yazmaz.

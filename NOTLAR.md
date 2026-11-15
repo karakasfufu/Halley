@@ -1656,3 +1656,18 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Sürüm: kurulum paketi 42ecf7f (147 MB, SHA-256 b1651209…): güncelleme testi 6b4d2d4 → 42ecf7f veri korundu, sağlık
   tamam, Defender temiz; GitHub v2026.11.09 "Halley 2026-11-15 (güncel: 42ecf7f)".
 - Aşama 6 planı yazıldı: ASAMA6_PLAN.md (onay bekliyor; YZ maliyeti 0 $, araştırma ~4–6 saat).
+
+## 2026-11-15 — Aşama 6 araştırması (kullanıcı onayı: "Evet, başla")
+- 632 hissenin 5 yıllık fiyatı ayrı dosyaya: `data/backtest/arastirma_5y.db` (gitignore; canlı DB yalnız okundu). YZ 0 $.
+- `arastirma/asama6/etiketle.py`: canlı kod (ready.candidates/entries/technical, 250 günlük pencere, bayat-veri kontrolü
+  o güne göre) geçmişin her gününde; giriş ertesi açılış (azami üstü → girişsiz), çıkış journal.evaluate. 46.053 sinyal,
+  34.579 kapanmış plan (risk yüksek ve stop < %1 çıkarıldı).
+- `model.py`: (A) benzer durumlar tablosu, (B) numpy lojistik; son 12 ay ve 2024 ileriye dönük sınama, 45 gün ambargo,
+  aylık blok bootstrap, tekilleştirilmiş kontrol.
+- Sonuç: AUC tablo 0,583 / lojistik 0,576 (taban senaryo türü 0,546); Brier kazancı ~%1; tablo olasılıkları son 12 ayda
+  5–9 puan yüksek; ekonomik fayda 2024'te senaryo türü tabanını geçemedi → **plan kuralı gereği devreye alınmadı**,
+  panel değişmedi. Kırılım her dönemde en iyi tür (son 12 ay %32 TP1 / +0,09 R; destek %18 / −0,40 R).
+  Genel puan AUC 0,49 (TP1'i ayırt etmiyor), teknik skor 0,53.
+- Yan bulgu: hacmi tamamen 0 olan hisselerde (DUNYH, ISATR) işlem hacmi "ölçülemedi" (None) sayılıp likidite engeli
+  çalışmıyor; düzeltme kullanıcı onayına bırakıldı.
+- Rapor: ASAMA6_RAPOR.md. Kod değişikliği yok (yalnız araştırma betikleri ve belgeler).

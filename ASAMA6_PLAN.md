@@ -1,4 +1,4 @@
-# Aşama 6 planı — kendi tahmin modelimiz (onay bekliyor)
+# Aşama 6 planı — kendi tahmin modelimiz (araştırma yapıldı: sonuç ASAMA6_RAPOR.md)
 
 **Soru:** Halley'in önerdiği bir plan, **zarar durdur (SL) gelmeden TP1'e ulaşır mı?** Model bunun olasılığını
 Halley'in kendi kurallarının geçmişte nasıl sonuç verdiğine bakarak hesaplar.

@@ -81,6 +81,6 @@ performans, raporlar, Telegram, veri aktarma, kurulum/güncelleme, arayüz (9 ek
 | 3 | Python ön eleme/sınıflandırma (KAP önceliği; RSS ön eleme çağrısının yerini alır) — geçmiş haberlerle kaçırma oranı ölçülerek | ✅ Devrede (kullanıcı onayı 14.11, doğrulama örneği istemeden): 148 etiketli haberde 0 kaçırma; bekleyenlerin ~%37'si YZ'ye gitmez |
 | 4 | Genel fırsat puanı, haber özeti/etkisi, "yalnız teknik" fırsatlar, haftalık rapor | ✅ (14.11; puan yalnız bilgi, kurallar sınanmadı) |
 | 5 | Profesyonel grafik + olası fiyat aralığı konisi | ✅ (15.11; koni oynaklıktan, yön tahmini değil) |
-| 6 | Kendi tahmin modelimiz (TP1'e SL'den önce ulaşma olasılığı) | |
+| 6 | Kendi tahmin modelimiz (TP1'e SL'den önce ulaşma olasılığı) | 🔬 araştırıldı, devreye alınmadı (zayıf ve kararsız fayda; ASAMA6_RAPOR.md) |
 | 7 | Hazır zaman serisi modeli (Kronos / Chronos-Bolt / TinyTimeMixer) — BIST ince ayarı, isteğe bağlı paket | |
 | 8 | 6 ve 7 işe yararsa birleştirme | |
