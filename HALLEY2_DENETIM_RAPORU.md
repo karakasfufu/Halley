@@ -1514,3 +1514,78 @@ model hesabı ve bir satırdır; günde en fazla 5–10 kayıt. Panel açılış
 4. Sonraki akşam analizi, sabah kontrolü ve açılış döngüsünde kayıtlar gerçek veride kontrol edilir: satır
    sayıları, sürüm zinciri, açık / girişsiz.
 5. Müşteri güncellemesi ayrı onayla yayımlanır.
+
+---
+
+# EK E (16.11.2026 01:00) — FAZ 1 gerçek veri kabul testi: ara rapor
+
+**Durum: FAZ 1 henüz KABUL EDİLMEDİ.**
+
+- Canlı sabah kontrolü saat 08:30'da yapılacak.
+- Rapor yazılırken saat 00:56'ydı ve canlı defterde henüz tahmin yoktu.
+- Bu durum beklenen bir durumdu: 15.11 akşam analizi FAZ 1 canlıya alınmadan önce çalışmıştı, bu yüzden o
+  analizde tahmin yazılmadı.
+- Gerçek veri kanıtları iki zamanda toplanacak:
+  - 09:15: sabah kontrolünden sonra,
+  - akşam analizinden sonra.
+
+  İki bekçi (salt-okunur) kurulu.
+
+Beklerken sabah akışı **canlı veritabanının kopyasında**, **canlı klasördeki kodla**, saat 08:30'a ayarlanarak
+prova edildi. Provada:
+
+- haber ve fiyat güncelleme adımları boş geçildi,
+- yapay zekâ çağrısı yasaklandı,
+- Telegram kapatıldı,
+- rapor arşivi kopyanın klasörüne yazıldı.
+
+Prova canlı veritabanını değiştirmedi: canlıda 0 tahmin kaldı ve hazır fırsatlar "aday" durumunda kaldı.
+
+## E1. Prova sonuçları (kanıt: `sabah_prova.py`, `panel_prova.py` çıktıları)
+
+| Kontrol | Sonuç | Kanıt |
+|---|---|---|
+| BAHKM ve ENERY tahminleri oluştu mu? | ✅ 08:30'da 2 tahmin (#1 BAHKM, #2 ENERY); hazır fırsatlar "onaylandı" | prova öncesi 0 → sonrası 2 |
+| Olasılıklar doğru dondurulmuş mu? | ✅ BAHKM 0,3265 (orta), ENERY 0,3728 (yüksek). Hazır fırsattaki gösterim olasılığıyla birebir aynı. | defter ↔ `hazir_firsat.model_json` |
+| Teknik göstergeler doğru mu? | ✅ Gösterge günü 13.11 (sinyal günü). BAHKM: RSI 59,96, ATR 11,82, teknik skor 7. ENERY: RSI 62,18, ATR 0,541, skor 8. | `teknik_json` |
+| Model sürümleri | ✅ tp1_v1 / özellik 97b3f45b5a82 / parametre 22b983b5a3ec (ikisinde aynı) | `tahmin` satırları |
+| İşlem seviyeleri | ✅ BAHKM: kırılım, giriş 163,50, azami 167,05, SL 150,88, TP1 202,00. ENERY: kırılım, giriş 14,60, azami 14,72, SL 13,99, TP1 15,82. Hazır fırsatla aynı. | `tahmin` ↔ `hazir_firsat` |
+| Rejim ve veri kalitesi | ✅ Rejim: düşüş, yüksek oynaklık, genişlik %12,1. Veri: uyarı yok, kritik değil, 250 gün, son fiyat 13.11. | `rejim_json`, `veri_json` |
+| Aynı analiz tekrarlanınca mükerrer kayıt | ✅ **Yok.** 08:45'te ikinci sabah analizi: yeni satır 0; eski satırlar birebir aynı | 2 → 2 |
+| Sayfa yenileme ve Streamlit rerun | ✅ **Değişmiyor.** Performans ↔ Fırsatlar 3 kez + rerun: kayıt sayısı (2, 0, 2) → (2, 0, 2) | `panel_prova.py` |
+| Giriş günü ve zaman damgası | ✅ Giriş günü 16.11, sinyal günü 13.11, tahmin zamanı 2026-11-16T08:30:00+03:00. Açılıştan (09:55) önce olduğu için ölçüme girecek. | `tahmin` |
+| Açık / girişsiz / sonuçlanmış ayrımı | ✅ 16.11 fiyatı henüz yok → ikisi de **açık**, sonuç satırı yok. Girişsiz ve sonuçlanmış ayrımı birim testlerinde doğrulandı; gerçek veride akşam analizinde görülecek. | özet: açık 2, sonuçlanan 0 |
+| Panel sayıları = veritabanı | ✅ Panel: Tahmin 2, Sonuçlanan 0, Açık 2, diğerleri 0. Veritabanı: 2 / 0 / 2. Model seçicide tek seçenek "tp1_v1 (2 tahmin)". Panel hatasız. | `panel_prova.py` |
+| Eski tahminler yeni analizden etkileniyor mu? | ✅ Etkilenmiyor. İkinci analizden sonra satırlar birebir aynı; tetikleyiciler değişikliği zaten reddediyor (Ek D6). | karşılaştırma `True` |
+
+## E2. Bulgu: "analiz" etiketi (hata değil, açıklama gerekiyor)
+
+- **Ne görüldü:** Sabah 08:30'da yazılan iki tahminin `analiz` alanı **"aksam"**.
+- **Neden:** `ready.morning`, akşam listesindeki fırsatları onaylarken `_store`'u **fırsatın kendi analiz etiketiyle**
+  çağırıyor: `ready.py` satır 500, `_store(conn, p, o["analiz"], gday, "onaylandi", now)`. Bu, hazır fırsat
+  tablosunun bugünkü davranışı. Defter bu etiketi aynen aldı. Yani alanın anlamı "planı üreten analiz", "kaydın
+  yazıldığı analiz" değil.
+- **Etkisi:**
+  - Veride hata yok. Kaydın gerçek zamanı `tahmin_zamani` alanında doğru (08:30).
+  - Ölçüm kuralı (açılıştan önceki son tahmin) etkilenmiyor.
+  - Yalnız paneldeki "Analiz: Akşam / Sabah" filtresi, sabah onaylanan akşam planlarını "Akşam" altında gösterir.
+    Bu yanıltıcı olabilir.
+- **Önerilen düzeltme (onayınla):** Kayıt değiştirilmez; tetikleyiciler buna zaten izin vermez. Panel etiketi
+  "Planı üreten analiz" olarak değiştirilir. Ayrıca filtreye "kaydın yazıldığı saat" bilgisi eklenir: açılıştan
+  önce akşam ya da sabah, `tahmin_zamani`'ndan hesaplanır.
+  - Seçim kurallarına, olasılıklara ve kayıtlara dokunmaz.
+  - Yalnız `app.py` metni ve `defter.ozet`'e bir filtre eklenir.
+
+## E3. Kalan kabul adımları (gerçek veri)
+
+1. **09:15 raporu:**
+   - Canlı defterde BAHKM ve ENERY tahminleri yazılmış mı?
+   - Alanlar provayla aynı mı?
+   - Mükerrer var mı?
+   - Panel ile veritabanı eşleşiyor mu?
+2. **Akşam raporu:**
+   - 16.11 fiyatları indikten sonra sonuçlandırma: açılış azami girişin üstündeyse "girişsiz", değilse açık
+     pozisyon.
+   - Yeni akşam tahminleri eklendi mi?
+   - Önceki tahminler değişmedi mi?
+3. İki rapor da beklenen sonucu verirse FAZ 1 kabulü önerilecek. Karar kullanıcıda.
