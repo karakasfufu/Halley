@@ -5,7 +5,7 @@ kaldığı yerden devam eder. Kullanım: python metin_indir.py <repo> <arastirma
 import sqlite3
 import sys
 import time
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import pandas as pd
 
@@ -32,8 +32,22 @@ have = {r[0] for r in conn.execute("SELECT idx FROM kap_metin")}
 todo = sorted(need - have, key=int)
 __import__("random").Random(7).shuffle(todo)   # karışık sıra: yarıda kalsa da her dönemden örnek olsun
 print("gereken", len(need), "kalan", len(todo), flush=True)
+DELAY = 6.0        # sn; KAP_REQUEST_DELAY'den (1,5) YAVAŞ: sınıra takılmasın, canlı okuyucuya yer kalsın
+
+
+def market_pause():
+    """Hafta içi 08:00–19:00 (TR) beklenir: canlı Halley'in KAP okuyucusu seans saatlerinde sınırı paylaşmasın."""
+    while True:
+        now = datetime.now(config.TR_TZ)
+        if now.weekday() >= 5 or not (8 <= now.hour < 19):
+            return
+        print("seans saatleri: 19:00'a kadar duruldu", now.strftime("%H:%M"), flush=True)
+        time.sleep(600)
+
+
 t0 = time.time()
 for i, idx in enumerate(todo):
+    market_pause()
     for k in range(6):
         try:
             body = kap._parse_page(kap._get(kap.DETAIL_URL.format(index=idx)).text)[0]
@@ -51,6 +65,6 @@ for i, idx in enumerate(todo):
     if i % 25 == 0:
         conn.commit()
         print(i, len(todo), round(time.time() - t0), "sn", flush=True)
-    time.sleep(config.KAP_REQUEST_DELAY)
+    time.sleep(max(DELAY, config.KAP_REQUEST_DELAY))
 conn.commit()
 print("bitti", conn.execute("SELECT COUNT(*), SUM(LENGTH(metin)>0) FROM kap_metin").fetchone(), flush=True)

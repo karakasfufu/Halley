@@ -1717,3 +1717,7 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   `scenario_guard` likidite engeli çalışmıyordu; Aşama 6 araştırmasında stop ~%0 planlar böyle çıktı). Hacim bilgisi hiç
   olmayan seriler (pilot) None kalır. Eşik değişmedi (2 mn TL).
 - Canlıda etkilenen: DUNYH, ISATR, UMPAS → "Likidite çok düşük; senaryo üretilmedi". Test: tests/test_zero_volume.py.
+- Sürüm: kurulum paketi 1e5dab8 (147 MB, SHA-256 8ae0a7c9…): güncelleme testi 42ecf7f → 1e5dab8 veri korundu, sağlık
+  tamam, tp1_model + modeller/tp1_v1.json pakette, Defender temiz; GitHub v2026.11.09 "Halley 2026-11-15 (güncel:
+  1e5dab8)"; Masaüstü ve dagitim/ kopyaları yenilendi.
+- metin_indir.py: istek arası 6 sn (KAP sınırına takılmasın, canlı okuyucuya yer kalsın) + hafta içi 08:00–19:00 durur.
