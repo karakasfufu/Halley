@@ -174,7 +174,7 @@ static class Kurulum
 
         // eski program dosyaları (veri hariç)
         progress(4, "Eski program dosyaları kaldırılıyor…");
-        foreach (string d in new string[] { "python", "app\\bist_haber", "app\\.streamlit" })
+        foreach (string d in new string[] { "python", "app\\bist_haber", "app\\.streamlit", "guncelleme" })
         {
             string full = Path.Combine(Target, d);
             for (int i = 0; i < 5 && Directory.Exists(full); i++)

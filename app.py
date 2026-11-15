@@ -390,6 +390,63 @@ if not pipeline.has_api_key():
         conn.close()  # sayfa yenilenmeden önce bağlantıyı bırak (aksi hâlde açık kalıyordu)
         st.rerun()
 
+def update_apply(m: dict) -> None:
+    """İndir → doğrula → dene → Halley'i yeniden başlat (dosya değişimini Halley.exe yapar)."""
+    from bist_haber import guncelleme
+    bar = st.progress(0.0, text="Güncelleme başlıyor…")
+    try:
+        guncelleme.hazirla(m, lambda p_, t_: bar.progress(min(p_, 1.0), text=t_))
+        guncelleme.yeniden_baslat()
+        st.success("✅ Güncelleme hazır. Halley birkaç saniye içinde kapanıp yeni sürümle açılacak; verileriniz korunur.")
+    except Exception as e:
+        st.error(f"Güncelleme yapılamadı: {nice_err(e)} Mevcut sürüm değişmedi.")
+
+
+def update_banner() -> None:
+    """2026-11-15: yeni sürüm varsa üstte bant (günde en fazla bir kez kontrol; ağ hatası paneli engellemez)."""
+    from bist_haber import guncelleme
+    if "_upd" not in st.session_state:
+        try:
+            st.session_state["_upd"] = guncelleme.kontrol()
+        except Exception:
+            st.session_state["_upd"] = {"durum": "hata"}
+        son = guncelleme.son_islem()
+        if son:
+            st.session_state["_upd_son"] = son
+            try:
+                (guncelleme.kok() / "guncelleme" / "son_islem.json").unlink()
+            except OSError:
+                pass
+    son = st.session_state.get("_upd_son")
+    if son:
+        msg = {"guncellendi": ("success", f"✅ Halley güncellendi: {son.get('surum', '')}. Verileriniz korundu."),
+               "geri_donuldu": ("info", f"↩️ Önceki sürüme dönüldü: {son.get('surum', '')}."),
+               "otomatik_geri_donuldu": ("warning", f"⚠️ Yeni sürüm açılamadığı için önceki sürüme dönüldü "
+                                                    f"({son.get('surum', '')}). Sorunu bildirin."),
+               "hata": ("warning", "⚠️ Güncelleme uygulanamadı; mevcut sürümle devam ediliyor.")}.get(son.get("islem"))
+        if msg:
+            getattr(st, msg[0])(msg[1])
+    u = st.session_state["_upd"]
+    if u.get("durum") == "yeni":
+        with st.container(border=True, key="upd_box"):
+            c1, c2 = st.columns([4, 1.4], vertical_alignment="center")
+            c1.markdown(f"🆕 **Yeni Halley sürümü var: {esc(u.get('yeni') or '')}** "
+                        f"<span class='news-meta'>(kurulu: {esc(u.get('kurulu') or '')})</span>"
+                        + (f"  \n{esc(u['notlar'])}" if u.get("notlar") else ""), unsafe_allow_html=True)
+            if c2.button(f"🔄 Güncelle ({u.get('boyut_mb', 0):g} MB)", key="upd_go", type="primary", width="stretch",
+                         help="Yalnız uygulama kodu iner; verileriniz, ayarlarınız ve API anahtarınız değişmez. "
+                              "Halley kendini yeniden başlatır. Sorun çıkarsa önceki sürüme dönülür."):
+                update_apply(guncelleme.manifest())
+    elif u.get("durum") == "tam_kurulum":
+        st.caption(f"🆕 Yeni Halley sürümü var ({esc(u.get('yeni') or '')}), ama {esc(u.get('neden', ''))}: uygulama "
+                   f"içinden güncellenemez. Yeni kurulum dosyasını [güncelleme sayfasından]({u.get('sayfa')}) indirip "
+                   "**Güncelle** ile kurun; verileriniz korunur.")
+    elif u.get("durum") == "bekliyor":
+        st.caption("🔄 Bir güncelleme hazır bekliyor; Halley yeniden açıldığında uygulanır.")
+
+
+update_banner()
+
 if not conn.execute("SELECT 1 FROM news LIMIT 1").fetchone():
     st.info("🆕 Halley yeni kurulmuş görünüyor. Başka bilgisayardan veri taşıyorsanız: **⚙️ Ayarlar → 💾 Veri ve gelişmiş → "
             "İçe aktar**.")
@@ -2493,6 +2550,44 @@ def ai_usage_panel() -> None:
                          hide_index=True, width="stretch")
 
 
+def update_panel() -> None:
+    """⚙️ Ayarlar → 💾 Veri ve gelişmiş: sürüm, elle kontrol, önceki sürüme dönüş (2026-11-15)."""
+    from bist_haber import guncelleme
+    with st.container(border=True, key="upd_panel"):
+        section_title("🔄", "Güncelleme")
+        root = guncelleme.kok()
+        if not root:
+            st.caption("Bu Halley geliştirme klasöründen çalışıyor; uygulama içi güncelleme yalnız kurulum dosyasıyla "
+                       "kurulmuş Halley'de açıktır.")
+            return
+        k = guncelleme.kurulu(root)
+        st.markdown(f"Kurulu sürüm: **{esc(k['surum'])}**", unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        if c1.button("🔎 Güncellemeyi şimdi kontrol et", key="upd_check", width="stretch"):
+            st.session_state["_upd"] = u = guncelleme.kontrol(zorla=True)
+            txt = {"guncel": "✅ Halley güncel.", "yeni": "🆕 Yeni sürüm var; sayfanın üstündeki **Güncelle** düğmesini "
+                   "kullanın.", "tam_kurulum": "🆕 Yeni sürüm var ama tam kurulum gerekiyor (üstteki nota bakın).",
+                   "bekliyor": "🔄 Hazırlanmış güncelleme yeniden açılışta uygulanacak.",
+                   "hata": f"Kontrol edilemedi (internet bağlantısı?): {u.get('hata', '')}"}.get(u.get("durum"), "")
+            flash("info", txt)
+            conn.close()
+            st.rerun()
+        prev = guncelleme.onceki(root)
+        if prev:
+            if c2.button(f"↩️ Önceki sürüme dön ({prev})", key="upd_back", width="stretch",
+                         help="Son güncellemeden önceki sürüm geri yüklenir; verileriniz değişmez. Halley yeniden açılır."):
+                try:
+                    guncelleme.geri_don_iste()
+                    guncelleme.yeniden_baslat()
+                    st.success("↩️ Halley birkaç saniye içinde kapanıp önceki sürümle açılacak.")
+                except Exception as e:
+                    st.error(f"Geri dönülemedi: {nice_err(e)}")
+        else:
+            c2.caption("Geri dönülecek önceki sürüm yok (henüz uygulama içinden güncelleme yapılmadı).")
+        st.caption("Halley yeni sürümü günde bir kez kendiliğinden kontrol eder. Güncellemede yalnız uygulama kodu iner; "
+                   "verileriniz (veritabanı, ayarlar, raporlar) ve API anahtarınız değişmez.")
+
+
 def page_ayarlar() -> None:
     page_head(PAGE_AYAR)
     t1, t4, t2, t3 = st.tabs(["⚙️ Ayarlar ve bildirim", "🤖 Yapay zekâ kullanımı", "💾 Veri ve gelişmiş", "❓ Kılavuz"])
@@ -2501,6 +2596,7 @@ def page_ayarlar() -> None:
     with t1:
         settings_panel()
     with t2:
+        update_panel()
         advanced_panel()
     with t3:
         # Plan 1.3 (2026-11-09): programı kullanacak kişi için güncel kılavuz (KULLANIM.md ile aynı metin)

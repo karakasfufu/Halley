@@ -1797,3 +1797,18 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   her açılışta boşuna üretilmesin). KULLANIM.md tablosu güncellendi.
 - Testler: tests/test_html_export.py (3), test_hisse_page_html_download (panel). 514 test OK. Canlı veri kopyasıyla
   ENERY dosyası üretildi ve tarayıcıda açıldı: grafik, senaryolar, teknik tablo, takvim, haberler, dipnot görünüyor.
+
+## 2026-11-15 — Uygulama içi güncelleme (kullanıcı: "güncel sürümü takip edecek bir versiyon")
+- Kod: `bist_haber/guncelleme.py` (kontrol günde 1 kez · indir · SHA-256 · güvenli açma (data/.env/yol kaçışı reddi) ·
+  gömülü Python'la içe aktarma denemesi · hazir.json · yeniden_baslat), `paket/Halley.cs` (--yeniden-baslat; dosya
+  değişimini hiçbir şey çalışmazken yapar; eski kod guncelleme\onceki; yeni sürüm 2 dk'da açılmazsa otomatik geri dönüş;
+  --port/--pencere-yok yeniden başlatmada korunur), `paket/app_baslangic.py` (panel kodu hata verirse bist_haber'siz
+  "önceki sürüme dön" düğmesi), panelde üst bant + Ayarlar → Veri ve gelişmiş → 🔄 Güncelleme (kontrol, geri dön).
+- Paket: uygulama kodu DERLENMİŞ (.pyc), kaynak .py yok; gizli bilgi denetimi (.env/.db/anahtar biçimi/kaynak) üretimi
+  durdurur. `build_package.py --guncelleme-paketi` → Halley_Guncelleme.zip (~0,4 MB) + surum.json (sıra, sha256,
+  ortam imzası = Python+kütüphaneler, başlatıcı imzası; uyumsuzsa "tam kurulum gerekir"). Kurulum programı eski
+  guncelleme klasörünü siler. Lisans notu eklenmedi (kullanıcı istemedi).
+- Dağıtım: herkese açık ayrı depo (ad onay bekliyor); asıl depo gizli kalır. Geliştirme klasöründe özellik kapalı.
+- Uçtan uca (gerçek kurulum, 8507, penceresiz): A kur → B paketini hazırla → --yeniden-baslat: sıra 2134→2139, veri ve
+  .env korundu, onceki yedeği var, son_islem "guncellendi"; geri dön: sıra 2134, "geri_donuldu"; --kapat temiz.
+  Panel içinden tetikleme ve otomatik geri dönüş gerçek kurulumda ayrıca denenmedi (birim testleri var). 522 test OK.

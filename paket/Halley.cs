@@ -8,6 +8,10 @@
 //            Halley.exe --port 8503     → başka port (deneme için)
 //            Halley.exe --pencere-yok   → pencere açmadan yalnız arka planı çalıştır (deneme için)
 //            Halley.exe --kaldir        → programı kaldırır (veriler isteğe bağlı korunur)
+//            Halley.exe --yeniden-baslat → açık Halley'i kapatır, bekleyen güncellemeyi/geri dönüşü uygular, yeniden açar
+// Güncelleme (2026-11-15): panel yeni kodu guncelleme\yeni'ye hazırlar (bist_haber/guncelleme.py); dosya değişimini
+// burada, hiçbir şey çalışmazken yaparız. Eski kod guncelleme\onceki'de kalır; yeni sürüm 2 dakikada açılmazsa
+// kendiliğinden önceki sürüme dönülür. app\data ve app\.env hiçbir zaman taşınmaz.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -31,6 +35,7 @@ static class Halley
 
     internal static string Root, Py, App, LogDir;
     static int Port = 8501;
+    static string ExtraArgs = "";    // yeniden başlatmada korunacak seçenekler (--port, --pencere-yok)
     static bool NoWindow = false;
     static Process Panel, Reader;
     static Control Ui;
@@ -44,17 +49,21 @@ static class Halley
         Py = Path.Combine(Root, "python\\python.exe");
         App = Path.Combine(Root, "app");
         LogDir = Path.Combine(App, "data\\gunluk");
-        bool quit = false, uninstall = false;
+        bool quit = false, uninstall = false, restart = false;
         for (int i = 0; i < args.Length; i++)
         {
             string a = args[i].ToLowerInvariant();
             if (a == "--kapat") quit = true;
             else if (a == "--kaldir") uninstall = true;
+            else if (a == "--yeniden-baslat") restart = true;
             else if (a == "--pencere-yok" || a == "--tarayici-yok") NoWindow = true;
             else if (a == "--port" && i + 1 < args.Length) { Port = int.Parse(args[i + 1]); i++; }
         }
+        if (Port != 8501) ExtraArgs += " --port " + Port;
+        if (NoWindow) ExtraArgs += " --pencere-yok";
         if (quit) return SignalQuit(true) ? 0 : 1;
         if (uninstall) return Uninstall();
+        if (restart) SignalQuit(true, 120);      // açık olan tamamen kapanana kadar bekle (en fazla ~60 sn)
 
         bool created;
         using (Mutex m = new Mutex(true, MutexName, out created))
@@ -79,6 +88,7 @@ static class Halley
             return 2;
         }
         Directory.CreateDirectory(LogDir);
+        ApplyPending();
         if (!PortFree(Port))
         {
             int p = Port;
@@ -121,7 +131,7 @@ static class Halley
                 int w = WaitHandle.WaitAny(hs, 1000);
                 if (w == 0) { Ui.BeginInvoke((MethodInvoker)delegate { Shutdown(); }); break; }
                 if (w == 1) Ui.BeginInvoke((MethodInvoker)delegate { BringToFront(); });
-                if (Panel != null && Panel.HasExited && !Quitting)
+                if (Panel != null && Panel.HasExited && !Quitting && !File.Exists(Path.Combine(G, "denetim.txt")))
                 {
                     Ui.BeginInvoke((MethodInvoker)delegate
                     {
@@ -140,6 +150,25 @@ static class Halley
             Ui.BeginInvoke((MethodInvoker)delegate
             {
                 if (Quitting) return;
+                string denetim = Path.Combine(G, "denetim.txt");
+                if (File.Exists(denetim))
+                {   // güncellemeden sonraki ilk açılış
+                    if (ok) { TryDelete(denetim); Record("guncellendi"); }
+                    else
+                    {
+                        KillAll();
+                        string err = "";
+                        try { Swap(Path.Combine(G, "onceki"), Path.Combine(G, "acilmayan")); Record("otomatik_geri_donuldu"); }
+                        catch (Exception e) { err = "\n\nGeri dönüş de başarısız: " + e.Message; }
+                        TryDelete(denetim);
+                        MessageBox.Show("Yeni sürüm açılamadı; önceki sürüme dönüldü. Halley yeniden açılıyor." + err +
+                                        "\nAyrıntı: " + Path.Combine(LogDir, "panel.log"), "Halley",
+                                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        try { Process.Start(new ProcessStartInfo(Path.Combine(Root, "Halley.exe"), "--yeniden-baslat" + ExtraArgs) { UseShellExecute = false }); } catch { }
+                        Shutdown();
+                        return;
+                    }
+                }
                 if (ok) { if (Window != null) Window.Ready("http://127.0.0.1:" + Port); }
                 else
                 {
@@ -178,6 +207,7 @@ static class Halley
         si.EnvironmentVariables["PYTHONUTF8"] = "1";
         si.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
         si.EnvironmentVariables["PYTHONDONTWRITEBYTECODE"] = "1";
+        si.EnvironmentVariables["HALLEY_BASLATICI_ARGS"] = ExtraArgs.Trim();   // panel yeniden başlatırken aynı seçenekler
         string logPath = Path.Combine(LogDir, logName);
         try { if (File.Exists(logPath) && new FileInfo(logPath).Length > 5 * 1024 * 1024) File.Delete(logPath); } catch { }
         StreamWriter log = new StreamWriter(logPath, true, new UTF8Encoding(false));
@@ -269,14 +299,16 @@ static class Halley
         }
     }
 
-    static bool SignalQuit(bool wait)
+    static bool SignalQuit(bool wait) { return SignalQuit(wait, 40); }
+
+    static bool SignalQuit(bool wait, int tries)
     {
         try
         {
             EventWaitHandle.OpenExisting(QuitEventName).Set();
             if (wait)
             {
-                for (int i = 0; i < 40; i++)
+                for (int i = 0; i < tries; i++)
                 {
                     bool createdNew;
                     using (Mutex m = new Mutex(false, MutexName, out createdNew)) { if (createdNew) return true; }
@@ -286,6 +318,95 @@ static class Halley
             return true;
         }
         catch (WaitHandleCannotBeOpenedException) { return true; }   // zaten kapalı
+    }
+
+    // ---------------------------------------------------------------- uygulama içi güncelleme (2026-11-15)
+    internal static string G { get { return Path.Combine(Root, "guncelleme"); } }
+    static readonly string[] Keep = new string[] { "data", ".env" };
+
+    static void TryDelete(string f) { try { if (File.Exists(f)) File.Delete(f); } catch { } }
+
+    static void CopyIf(string a, string b) { try { if (File.Exists(a)) File.Copy(a, b, true); } catch { } }
+
+    static void MoveCode(string from, string to)
+    {   // from içindeki her şeyi (data ve .env hariç) to'ya taşı
+        Directory.CreateDirectory(to);
+        foreach (string d in Directory.GetDirectories(from))
+        {
+            string n = Path.GetFileName(d), dst = Path.Combine(to, n);
+            if (Array.IndexOf(Keep, n.ToLowerInvariant()) >= 0) continue;
+            if (Directory.Exists(dst)) Directory.Delete(dst, true);
+            Directory.Move(d, dst);
+        }
+        foreach (string f in Directory.GetFiles(from))
+        {
+            string n = Path.GetFileName(f), dst = Path.Combine(to, n);
+            if (Array.IndexOf(Keep, n.ToLowerInvariant()) >= 0) continue;
+            if (File.Exists(dst)) File.Delete(dst);
+            File.Move(f, dst);
+        }
+    }
+
+    // incoming klasöründeki kodu app\'e koy; app\'teki kod outgoing'e gider. Sürüm dosyaları kodla birlikte taşınır.
+    static void Swap(string incoming, string outgoing)
+    {
+        if (!File.Exists(Path.Combine(incoming, "app.py"))) throw new Exception("kurulacak kod eksik: " + incoming);
+        CopyIf(Path.Combine(Root, "surum.txt"), Path.Combine(App, "surum.txt"));
+        CopyIf(Path.Combine(Root, "surum_sira.txt"), Path.Combine(App, "surum_sira.txt"));
+        if (Directory.Exists(outgoing)) Directory.Delete(outgoing, true);
+        try
+        {
+            MoveCode(App, outgoing);
+            MoveCode(incoming, App);
+        }
+        catch
+        {   // yarım kaldıysa eski hâline getirmeyi dene
+            try { MoveCode(App, incoming); MoveCode(outgoing, App); } catch { }
+            throw;
+        }
+        try { Directory.Delete(incoming, true); } catch { }
+        CopyIf(Path.Combine(App, "surum.txt"), Path.Combine(Root, "surum.txt"));
+        CopyIf(Path.Combine(App, "surum_sira.txt"), Path.Combine(Root, "surum_sira.txt"));
+    }
+
+    static void Record(string islem)
+    {
+        try
+        {
+            string f = Path.Combine(Root, "surum.txt");
+            string surum = File.Exists(f) ? File.ReadAllText(f).Trim() : "";
+            File.WriteAllText(Path.Combine(G, "son_islem.json"), "{\"islem\": \"" + islem + "\", \"surum\": \"" +
+                              surum.Replace("\\", "/").Replace("\"", "'") + "\", \"zaman\": \"" +
+                              DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss") + "\"}", new UTF8Encoding(false));
+        }
+        catch { }
+    }
+
+    static void ApplyPending()
+    {
+        string geri = Path.Combine(G, "geri_don.txt"), hazir = Path.Combine(G, "hazir.json");
+        try
+        {
+            if (File.Exists(geri))
+            {
+                TryDelete(geri);
+                TryDelete(hazir);
+                Swap(Path.Combine(G, "onceki"), Path.Combine(G, "geri_alinan"));
+                Record("geri_donuldu");
+            }
+            else if (File.Exists(hazir))
+            {
+                TryDelete(hazir);
+                Swap(Path.Combine(G, "yeni"), Path.Combine(G, "onceki"));
+                File.WriteAllText(Path.Combine(G, "denetim.txt"), DateTime.Now.ToString("s"));
+            }
+        }
+        catch (Exception e)
+        {
+            Record("hata");
+            MessageBox.Show("Güncelleme uygulanamadı; mevcut sürümle devam ediliyor.\n" + e.Message, "Halley",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
     }
 
     static int Uninstall()

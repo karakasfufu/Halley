@@ -5,11 +5,18 @@ dosyalar, antivirüs yanlış alarmları). Burada bu bilgisayarda çalışan GER
 gibi kopyalanır; uygulama paket içinde de bugün nasıl çalışıyorsa öyle çalışır.
 
 Kullanım (proje kökünden, sanal ortamın Python'u ile):
-    python paket/build_package.py --cikti <klasör> [--veri <canlı data klasörü>] [--veri-yok]
+    python paket/build_package.py --cikti <klasör> [--veri <canlı data klasörü>] [--veri-yok] [--guncelleme-paketi]
 Çıktı: <klasör>/Halley_Kurulum.exe  (+ <klasör>/staging/ açılmış hâli, denemeler için)
+       --guncelleme-paketi ile ayrıca <klasör>/Halley_Guncelleme.zip + surum.json (uygulama içi güncelleme, aynı derleme)
 API anahtarı (.env) ASLA pakete girmez; kullanıcı ilk açılışta panelden girer.
+2026-11-15: uygulama kodu pakete DERLENMİŞ (.pyc) girer; kaynak .py dosyaları pakette yoktur (app.py yalnız derlenmiş
+paneli çalıştıran kısa bir başlangıç dosyasıdır). Paket gizli bilgi denetiminden geçmezse üretim durur.
 """
 import argparse
+import hashlib
+import json
+import py_compile
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -28,6 +35,9 @@ VC_RUNTIME = ["vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll", "msvcp14
               "concrt140.dll"]
 DATA_SKIP_DIRS = {"yedek", "gunluk"}
 DATA_SKIP_FILES = {"kap_okuyucu_servis.json", "analiz_durumu.json"}
+GIZLI = [re.compile(rb"sk-[A-Za-z0-9_\-]{20,}"), re.compile(rb"OPENAI_API_KEY\s*=\s*['\"]?[A-Za-z0-9_\-]{8,}"),
+         re.compile(rb"\d{8,10}:[A-Za-z0-9_\-]{30,}")]          # OpenAI anahtarı, .env satırı, Telegram bot anahtarı
+GIZLI_DOSYA = (".env", ".db", ".sqlite", "-wal", "-shm")
 
 
 def log(msg):
@@ -81,6 +91,73 @@ def copy_app(dst: Path) -> None:
     # panel paket içinde tarayıcıyı başlatıcı açar
     cfg = dst / ".streamlit" / "config.toml"
     cfg.write_text(cfg.read_text(encoding="utf-8").replace("headless = false", "headless = true"), encoding="utf-8")
+    derle(dst)
+
+
+def derle(app: Path) -> None:
+    """Kaynak .py → derlenmiş .pyc (aynı klasörde; Python kaynaksız .pyc'yi doğrudan yükler), kaynak silinir.
+    app.py → app_kod.pyc + kısa başlangıç dosyası (Streamlit .py dosyası çalıştırır)."""
+    n = 0
+    for f in sorted((app / "bist_haber").rglob("*.py")):
+        py_compile.compile(str(f), cfile=str(f.with_suffix(".pyc")), dfile=f.relative_to(app).as_posix(), doraise=True)
+        f.unlink()
+        n += 1
+    py_compile.compile(str(app / "app.py"), cfile=str(app / "app_kod.pyc"), dfile="app.py", doraise=True)
+    shutil.copy2(ROOT / "paket" / "app_baslangic.py", app / "app.py")    # derlenmiş paneli çalıştırır; hata olursa geri dönüş
+    log(f"Uygulama kodu derlendi: {n + 1} dosya (kaynak .py pakette yok)")
+
+
+def gizli_denetim(app: Path, veri_dahil: bool = False) -> None:
+    """Pakete gizli bilgi girmesin: .env/veritabanı dosyası ya da anahtar biçiminde metin varsa üretimi durdur."""
+    bad = []
+    for f in app.rglob("*"):
+        if not f.is_file():
+            continue
+        rel = f.relative_to(app).as_posix()
+        if veri_dahil and rel.startswith("data/"):
+            continue
+        if f.name.endswith(GIZLI_DOSYA) or rel.startswith("data/"):
+            bad.append(rel)
+            continue
+        if f.name.endswith(".py") and rel != "app.py":
+            bad.append(rel + " (kaynak kod)")
+            continue
+        b = f.read_bytes()
+        if any(r.search(b) for r in GIZLI):
+            bad.append(rel + " (anahtar biçiminde metin)")
+    if bad:
+        raise RuntimeError("Gizli bilgi denetimi BAŞARISIZ, paket üretilmedi: " + ", ".join(sorted(bad)[:20]))
+    log("Gizli bilgi denetimi: temiz")
+
+
+def baslatici_imzasi() -> str:
+    t = (ROOT / "paket" / "Halley.cs").read_text(encoding="utf-8").replace("\r\n", "\n")
+    return hashlib.sha256(t.encode("utf-8")).hexdigest()[:16]
+
+
+def guncelleme_paketi(stage: Path, out: Path, surum: str, sira: str, rev: str) -> None:
+    """Uygulama içi güncelleme paketi: app klasörü (data ve .env hariç) + sürüm dosyaları; surum.json bilgisi."""
+    sys.path.insert(0, str(ROOT))
+    from bist_haber import guncelleme
+    app = stage / "app"
+    gizli_denetim(app)
+    zp = out / "Halley_Guncelleme.zip"
+    with zipfile.ZipFile(zp, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+        for f in sorted(app.rglob("*")):
+            rel = f.relative_to(app).as_posix()
+            if f.is_file() and not rel.startswith("data/") and rel != ".env":
+                z.write(f, rel)
+        z.writestr("surum.txt", surum)
+        z.writestr("surum_sira.txt", sira)
+    h = hashlib.sha256(zp.read_bytes()).hexdigest()
+    tag = f"v{sira}"
+    m = {"surum": surum, "sira": int(sira), "commit": rev, "etiket": tag,
+         "paket_url": f"https://github.com/{guncelleme.DEPO}/releases/download/{tag}/Halley_Guncelleme.zip",
+         "sha256": h, "boyut": zp.stat().st_size,
+         "ortam": guncelleme.ortam_imzasi(Path(sysconfig.get_paths()["purelib"]), "%d.%d" % sys.version_info[:2]),
+         "baslatici": baslatici_imzasi(), "notlar": ""}
+    (out / "surum.json").write_text(json.dumps(m, ensure_ascii=False, indent=1), encoding="utf-8")
+    log(f"Güncelleme paketi: {zp} ({zp.stat().st_size / 1e6:.1f} MB) · etiket {tag} · sha256 {h[:12]}…")
 
 
 def copy_data(src: Path, dst: Path) -> None:
@@ -159,6 +236,8 @@ def main():
     ap.add_argument("--cikti", required=True)
     ap.add_argument("--veri", help="pakete konacak data klasörü (ör. panel klasörünün data'sı)")
     ap.add_argument("--veri-yok", action="store_true")
+    ap.add_argument("--guncelleme-paketi", action="store_true",
+                    help="ayrıca Halley_Guncelleme.zip + surum.json üret (uygulama içi güncelleme)")
     ap.add_argument("--hazir-klasor", action="store_true",
                     help="önceki staging'deki Python ve veriyi yeniden kullan; yalnız uygulama kodu ve exe'ler yenilenir")
     a = ap.parse_args()
@@ -194,8 +273,8 @@ def main():
             (stage / "app" / "data").mkdir(parents=True, exist_ok=True)
     log("Python dosyaları önceden derleniyor (ilk açılış hızlı olsun)…")
     subprocess.run([str(stage / "python" / "python.exe"), "-m", "compileall", "-q", "-j", "0",
-                    str(stage / "python" / "Lib"), str(stage / "app" / "bist_haber"), str(stage / "app" / "app.py")],
-                   check=False, capture_output=True)
+                    str(stage / "python" / "Lib")], check=False, capture_output=True)
+    gizli_denetim(stage / "app", veri_dahil=bool(a.veri and not a.veri_yok))
     ico = out / "halley.ico"
     make_icon(ico)
     shutil.copy2(ico, stage / "halley.ico")
@@ -216,8 +295,14 @@ def main():
          f"/r:{wv / 'Microsoft.Web.WebView2.WinForms.dll'}", str(ROOT / "paket" / "Halley.cs"), str(info_app)])
     # Sürüm bilgisi (kurulum programı kurulu sürümle karşılaştırır: aynıysa yeniden kurmaz, farklıysa günceller)
     from datetime import datetime as _dt
-    (stage / "surum.txt").write_text(f"{_dt.now():%Y-%m-%d} ({rev})", encoding="utf-8")
-    log("Sürüm: " + (stage / "surum.txt").read_text(encoding="utf-8"))
+    now = _dt.now()
+    surum, sira = f"{now:%Y-%m-%d} ({rev})", f"{now:%Y%m%d%H%M}"
+    (stage / "surum.txt").write_text(surum, encoding="utf-8")
+    (stage / "surum_sira.txt").write_text(sira, encoding="utf-8")          # uygulama içi güncelleme karşılaştırması
+    (stage / "baslatici.txt").write_text(baslatici_imzasi(), encoding="utf-8")
+    log("Sürüm: " + surum + " · sıra " + sira)
+    if a.guncelleme_paketi:
+        guncelleme_paketi(stage, out, surum, sira, rev)
     log("Paket sıkıştırılıyor…")
     payload = out / "payload.zip"
     with zipfile.ZipFile(payload, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z:
