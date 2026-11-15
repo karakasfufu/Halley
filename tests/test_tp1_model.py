@@ -1,6 +1,7 @@
 """Aşama 6 (2026-11-15): TP1 olasılık modeli — girdiler, kayıtlı model dosyası, eğitim = canlı tahmin eşliği."""
 import importlib.util
 import json
+import math
 import tempfile
 import unittest
 from datetime import date, timedelta
@@ -55,6 +56,19 @@ class Features(unittest.TestCase):
         self.assertTrue(0 < tp1_model.predict(f2, m) < 1)
         self.assertGreater(m["egitim"]["hisse"], 100)
         self.assertIsNone(tp1_model.load("yok.json"))
+
+
+class NewsFeatures(unittest.TestCase):
+    def test_kap_subject_features_without_look_ahead(self):
+        items = [("2026-11-10T09:00:00", "Yeni İş İlişkisi"), ("2026-11-12T19:00:00", "Finansal Rapor"),
+                 ("2026-11-11T10:00:00", "Pay Bazında Devre Kesici Bildirimi"),
+                 ("2026-11-12T10:00:00+03:00", "Pay Dışında Sermaye Piyasası Aracı İşlemlerine İlişkin Bildirim"),
+                 ("2026-10-25T10:00:00", "Özel Durum Açıklaması (Genel)"), ("2026-11-13T09:00:00", "Kar Payı")]
+        f = tp1_model.news_features(items, "2026-11-12")
+        self.assertEqual((f["h_is"], f["h_finansal"], f["h_kar_payi"], f["h_ozel"]), (1.0, 0.0, 0.0, 0.0))  # 18:00 sonrası yok
+        self.assertEqual((f["h_devre"], f["h_var"], f["h_gun"]), (1.0, 1.0, 2.0))
+        self.assertAlmostEqual(f["h_say30"], math.log1p(2))                  # tahvil bildirimi sayılmaz
+        self.assertEqual(tp1_model.news_features([], "2026-11-12")["h_var"], 0.0)
 
 
 class TrainingMatchesLive(unittest.TestCase):

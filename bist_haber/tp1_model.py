@@ -10,7 +10,8 @@ Yapay zekâ kullanılmaz; yalnız standart kütüphane (Python 3.9).
 import json
 import math
 from pathlib import Path
-from typing import Dict, List, Optional
+from datetime import date, timedelta
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from . import technical
 
@@ -59,6 +60,60 @@ def features(t: Dict, plan: Dict, ts: Dict, risk: str, mk: Dict) -> Dict[str, Op
          "risk_orta": 1.0 if risk == "orta" else 0.0,
          **{"tur_" + k: 1.0 if plan["tur"] == k else 0.0 for k in TURLER}, **mk}
     return f
+
+
+# ---------------------------------------------------------------- haber girdileri (yapay zekâsız, KAP konu başlığından)
+# 1. aşama (2026-11-15, kullanıcı: "Yalnız 1'e devam"): haberin İÇERİĞİ okunmaz; yalnız KAP bildiriminin konusu ve
+# zamanı. Haberin yönü/gücü (yapay zekâ skoru) 2. aşamaya bırakıldı.
+NOISE = ("Devre Kesici", "Pay Dışında Sermaye Piyasası Aracı", "Şirket Genel Bilgi Formu", "Faaliyet Raporu",
+         "Sorumluluk Beyanı", "Kurumsal Yönetim", "Katılım Finansı", "İzahname", "İhraç Tavanı", "Varant",
+         "BISTECH", "Bağımsız Denetim", "Sürdürülebilirlik", "Fon ", "Borçlanma Aracı")
+KATEGORI = {"h_is": ("Yeni İş İlişkisi", "Sözleşme", "İhale"), "h_geri_alim": ("Geri Alın",),
+            "h_pay_alim": ("Pay Alım Satım",), "h_sermaye": ("Sermaye Artırımı", "Bedelsiz"),
+            "h_finansal": ("Finansal Rapor",), "h_kar_payi": ("Kar Payı", "Kâr Payı"),
+            "h_ozel": ("Özel Durum Açıklaması (Genel)",), "h_olagan": ("Olağan Dışı",),
+            "h_genel_kurul": ("Genel Kurul",)}
+HABER_GUN = 5                    # sinyal gününden önceki 5 takvim günü (~3 işlem günü)
+
+
+def news_features(items: Iterable[Tuple[str, str]], signal_day: str) -> Dict[str, float]:
+    """items: (yayın zamanı 'YYYY-MM-DDTHH:MM:SS' TR saati, KAP konusu) — bu hissenin KAP bildirimleri.
+    Yalnız sinyal günü 18:00'e kadar yayımlananlar sayılır (akşam analizi 18:20'de; geleceği görme yok)."""
+    d = date.fromisoformat(signal_day)
+    end = signal_day + "T18:00:00"
+    w0 = (d - timedelta(days=HABER_GUN)).isoformat() + "T18:00:00"
+    m0 = (d - timedelta(days=30)).isoformat() + "T18:00:00"
+    f = {k: 0.0 for k in KATEGORI}
+    f.update(h_say=0.0, h_say30=0.0, h_devre=0.0, h_gun=30.0)
+    for ts, subj in items:
+        ts, subj = str(ts)[:19], subj or ""
+        if not (m0 < ts <= end):
+            continue
+        if "Devre Kesici" in subj:
+            if ts > w0:
+                f["h_devre"] = 1.0
+            continue
+        if any(n in subj for n in NOISE):
+            continue
+        f["h_say30"] += 1
+        f["h_gun"] = min(f["h_gun"], float((d - date.fromisoformat(ts[:10])).days))
+        if ts > w0:
+            f["h_say"] += 1
+            for k, keys in KATEGORI.items():
+                if any(x in subj for x in keys):
+                    f[k] = 1.0
+    f["h_var"] = 1.0 if f["h_say"] else 0.0
+    f["h_say"] = math.log1p(min(f["h_say"], 10))
+    f["h_say30"] = math.log1p(f["h_say30"])
+    return f
+
+
+def news_items(conn, ticker: str, signal_day: str) -> List[Tuple[str, str]]:
+    """Canlı veritabanından bu hissenin son 31 günlük KAP bildirimleri (news tablosu; analiz edilmiş/edilmemiş hepsi)."""
+    since = (date.fromisoformat(signal_day) - timedelta(days=31)).isoformat()
+    rows = conn.execute("SELECT published_at, subject FROM news WHERE source='kap' AND published_at>=? AND "
+                        "(','||candidates||',') LIKE ?", (since, f"%,{ticker},%")).fetchall()
+    return [(r[0], r[1]) for r in rows]
 
 
 # ---------------------------------------------------------------- model dosyası ve tahmin

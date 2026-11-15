@@ -186,3 +186,50 @@ Kullanıcı isteği: "Modeli geliştir, başlangıç sürümü eğitilmiş bir m
 
 - **Panele bağlı değil.** Seçimi ve eşikleri değiştirmez. Kartlarda bilgi olarak gösterilmesi ayrı onaya bağlı.
 - **Yeniden eğitmek için:** `python arastirma/asama6/egit.py <repo> <etiket.csv> <sonuc.json> --kaydet`
+
+---
+
+# Ek 2 (15.11.2026): haber 1. aşama — KAP konu başlıkları (yapay zekâsız)
+
+Kullanıcı kararı: "Yalnız 1. aşama" (yapay zekâ skoru yok).
+
+## Ne yapıldı
+- **Veri:** 4 yılın KAP bildirim listeleri indirildi (17.10.2022–13.11.2026; 299.996 bildirim, 216 haftalık aralık,
+  boşluk yok).
+  - Yalnız liste bilgisi alındı; metin okunmadı. Araştırma dosyasında `kap_liste` tablosunda duruyor.
+  - KAP bekleme süresi korundu. KAP iki kez istek sınırı uyguladı; beklenip kaldığı yerden devam edildi.
+- **Haber girdileri:** `tp1_model.news_features()`. Canlı ile ortak; canlıda `news_items()` haber tablosundan okur.
+  - Sinyal gününden önceki 5 gün içinde, o gün saat 18:00'e kadar yayımlanmış bildirimler sayılır. 18:00'den sonra
+    yayımlananlar hesaba katılmaz, böylece geleceği görme olmaz.
+  - Girdiler:
+    - haber var mı, kaç tane, son haberden bu yana geçen gün sayısı;
+    - konu türleri: yeni iş ilişkisi / sözleşme, geri alım, pay alım satım, sermaye artırımı, finansal rapor, kâr
+      payı, özel durum, olağan dışı hareket, genel kurul;
+    - devre kesici.
+  - Tahvil, bono ve bilgi formu gibi gürültü niteliğindeki bildirimler sayılmaz.
+- Planların %42'sinde son 5 günde en az bir haber vardı.
+
+## Sonuç: haber türü modele katkı yapmadı
+
+| Durum | TP1 SL'den önce |
+|---|---|
+| Son 5 günde haberi olan planlar | %29,2 |
+| Haberi olmayan planlar | %29,3 |
+
+- Konu türleri arasında da belirgin fark yok; çoğu %27–33 arasında.
+- Tek fark devre kesici: devre kesicisi olan planlarda TP1 oranı %24,8, olmayanlarda %31,2. Bu bilgiyi model
+  oynaklık girdisinden zaten alıyor.
+
+| Model | Son 12 ay isabet (AUC) | 2024 isabet (AUC) |
+|---|---|---|
+| Yalnız teknik (tp1_v1) | 0,605 | 0,612 |
+| Teknik + haber türü | 0,603 | 0,609 |
+
+- Fark aralığı son 12 ayda −0,006…+0,002, 2024'te −0,005…−0,001. Haber türü eklemek modeli iyileştirmiyor, hatta çok
+  az kötüleştiriyor.
+- **Karar:** Model dosyası tp1_v1 (yalnız teknik) olarak kalıyor.
+- Haber girdileri kodda hazır duruyor. 2. aşamada (haber metninden skor) aynı yapıya eklenecek.
+
+## Neden beklenen bir sonuç
+- Asıl haberlerin çoğu "Özel Durum Açıklaması (Genel)" konusunda: 5.649 bildirim.
+- İçeriğin iyi mi kötü mü olduğu konu başlığından anlaşılmıyor. Bunu yalnız metin söyler.

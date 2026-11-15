@@ -1682,3 +1682,11 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   bakılarak seçildi → hafif iyimserlik; canlı planlarla izlenmeli.
 - Test: tests/test_tp1_model.py (girdiler, kayıtlı model, eğitimdeki tahmin = canlı tahmin 9 basamak).
 - Canlı deneme: BAHKM kırılım %33 (orta), ENERY kırılım %37 (yüksek).
+
+## 2026-11-15 — Aşama 6 haber 1. aşama: KAP konu başlıkları (kullanıcı: "Yalnız 1'e devam")
+- `arastirma/asama6/kap_liste.py`: 4 yıllık KAP LİSTELERİ araştırma DB'sine (kap_liste; 299.996 bildirim, boşluksuz;
+  KAP_REQUEST_DELAY korundu; 429'da 5 dk bekleyip kaldığı yerden devam). Metin yok, YZ yok.
+- `tp1_model.news_features()` / `news_items()` (canlıyla ortak; sinyal günü 18:00'e kadar, 5 gün pencere) + test.
+- `haber_ekle.py`: etiketlere haber girdileri. Sonuç: haberli %29,2 / haberli olmayan %29,3 TP1; teknik+haber türü
+  AUC 0,603 / 0,609 (teknik 0,605 / 0,612) → katkı yok; tp1_v1 değişmedi. Konudan içerik anlaşılmıyor (Özel Durum).
+- 2. aşama için gereken metin sayısı (plan öncesi 5 gün, gürültü hariç): 19.752 (Özel Durum 5.649).
