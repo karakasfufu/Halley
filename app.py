@@ -1052,7 +1052,7 @@ def ready_card(r: dict) -> None:
                    + (f" · açılış {r['acilis']:.2f}" if r.get("acilis") else ""))
         st.caption(f"🧮 **Genel fırsat puanı {gp['puan']}/100** — haber {gp['parca']['haber']:.0f}/30 · teknik "
                    f"{gp['parca']['teknik']:.0f}/30 · risk/getiri {gp['parca']['risk_getiri']:.0f}/20 · risk "
-                   f"{gp['parca']['risk']:.0f}/20. Yalnız bilgi: seçimi ve sırayı değiştirmez, ağırlıklar henüz sınanmadı."
+                   f"{gp['parca']['risk']:.0f}/20. Yalnız bilgi: seçimi ve sırayı değiştirmez; 5 yıllık geçmiş sınamada TP1'i öngörmedi (yazı-tura düzeyi)."
                    + (" Yalnız teknik fırsatta haber puanı 0'dır (en fazla 70)." if teknik_ else ""))
         ml = model_line(r)
         if ml:
@@ -1976,8 +1976,8 @@ def page_dashboard() -> None:
                 "Durum": ready.STATE_TR.get(r["durum"], r["durum"])}
                 for r in READY_NEWS + READY_TECH]), ["SL", "TP1", "TP2", "R/G"]), hide_index=True, width="stretch")
             st.caption("Koşulu sağlanmış, açılışta uygulanabilir planlar. Açılış azami girişin (aralığın üst ucu) "
-                       "üstündeyse alınmaz. 📐 Yalnız teknik = haber desteği yok. Genel puan yalnız bilgi (ağırlıklar "
-                       "sınanmadı). Ayrıntı ve gerekçe Fırsatlar ekranında.")
+                       "üstündeyse alınmaz. 📐 Yalnız teknik = haber desteği yok. Genel puan yalnız bilgi "
+                       "(5 yıllık geçmiş sınamada TP1'i öngörmedi (yazı-tura düzeyi)). Ayrıntı ve gerekçe Fırsatlar ekranında.")
         else:
             st.caption("Şu an geçerli hazır fırsat yok (uygun yoksa liste boş kalır). Akşam analizi kapanıştan sonra "
                        "kendiliğinden yeni liste hazırlar.")
@@ -2067,7 +2067,7 @@ def page_firsatlar() -> None:
                    "üstü olumlu, −1,50 ve altı olumsuz). ✅ Teyitli: iki ayrı analiz aynı sonuca vardı · ⚠️ Kontrol et: "
                    "analizler çelişti. Altındaki etiket teknik trend özeti. 🔍 Analiz: tüm analiz · ➕ Takibe Al: bekçi "
                    "izlesin ve bildirsin. **Puan** = genel fırsat puanı (0–100: haber, teknik, en uygun giriş "
-                   "senaryosunun risk/getirisi ve riski); yalnız bilgi, ağırlıklar henüz sınanmadı, sırayı değiştirmez.")
+                   "senaryosunun risk/getirisi ve riski); yalnız bilgi, sırayı değiştirmez; 5 yıllık geçmiş sınamada TP1'i öngörmedi (yazı-tura düzeyi).")
         stock_list(positives, "Bu dönemde olumlu haber alan hisse yok.", "pos")
         section_title("📉", "Olumsuz haber alanlar", "neg", len(negatives))
         stock_list(negatives, "Bu dönemde olumsuz haber alan hisse yok.", "neg")

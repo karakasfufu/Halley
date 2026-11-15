@@ -13,7 +13,8 @@ En fazla 5 hisse; uygun yoksa 0 (liste doldurulmaz).
 2026-11-14 Aşama 4 (kullanıcı onaylı plan): "📐 Yalnız teknik fırsatlar" — olumlu haberi OLMAYAN likit hisselerden
 aynı "koşulu sağlanmış plan" kuralıyla, daha sıkı teknik şartla (≥ 7/10, yükseliş trendi; son haberleri olumsuz
 olanlar hariç) seçilir; kaynak='teknik' ile kaydedilir, haberlilerden AYRI listelenir ve AYRI ölçülür. Genel fırsat
-puanı (0–100) yalnız bilgi amaçlıdır: seçimi ve sıralamayı değiştirmez, ağırlıkları sınanmadı.
+puanı (0–100) yalnız bilgi amaçlıdır: seçimi ve sıralamayı değiştirmez. 2026-11-15 Aşama 6
+sınaması: 5 yıllık geçmişte TP1'i öngörmedi (AUC 0,49) — bu yüzden yalnız bilgi olarak kalır.
 
 YENİ ve HENÜZ SINANMAMIŞ sabitler (temkinli seçildi; sonuçlar hazir_firsat tablosunda ayrı ölçülüyor):
 READY_GAP_ATR, MAX_ENTRY_ATR, MIN_RR_AT_MAX, MIN_TECH. Hiçbir mevcut eşik değiştirilmedi. Yapay zekâ kullanılmaz
@@ -211,7 +212,7 @@ def overall_score(haber_skoru: Optional[float], teknik_skor: int, rr1: float, ri
 def score_text(g: Dict) -> str:
     p = g["parca"]
     return (f"genel puan {g['puan']}/100 (haber {p['haber']:.0f}/30 · teknik {p['teknik']:.0f}/30 · risk/getiri "
-            f"{p['risk_getiri']:.0f}/20 · risk {p['risk']:.0f}/20; ağırlıklar sınanmadı, yalnız bilgi)")
+            f"{p['risk_getiri']:.0f}/20 · risk {p['risk']:.0f}/20; 5 yıllık sınamada TP1'i öngörmedi, yalnız bilgi)")
 
 
 # ---------------------------------------------------------------- yalnız teknik fırsatlar
@@ -619,7 +620,7 @@ def report_md(res: Optional[Dict]) -> str:
         md += "\n"
     md += ("_Hazır fırsat kuralları yeni ve henüz sınanmadı (son kapanışa ≤0,5 ATR, r/g ≥1:2, teknik ≥5/10 — yalnız "
            "teknikte ≥7/10 ve yükseliş trendi —, risk yüksek değil); sonuçlar ayrıca ölçülüyor (🏁 Performans). Genel "
-           "puan yalnız bilgi amaçlıdır, ağırlıkları sınanmadı. Yatırım tavsiyesi değildir._\n\n")
+           "puan yalnız bilgi amaçlıdır; 5 yıllık geçmiş sınamada TP1'i öngörmedi (yazı-tura düzeyi). Yatırım tavsiyesi değildir._\n\n")
     return md
 
 

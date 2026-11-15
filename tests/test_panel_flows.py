@@ -214,7 +214,7 @@ class PanelFlowTests(unittest.TestCase):
         self.assertLess(md_.index("Hazır Fırsatlar"), md_.index("Yalnız teknik fırsatlar"))
         self.assertLess(md_.index("Yalnız teknik fırsatlar"), md_.index("Bekleyen Fırsatlar"))
         caps = [c_.value for c_ in at.caption]
-        self.assertTrue(any("Genel fırsat puanı 62/100" in x and "sınanmadı" in x for x in caps), caps)   # 15+24+12,5+10
+        self.assertTrue(any("Genel fırsat puanı 62/100" in x and "öngörmedi" in x for x in caps), caps)   # 15+24+12,5+10
         self.assertTrue(any("Genel fırsat puanı 46/100" in x and "en fazla 70" in x for x in caps))      # 0+24+12,5+10
         self.assertTrue(any("haber yok (yalnız teknik)" in x for x in caps))
         self.go(at, "🏁 Performans")

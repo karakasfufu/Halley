@@ -1759,3 +1759,9 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Panel: ⚙️ Ayarlar → "🎯 … olasılığını göster" anahtarı (`model_olasilik_goster`, varsayılan KAPALI); açıkken hazır
   fırsat kartında `model_line()`: "%37 — yüksek · geçmişte benzer 1465 durumda %31" + "haber hesaba katılmaz" uyarısı.
   KULLANIM.md bölümü eklendi. Test: test_stage6_model_line_hidden_until_setting_on. 510 test OK.
+
+## 2026-11-15 — Genel puan notu (kullanıcı: "senin önerilerine göre devam edelim")
+- Genel puan ekranda kalır, seçimi/sırayı yine değiştirmez; "ağırlıklar sınanmadı" yazan yerler (Fırsatlar kartı,
+  Pano altyazısı, olumlu haber listesi açıklaması, rapor dipnotu, score_text) "5 yıllık geçmiş sınamada TP1'i öngörmedi
+  (yazı-tura düzeyi)" olarak değişti (Aşama 6: AUC 0,49). Kart model olasılığı anahtarı KAPALI kalır; metin sınaması
+  sonucu görülünce karar verilecek. 510 test OK.

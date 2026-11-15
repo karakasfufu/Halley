@@ -34,7 +34,7 @@ class Score(unittest.TestCase):
         t = ready.overall_score(None, 10, 9, "düşük", "teknik")
         self.assertEqual((t["parca"]["haber"], t["puan"]), (0.0, 70))          # haber yok → en fazla 70
         self.assertEqual(ready.overall_score(9, 12, 9, "yüksek")["puan"], 80)  # sınırlar kırpılır
-        self.assertIn("sınanmadı", ready.score_text(g))
+        self.assertIn("öngörmedi", ready.score_text(g))
 
 
 class TechOnly(Base):
