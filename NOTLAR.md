@@ -1747,3 +1747,15 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   tüm DB'yi kopyaladığı için sütun korunuyor.
 - Eksik bulundu ve eklendi: gizli kaydı gerçek sonuçla karşılaştıran ölçüm yoktu → `tp1_model.live_check()` (+ test).
 - ASAMA6_RAPOR Ek 3 ve MIMARI_RAPOR aşama 7 satırı güncellendi.
+
+## 2026-11-15 — Aylık yeniden eğitim + kart gösterimi (kapalı anahtar) (kullanıcı: "Önerdiğin gibi yap")
+- `tp1_model.active_name()` / `load()`: etkin model `modeller/aktif.txt`'den (yoksa tp1_v1.json); eski dosyalar
+  silinmez, geri dönmek için aktif.txt'yi değiştirmek yeterli.
+- `arastirma/asama6/yeniden_egit.py`: --fiyat (araştırma DB'sine son 3 ay, Yahoo) → --etiket (etiketle.py) → ileriye
+  dönük sınama (son 12 ay) + eski modelin görmediği planlarda karşılaştırma → KAPI (AUC ≥ 0,55, Brier sabit orandan iyi,
+  eskiden en fazla 0,02 AUC düşük) → tp1_vYYYYMMDD.json; --etkinlestir ile aktif.txt. Canlı DB'ye yazmaz.
+  Deneme (geçici kopya repo): sınama AUC 0,605 / Brier +%2,81; yapay eski model (Eylül 2025'e kadar) ile 9.170 yeni
+  planda eski 0,6025 ↔ aday 0,6038 → kapı geçti; --etkinlestir yokken aktif.txt değişmedi.
+- Panel: ⚙️ Ayarlar → "🎯 … olasılığını göster" anahtarı (`model_olasilik_goster`, varsayılan KAPALI); açıkken hazır
+  fırsat kartında `model_line()`: "%37 — yüksek · geçmişte benzer 1465 durumda %31" + "haber hesaba katılmaz" uyarısı.
+  KULLANIM.md bölümü eklendi. Test: test_stage6_model_line_hidden_until_setting_on. 510 test OK.

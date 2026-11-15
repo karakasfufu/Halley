@@ -120,7 +120,19 @@ def news_items(conn, ticker: str, signal_day: str) -> List[Tuple[str, str]]:
 _CACHE: Dict[str, Dict] = {}
 
 
-def load(name: str = DEFAULT) -> Optional[Dict]:
+def active_name() -> str:
+    """Etkin model dosyası: modeller/aktif.txt (aylık yeniden eğitim yazar); yoksa tp1_v1.json."""
+    try:
+        n = (MODEL_DIR / "aktif.txt").read_text(encoding="utf-8").strip()
+        if n and (MODEL_DIR / n).exists():
+            return n
+    except OSError:
+        pass
+    return DEFAULT
+
+
+def load(name: Optional[str] = None) -> Optional[Dict]:
+    name = name or active_name()
     if name not in _CACHE:
         try:
             _CACHE[name] = json.loads((MODEL_DIR / name).read_text(encoding="utf-8"))

@@ -1006,6 +1006,22 @@ def news_line(tk: str) -> str:
 NAMES_ALL = {r["ticker"]: r["name"] for r in conn.execute("SELECT ticker, name FROM companies")}
 
 
+def model_line(r: dict) -> str:
+    """Aşama 6: öneri anında kaydedilen model olasılığı (gizli kayıt). Ayar kapalıysa ya da kayıt yoksa boş."""
+    if not pipeline.load_settings().get("model_olasilik_goster", False) or not r.get("model_json"):
+        return ""
+    try:
+        m = json.loads(r["model_json"])
+    except ValueError:
+        return ""
+    if m.get("olasilik") is None:
+        return ""
+    sim = (f" · geçmişte benzer {m['benzer_n']} durumda %{100 * m['benzer_oran']:.0f}"
+           if m.get("benzer_n") and m.get("benzer_oran") is not None else "")
+    return (f"🎯 **TP1'e SL'den önce ulaşma olasılığı (model): %{100 * m['olasilik']:.0f} — {m.get('bant', '?')}**{sim}. "
+            "Yalnız bilgi: yalnız teknik veriden (haber hesaba katılmaz); geçmişte söylediği oranlar biraz iyimser çıktı.")
+
+
 def ready_card(r: dict) -> None:
     tk = r["ticker"]
     pct = lambda v: f"{(v / r['giris'] - 1) * 100:+.1f}%"
@@ -1038,6 +1054,9 @@ def ready_card(r: dict) -> None:
                    f"{gp['parca']['teknik']:.0f}/30 · risk/getiri {gp['parca']['risk_getiri']:.0f}/20 · risk "
                    f"{gp['parca']['risk']:.0f}/20. Yalnız bilgi: seçimi ve sırayı değiştirmez, ağırlıklar henüz sınanmadı."
                    + (" Yalnız teknik fırsatta haber puanı 0'dır (en fazla 70)." if teknik_ else ""))
+        ml = model_line(r)
+        if ml:
+            st.caption(ml)
         if not teknik_:
             st.caption(news_line(tk))
         st.caption("Neden: " + r["neden"])
@@ -1455,6 +1474,13 @@ def settings_panel() -> None:
     if (commission, slippage, capital, risk_pct) != (saved.get("komisyon_pct"), saved.get("kayma_pct"),
                                                       saved.get("sermaye"), saved.get("risk_pct")):
         pipeline.save_settings(komisyon_pct=commission, kayma_pct=slippage, sermaye=capital, risk_pct=risk_pct)
+    # 2026-11-15 Aşama 6: model olasılığını kartlarda gösterme anahtarı (varsayılan KAPALI; kullanıcı kararı bekleniyor)
+    mp_on = st.toggle("🎯 Hazır fırsat kartlarında modelin \"TP1'e SL'den önce ulaşma olasılığı\"nı göster (varsayılan kapalı)",
+                      key="model_olasilik_set", value=bool(saved.get("model_olasilik_goster", False)),
+                      help="Yalnız bilgi: seçimi, sırayı ve eşikleri değiştirmez. Model 4 yıllık geçmişle yalnız teknik veriden "
+                           "eğitildi (haberi hesaba katmaz); son 12 ayda olasılıkları 2–6 puan yüksek söyledi. Ayrıntı: ASAMA6_RAPOR.md")
+    if mp_on != bool(saved.get("model_olasilik_goster", False)):
+        pipeline.save_settings(model_olasilik_goster=mp_on)
     # W6: bekçinin yapay zekâ yorumları için aylık bütçe (haber analizi maliyeti bunun dışında)
     ai_budget = st.number_input("Bekçi yapay zekâ yorumu aylık bütçesi (\\$)", 0.0, 100.0,
                                 float(saved.get("yz_butce_usd", ai_comment.DEFAULT_BUDGET_USD)), 1.0, format="%.2f",

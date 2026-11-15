@@ -170,6 +170,16 @@ tavsiyesi değildir.
 - **📰 Haber özeti ve etkisi:** her haberli hazır fırsat kartında son yönlü haberin özeti, yönü, etkisi ve güveni yazar
   (kayıtlı analizden; yapay zekâ çağrılmaz).
 
+## 🎯 Model olasılığı (isteğe bağlı, varsayılan kapalı)
+- Halley her hazır fırsat için, öneri anında "TP1'e zarar durdurdan (SL) önce ulaşma olasılığı" tahminini sessizce
+  kaydeder. Bu tahmin, 4 yıllık BIST geçmişinden yalnız teknik veriyle eğitilmiş modelden gelir ve haberi hesaba katmaz.
+- Görmek için: ⚙️ Ayarlar → **🎯 Hazır fırsat kartlarında modelin olasılığını göster**. Kartta örneğin
+  "%37 — yüksek · geçmişte benzer 1465 durumda %31" yazar.
+- **Yalnız bilgi.** Seçimi, sırayı ve eşikleri değiştirmez. Geçmiş sınamada söylediği oranlar 2–6 puan iyimser çıktı;
+  sayıyı kesin bir şans gibi değil, kabaca bir yön göstergesi gibi okuyun. Bantlar (düşük / orta / yüksek), planın
+  benzerleri arasında nerede durduğunu gösterir.
+- Model ayda bir yeni fiyatlarla yeniden eğitilebilir. Yeni model eskisinden kötüyse kullanılmaz.
+
 ## 📈 Grafik ve olası fiyat aralığı (🔍 Hisse Analizi, hazır fırsat kartları)
 
 - **Mum grafiği:** her mum bir işlem günü (yeşil yükselen, kırmızı düşen); altında hacim. Çizgiler EMA 20/50/200.

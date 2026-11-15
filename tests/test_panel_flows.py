@@ -1,5 +1,6 @@
 """2026-11-09 uçtan uca kontrolde bulunan panel hataları için kalıcı testler (kullanıcı akışları)."""
 import math
+import json
 import os
 import tempfile
 import unittest
@@ -227,6 +228,28 @@ class PanelFlowTests(unittest.TestCase):
         opts = at.selectbox(key="rep_pick").options
         self.assertTrue(opts and all("haftalık rapor" in o for o in opts), opts)
         self.assertTrue(any("Haftalık rapor" in m.value for m in at.markdown))
+
+    def test_stage6_model_line_hidden_until_setting_on(self):
+        """2026-11-15 Aşama 6: gizli kayıttaki model olasılığı kartta yalnız ayar açıkken görünür (varsayılan kapalı)."""
+        c = db.connect()
+        mj = json.dumps({"olasilik": 0.3728, "bant": "yüksek", "benzer_n": 1465, "benzer_oran": 0.314, "surum": "tp1_v1"})
+        c.execute("INSERT INTO hazir_firsat(olusturuldu,analiz,signal_day,giris_gunu,ticker,tur,kapanis,giris,giris_alt,"
+                  "azami_giris,sl,tp1,tp2,rr1,vade_lo,vade_hi,haber_skoru,teknik_skor,risk,neden,durum,kaynak,model_json) "
+                  "VALUES('2026-11-09T19:00:00+03:00','aksam','2026-11-09',?,'TEK','kirilim_teyitli',100,100,99.4,100.6,96,"
+                  "110,114,2.5,10,14,NULL,8,'orta','gerekçe','aday','teknik',?)", (date.today().isoformat(), mj))
+        c.commit()
+        c.close()
+        at = self.app("🎯 Fırsatlar")
+        self.assertEqual(len(at.exception), 0, str(at.exception))
+        self.assertFalse(any("ulaşma olasılığı (model)" in c_.value for c_ in at.caption))
+        self.go(at, "⚙️ Ayarlar")
+        at.toggle(key="model_olasilik_set").set_value(True).run()
+        self.assertEqual(len(at.exception), 0, str(at.exception))
+        self.assertTrue(pipeline.load_settings().get("model_olasilik_goster"))
+        self.go(at, "🎯 Fırsatlar")
+        caps = [c_.value for c_ in at.caption]
+        self.assertTrue(any("%37 — yüksek" in x and "benzer 1465 durumda %31" in x and "haber hesaba katılmaz" in x
+                            for x in caps), caps)
 
     def test_stage5_chart_and_cone_on_stock_page(self):
         """2026-11-15 Aşama 5: Hisse Analizi'nde grafik çizilir, koni açıklaması ve dönem/koni seçimi çalışır."""
