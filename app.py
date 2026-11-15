@@ -2515,18 +2515,24 @@ def model_live_panel() -> None:
         st.caption("Henüz kaydedilmiş tahmin yok. İlk tahminler bir sonraki akşam analizinde ya da sabah kontrolünde "
                    "hazır fırsatlarla birlikte kaydedilir.")
         return
-    f1, f2, f3, f4, f5 = st.columns([1.4, 1.2, 1.4, 1.1, 1.3])
+    f1, f2, f3, f4, f6, f5 = st.columns([1.4, 1.1, 1.3, 1.2, 1.1, 1.3])
     ms = f1.selectbox("Model sürümü", [v["model_surum"] for v in vers], key="ml_model",
                       format_func=lambda m: f"{m} ({next(v['n'] for v in vers if v['model_surum'] == m)} tahmin)")
     kay = {"Hepsi": None, "📰 Haberli": "haber", "📐 Yalnız teknik": "teknik"}[
         f2.selectbox("Kaynak", ["Hepsi", "📰 Haberli", "📐 Yalnız teknik"], key="ml_kay")]
     tur_s = f3.selectbox("Senaryo türü", ["Hepsi"] + list(ready.TYPE_NAMES), key="ml_tur",
                          format_func=lambda t: "Hepsi" if t == "Hepsi" else ready.TYPE_NAMES[t])
-    ana = {"Hepsi": None, "Akşam": "aksam", "Sabah": "sabah"}[f4.selectbox("Analiz", ["Hepsi", "Akşam", "Sabah"],
-                                                                         key="ml_ana")]
+    ana = {"Hepsi": None, "Akşam": "aksam", "Sabah": "sabah"}[f4.selectbox(
+        "Planı üreten analiz", ["Hepsi", "Akşam", "Sabah"], key="ml_ana",
+        help="Planı ilk üreten analiz. Sabah kontrolünde onaylanan akşam planı burada 'Akşam' olarak kalır.")]
+    kyt = {"Tümü": None, "Sabah": "sabah", "Akşam": "aksam"}[f6.selectbox(
+        "Kayıt zamanı", ["Tümü", "Sabah", "Akşam"], key="ml_kayit",
+        help="Tahminin deftere gerçekte yazıldığı zaman: giriş gününün kendisinde (ör. 08:30 sabah kontrolü) ise "
+             "'Sabah', giriş gününden önce (akşam analizi, gece yarısını geçse bile) ise 'Akşam'.")]
     bel = f5.toggle("Aynı mumda TP/SL olanları dahil et", value=True, key="ml_bel",
                     help="Günlük mumda hem TP1 hem SL görüldüyse gerçekleşme sırası bilinmez; kural SL'yi önce sayar.")
-    o = defter.ozet(conn, ms, kaynak=kay, tur=None if tur_s == "Hepsi" else tur_s, analiz=ana, belirsiz_dahil=bel)
+    o = defter.ozet(conn, ms, kaynak=kay, tur=None if tur_s == "Hepsi" else tur_s, analiz=ana, belirsiz_dahil=bel,
+                    kayit=kyt)
     sy = o["sayilar"]
     k = st.columns(6)
     k[0].metric("Tahmin", sy["tahmin"])

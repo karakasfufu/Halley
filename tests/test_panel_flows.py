@@ -298,6 +298,17 @@ class PanelFlowTests(unittest.TestCase):
         md_ = " ".join(m.value for m in at.markdown)
         self.assertIn("Model canlı performansı", md_)
         self.assertEqual(at.selectbox(key="ml_model").value, "tp1_v1")
+        # 16.11: "Planı üreten analiz" etiketi ve ayrı "Kayıt zamanı" filtresi (Sabah / Akşam / Tümü)
+        self.assertEqual(at.selectbox(key="ml_ana").label, "Planı üreten analiz")
+        self.assertEqual((at.selectbox(key="ml_kayit").label, at.selectbox(key="ml_kayit").options),
+                         ("Kayıt zamanı", ["Tümü", "Sabah", "Akşam"]))
+        tah = lambda: next(m.value for m in at.metric if m.label == "Tahmin")
+        self.assertEqual(tah(), "1")
+        at.selectbox(key="ml_kayit").set_value("Akşam").run()       # kayıt bugün, giriş günü yarın → akşam
+        self.assertEqual((len(at.exception), tah()), (0, "1"))
+        at.selectbox(key="ml_kayit").set_value("Sabah").run()
+        self.assertEqual(len(at.exception), 0)
+        self.assertEqual(tah(), "0")                                    # o filtrede tahmin yok → sayı 0
         c = db.connect()
         self.assertEqual(c.execute("SELECT COUNT(*) FROM tahmin").fetchone()[0], 1)
         self.assertIsNotNone(c.execute("SELECT model_json FROM hazir_firsat").fetchone()[0])   # gösterim alanı doldu
