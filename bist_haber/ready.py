@@ -349,7 +349,7 @@ def fill_missing_model(conn, now: Optional[datetime] = None) -> int:
 
 
 def _store(conn, p: Dict, analiz: str, giris_gunu: str, durum: str, now: datetime) -> None:
-    conn.execute(
+    cur = conn.execute(
         "INSERT INTO hazir_firsat(olusturuldu,analiz,signal_day,giris_gunu,ticker,tur,kapanis,giris,giris_alt,azami_giris,"
         "sl,tp1,tp2,rr1,vade_lo,vade_hi,haber_skoru,teknik_skor,risk,neden,durum,guncellendi,kaynak,genel_puan,model_json) "
         "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(signal_day, ticker) DO UPDATE SET "
@@ -363,6 +363,21 @@ def _store(conn, p: Dict, analiz: str, giris_gunu: str, durum: str, now: datetim
          p["azami_giris"], p["sl"], p["tp1"], p["tp2"], p["rr1"], p["vade_lo"], p["vade_hi"], p["haber_skoru"],
          p["teknik_skor"], p["risk"], p["neden"], durum, _iso(now), p.get("kaynak", "haber"), p.get("genel_puan"),
          model_info(conn, p, now)))
+    if cur.rowcount:      # FAZ 1: plan gerçekten yazıldıysa tahmin defterine (aynı plan → tek satır; hata öneriyi engellemez)
+        from . import defter
+        row = conn.execute("SELECT id, giris_gunu FROM hazir_firsat WHERE signal_day=? AND ticker=?",
+                           (p["signal_day"], p["ticker"])).fetchone()
+        if row:
+            defter.kaydet(conn, p, row["id"], row["giris_gunu"], analiz, now)
+
+
+def _defter_sonuclandir(conn, now: datetime) -> None:
+    """FAZ 1: açık tahminlerin nihai sonuçları (yalnız kayıt; seçim kurallarını etkilemez, hata fırlatmaz)."""
+    try:
+        from . import defter
+        defter.sonuclandir(conn, now)
+    except Exception:
+        pass
 
 
 def _cancel(conn, rid: int, why: str, now: datetime) -> None:
@@ -374,6 +389,7 @@ def evening(conn, ctx, rows: List[Dict], now: Optional[datetime] = None,
     """Kapanış sonrası: ertesi işlem günü için hazır liste (durum 'aday'); önce eski önerilerin sonuçları güncellenir."""
     now = now or _now()
     ev = evaluate_all(conn)
+    _defter_sonuclandir(conn, now)
     sel = select(conn, ctx, rows)
     tech = select_tech(conn, ctx, rows, universe)
     allp = sel["secilen"] + tech["secilen"]
@@ -461,6 +477,7 @@ def morning(conn, ctx, rows: List[Dict], now: Optional[datetime] = None, ai: boo
     çıkan varsa ekle (toplam en fazla 5)."""
     now = now or _now()
     ev = evaluate_all(conn)
+    _defter_sonuclandir(conn, now)
     today = now.date().isoformat()
     gday = today if market_calendar.is_trading_day(now.date()) else market_calendar.next_trading_day(now.date()).isoformat()
     olds = rows_for(conn, gday, ["aday", "onaylandi"])

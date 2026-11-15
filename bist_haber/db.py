@@ -1,5 +1,7 @@
 """SQLite veritabanı. Prototip için SQLite; ileride PostgreSQL'e geçmek kolay."""
 import sqlite3
+from pathlib import Path
+from typing import Dict, List
 
 from . import config
 
@@ -326,4 +328,152 @@ def connect(path=None) -> sqlite3.Connection:
     for col in ("open", "high", "low"):  # teknik analiz için (2026-11-07)
         if col not in price_cols:
             conn.execute(f"ALTER TABLE prices ADD COLUMN {col} REAL")
+    migrate_tahmin(conn, path)
     return conn
+
+
+# ---------------------------------------------------------------- FAZ 1 (2026-11-16): canlı tahmin defteri
+# Tahmin = belirli anda, dondurulmuş plan seviyeleri için modelin söylediği (YALNIZ EKLENİR; değiştirilemez, silinemez).
+# Tahmin sonucu = o tahminin kendi seviyeleriyle nihai sonucu (tahmin başına en fazla bir satır; YALNIZ EKLENİR).
+# Hazır fırsat (hazir_firsat) ve sanal işlem (trade_journal) ayrı kavramlardır ve bu tablolardan etkilenmez.
+TAHMIN_SCHEMA = """
+CREATE TABLE IF NOT EXISTS tahmin (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    plan_imzasi      TEXT NOT NULL UNIQUE,
+    onceki_tahmin_id INTEGER REFERENCES tahmin(id),
+    hazir_firsat_id  INTEGER,
+    ticker           TEXT NOT NULL,
+    signal_day       TEXT NOT NULL,
+    giris_gunu       TEXT NOT NULL,
+    analiz           TEXT,
+    tahmin_zamani    TEXT NOT NULL,
+    model_surum      TEXT NOT NULL,
+    model_dosya      TEXT,
+    ozellik_surum    TEXT NOT NULL,
+    parametre_surum  TEXT NOT NULL,
+    kod_surum        TEXT,
+    olasilik         REAL NOT NULL,
+    bant             TEXT,
+    benzer_n         INTEGER,
+    benzer_oran      REAL,
+    tur              TEXT NOT NULL,
+    giris            REAL NOT NULL,
+    giris_alt        REAL,
+    azami_giris      REAL NOT NULL,
+    sl               REAL NOT NULL,
+    tp1              REAL NOT NULL,
+    tp2              REAL NOT NULL,
+    rr1              REAL,
+    gecerlilik_gun   INTEGER NOT NULL,
+    genel_puan       REAL,
+    teknik_skor      INTEGER,
+    haber_skoru      REAL,
+    kaynak           TEXT,
+    risk             TEXT,
+    girdi_json       TEXT,
+    teknik_json      TEXT,
+    rejim_json       TEXT,
+    veri_json        TEXT,
+    sonradan         INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS tahmin_hisse_gun ON tahmin(ticker, giris_gunu);
+CREATE TABLE IF NOT EXISTS tahmin_sonuc (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    tahmin_id          INTEGER NOT NULL UNIQUE REFERENCES tahmin(id),
+    sonuc_turu         TEXT NOT NULL,     -- tamamlandi | girissiz | iptal | yerini_aldi | gec_kayit
+    neden              TEXT,
+    giris_gunu_gercek  TEXT,
+    giris_fiyati       REAL,
+    tp1_goruldu        INTEGER,
+    sl_goruldu         INTEGER,
+    cikis_nedeni       TEXT,
+    cikis_gunu         TEXT,
+    islem_gunu         INTEGER,
+    net_getiri_pct     REAL,
+    r                  REAL,
+    mae_r              REAL,
+    mfe_r              REAL,
+    ayni_gun_belirsiz  INTEGER NOT NULL DEFAULT 0,
+    belirsiz_gunler    TEXT,
+    ayrinti_json       TEXT,
+    degerlendirme_zamani TEXT NOT NULL,
+    kural_surum        TEXT NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS tahmin_no_update BEFORE UPDATE ON tahmin
+BEGIN SELECT RAISE(ABORT, 'tahmin kaydı değiştirilemez'); END;
+CREATE TRIGGER IF NOT EXISTS tahmin_no_delete BEFORE DELETE ON tahmin
+BEGIN SELECT RAISE(ABORT, 'tahmin kaydı silinemez'); END;
+CREATE TRIGGER IF NOT EXISTS tahmin_sonuc_no_update BEFORE UPDATE ON tahmin_sonuc
+BEGIN SELECT RAISE(ABORT, 'tahmin sonucu değiştirilemez'); END;
+CREATE TRIGGER IF NOT EXISTS tahmin_sonuc_no_delete BEFORE DELETE ON tahmin_sonuc
+BEGIN SELECT RAISE(ABORT, 'tahmin sonucu silinemez'); END;
+"""
+USER_TABLES = ("news", "hazir_firsat", "trade_journal", "watchlist")
+TAHMIN_GOC = {"durum": None, "yedek": None, "hata": None}   # son göç denemesi (panel ve testler okur)
+
+
+def _has_user_data(conn) -> bool:
+    for t in USER_TABLES:
+        try:
+            if conn.execute(f"SELECT 1 FROM {t} LIMIT 1").fetchone():
+                return True
+        except sqlite3.Error:
+            continue
+    return False
+
+
+def migrate_tahmin(conn, path) -> Dict:
+    """Tahmin defteri tablolarını ekler (yalnız EKLEME; mevcut tablolara dokunmaz). Tablo zaten varsa hiçbir şey
+    yapmaz. Kullanıcı verisi varsa ÖNCE tutarlı yedek alınır ve doğrulanır (PRAGMA integrity_check); yedek
+    alınamazsa ya da bozuksa göç YAPILMAZ (Halley bugünkü gibi çalışır, defter kapalı kalır)."""
+    from datetime import datetime as _dt
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='tahmin'").fetchone():
+        TAHMIN_GOC.update(durum="var", yedek=None, hata=None)
+        return dict(TAHMIN_GOC)
+    yedek = None
+    try:
+        if path is not None and str(path) != ":memory:" and _has_user_data(conn):
+            p = Path(path)
+            ydir = p.parent / "yedek"
+            ydir.mkdir(parents=True, exist_ok=True)
+            yedek = ydir / f"{p.stem}_{_dt.now():%Y%m%d_%H%M%S}_tahmin_defteri_oncesi.db"
+            conn.commit()
+            dst = sqlite3.connect(yedek)
+            try:
+                conn.backup(dst)
+                chk = dst.execute("PRAGMA integrity_check").fetchone()[0]
+            finally:
+                dst.close()
+            if chk != "ok":
+                TAHMIN_GOC.update(durum="yedek_bozuk", yedek=str(yedek), hata=chk)
+                return dict(TAHMIN_GOC)
+    except Exception as e:  # yedek alınamadıysa göç yapılmaz
+        TAHMIN_GOC.update(durum="yedek_hatasi", yedek=str(yedek) if yedek else None, hata=str(e)[:200])
+        return dict(TAHMIN_GOC)
+    try:
+        conn.commit()
+        conn.execute("BEGIN")
+        for stmt in _split_sql(TAHMIN_SCHEMA):
+            conn.execute(stmt)
+        conn.execute("COMMIT")
+    except Exception as e:
+        try:
+            conn.execute("ROLLBACK")
+        except sqlite3.Error:
+            pass
+        TAHMIN_GOC.update(durum="goc_hatasi", yedek=str(yedek) if yedek else None, hata=str(e)[:200])
+        return dict(TAHMIN_GOC)
+    TAHMIN_GOC.update(durum="olusturuldu", yedek=str(yedek) if yedek else None, hata=None)
+    return dict(TAHMIN_GOC)
+
+
+def _split_sql(script: str) -> List[str]:
+    """Tetikleyici gövdesindeki ';' bölünmesin diye sqlite3.complete_statement ile ifadelere ayırır."""
+    out, buf = [], ""
+    for line in script.splitlines(keepends=True):
+        buf += line
+        if sqlite3.complete_statement(buf):
+            if buf.strip():
+                out.append(buf.strip())
+            buf = ""
+    return out

@@ -1344,3 +1344,173 @@ hesaplanır.
   7. Yedek geri konur (3. seviye); göç öncesi özetlerle birebir aynı olmalı.
 
   **Canlı veritabanına göç yapılmaz.** FAZ 1 kodu canlı klasöre ancak ayrı onayla konur.
+
+---
+
+# EK D (16.11.2026) — FAZ 1 tamamlama raporu: canlı tahmin defteri (test ortamı)
+
+**Durum:**
+
+- Kod yazıldı ve test ortamında sınandı.
+- Canlı veritabanına göç **yapılmadı**.
+- Canlı klasöre **konmadı**.
+- Müşteriye güncelleme **yayımlanmadı**.
+- FAZ 2'ye **geçilmedi**.
+
+Kod ayrı bir dalda: `faz1-tahmin-defteri` (gizli depo). Ana dal (`main`) FAZ 1 içermez; ileride başka bir düzeltme
+canlıya alınırsa FAZ 1 istemeden gitmez.
+
+## D1. Tamamlanan işler
+
+- **İki yeni tablo:** `tahmin` ve `tahmin_sonuc`. Yalnız eklenir; dört tetikleyici güncellemeyi ve silmeyi
+  reddeder.
+- **Plan imzası:** Ek C2'deki alanlar, `UNIQUE` + `INSERT OR IGNORE`.
+  - Tekrar kayıt "tekrar" sayılır.
+  - Seviye ya da sürüm değişince "yeni" kayıt açılır ve öncekine bağlanır (`onceki_tahmin_id`).
+  - Yalnız olasılık, rejim ya da veri kalitesi değişirse ilk kayıt dondurulmuş kalır.
+- **Dondurma:** Tahmin anında kopyalananlar:
+  - olasılık, bant, benzer durumlar,
+  - model, özellik, parametre ve kod sürümü,
+  - model girdileri, teknik göstergeler ve teknik skor,
+  - rejim, veri kalitesi,
+  - işlem seviyeleri ve puanlar.
+
+  Göstergeler ile olasılık aynı pencereden tek seferde alınır (`tp1_model.plan_context`).
+- **Sonuçlandırma (kural sürümü s1, Ek C3):**
+  - `journal.evaluate` aynen kullanılır.
+  - Giriş günü açılışında giriş yapılır; açılış azami girişin üstündeyse sonuç `girissiz` olur.
+  - Giriş günü mumu yoksa sonuç `girissiz` olur.
+  - Aynı mumda TP ve SL görülürse SL önce sayılır; ayrıca `ayni_gun_belirsiz` işareti ve günleri yazılır.
+  - MAE/MFE (R) hesaplanır.
+  - Diğer sonuç türleri: `iptal`, `yerini_aldi`, `gec_kayit`.
+  - Açık tahmin metriklere girmez.
+- **Ölçüm** (`defter.ozet`): tek model sürümü üzerinden çalışır; sürümler karışmaz. Hesaplananlar:
+  - sayılar, kazanma oranı, TP1 oranı (%90 Wilson aralığıyla),
+  - beklenen R, ortalama net %,
+  - Brier, log loss,
+  - MAE/MFE ortalamaları,
+  - kalibrasyon (bantlara göre), rejime göre sonuç,
+  - geçmiş beklenti ile canlı sonucun farkı,
+  - güven etiketi,
+  - aynı model sürümünde birden fazla özellik ya da parametre sürümü varsa uyarı.
+- **Panel:** 🏁 Performans → "🎯 Model canlı performansı (tahmin defteri)". Yalnız okuma. Filtreler:
+  - model sürümü (tek seçim, "tümü" yok),
+  - kaynak,
+  - senaryo türü,
+  - analiz (akşam / sabah),
+  - aynı mumda TP/SL olanları dahil et / hariç tut.
+- **Bağlantılar:**
+  - `ready._store`: plan gerçekten yazıldıysa (`rowcount`) tahmin kaydedilir.
+  - `ready.evening` ve `ready.morning`: başlarında sonuçlandırma yapılır.
+  - Her iki çağrı da hata fırlatmaz; hazır fırsat akışını engellemez.
+
+## D2. Değiştirilen ve yeni dosyalar
+
+| Dosya | Değişiklik |
+|---|---|
+| `bist_haber/defter.py` | **YENİ** (378 satır): kayıt, imza, sürümler, sonuçlandırma, ölçüm |
+| `bist_haber/db.py` | +150: `TAHMIN_SCHEMA`, `migrate_tahmin` (yedek → integrity_check → tek işlemde oluşturma), `_split_sql` |
+| `bist_haber/ready.py` | +19 / −2: `_store` sonunda tahmin kaydı; `evening`/`morning` başında `_defter_sonuclandir`. **Seçim kuralları ve eşikler değişmedi.** |
+| `bist_haber/tp1_model.py` | +20 / −6: `plan_context()` eklendi; `plan_features()` onu çağırıyor. **Hesap aynı.** Eğitim = canlı eşlik testi (TrainingMatchesLive) geçiyor. |
+| `app.py` | +68: `model_live_panel()` ve Performans'ta çağrısı |
+| `tests/test_defter.py` | **YENİ** (17 test) |
+| `tests/test_panel_flows.py` | +1 test (panel + yeniden çalıştırma) |
+
+Değişmeyenler: `journal.py`, `tradeplan.py`, `entries.py`, `signals.py`, model dosyası (`tp1_v1.json`),
+`analyzer.py` (gpt-5-mini kullanımı), `hazir_firsat` ve `trade_journal` şemaları.
+
+## D3. Veritabanı değişiklikleri
+
+- **Yeni:** `tahmin`, `tahmin_sonuc`, `tahmin_hisse_gun` indeksi ve 4 tetikleyici.
+- **Değişen:** mevcut tablo ya da sütun yok.
+- **Göç ne zaman çalışır:** `db.connect` içinde, yalnız `tahmin` tablosu yoksa.
+- **Yedek ne zaman alınır:** Kullanıcı verisi varsa (news, hazir_firsat, trade_journal ya da watchlist tablosunda
+  satır) önce yedek alınır: `<veri>/yedek/<ad>_<zaman>_tahmin_defteri_oncesi.db`.
+- **Yedek bozuksa ya da alınamazsa:** Göç yapılmaz, defter kapalı kalır, Halley bugünkü gibi çalışır.
+
+## D4. Yapay zekâ çağrılarındaki değişim
+
+**Yok.** Defter yalnız kayıtlı fiyatları ve yerel model dosyasını kullanır.
+
+## D5. Test sonuçları
+
+- **Tam takım:** `Ran 540 tests … OK`. Önceki 522 + 17 defter testi + 1 panel testi. Ağ denemesi 0.
+- **Defter testleri** (`tests/test_defter.py`, 17 test, hepsi geçti):
+  - **Değiştirilemezlik:** `UPDATE` ve `DELETE` reddediliyor (tahmin ve sonuç).
+  - **Dondurma:** Saklanan olasılık hazır fırsattaki olasılıkla aynı. Girdi, teknik, rejim ve veri alanları dolu;
+    teknik gösterge günü sinyal günü.
+  - **Tekrar / yeni:**
+    - 5 kayıt → 1 satır.
+    - Yalnız olasılık değişince "tekrar" ve ilk değer korunuyor.
+    - SL değişince "yeni" + `onceki_tahmin_id`.
+    - Parametre sürümü değişince "yeni".
+  - **Akış:**
+    - `_store` 3 kez → 1 tahmin.
+    - Defter hatası hazır fırsatı engellemiyor.
+    - `_store` yazmadıysa (durum "giris") tahmin yok.
+  - **Sonuç:**
+    - TP1 → TP2 yolu, R > 0, MAE −0,5 R ve MFE 3,25 R, elle hesaplananla aynı.
+    - Aynı mumda TP1 + SL → SL + belirsiz işaretli ve günü yazılı.
+    - Giriş gününde ikisi birden görülürse → SL + belirsiz.
+    - Açılış azami girişin üstündeyse → girişsiz.
+    - Giriş günü mumu yoksa → girişsiz.
+    - Pozisyon sürüyorsa → açık ve metrik yok.
+  - **Kendi seviyeleri:** Sabah yeni tahmin oluşunca akşamki "yerini aldı" oluyor. Hazır fırsatın SL'si sonradan
+    değişse bile sonuç tahminin kendi SL'siyle hesaplanıyor. İptal edilen fırsat → "iptal".
+  - **Zaman:** Açılıştan sonra kaydedilen → "geç kayıt". Sonradan eklenen → ana hesap dışında.
+  - **Metrik:** Bilinen 10 tahminde Brier, log loss, TP1 %, Wilson aralığı ve bant kalibrasyonu elle hesaplananla
+    aynı. Başka model sürümü karışmıyor. Girişsiz ayrı sayılıyor.
+  - **Göç:**
+    - Yeni veritabanında yedek alınmıyor, ikinci açılışta tekrar çalışmıyor.
+    - Kullanıcı verili eski şemada önce yedek alınıyor; yedek sağlam ve göç öncesi hâlinde.
+    - Yedek alınamazsa göç yok, defter kapalı, veri yerinde.
+    - Tablo silme (2. seviye) çalışıyor.
+- **Panel testi:** Performans ↔ Fırsatlar arasında 3 kez gidip gelme ve yeniden çalışmalardan sonra tahmin sayısı
+  1 olarak kaldı; "eksik olasılık" yalnız hazır fırsatın gösterim alanını doldurdu; bölüm ve model seçici görünüyor.
+
+## D6. Gerçek veritabanı kopyasında göç ve geri dönüş (Ek C5)
+
+Canlı veritabanı salt-okunur açılıp tutarlı kopyası test klasörüne alındı: 35,8 MB, 20 tablo, 167.412 satır.
+
+| Adım | Sonuç |
+|---|---|
+| 1. Göç öncesi tablo sayıları ve içerik özetleri | alındı |
+| 2. Yeni kodla açma | göç: `olusturuldu`; yedek `bist_haber_20261116_003415_tahmin_defteri_oncesi.db`; yedek integrity_check **ok**; yedekte tahmin tablosu yok |
+| 3. Mevcut tablolar göçten sonra | **20/20 tablo birebir aynı** (satır sayısı ve içerik özeti); yedek = göç öncesi kopya |
+| 4. Gerçek hazır fırsatlarla kayıt | BAHKM ilk "yeni", ikinci "tekrar" (olasılık 0,3265, orta). ENERY ilk "yeni", ikinci "tekrar" (0,3728, yüksek). Ortak: tp1_v1, özellik 97b3f45b5a82, parametre 22b983b5a3ec, rejim düşüş / yüksek oynaklık. `UPDATE` ve `DELETE` reddedildi. |
+| 5. Sonuçlandırma | 2 incelendi, 0 yazıldı. Giriş günü (16.11) mumu henüz yok → doğru olarak açık. Özet: 2 tahmin, 2 açık, "çok az örnek". |
+| 6. Kayıttan sonra mevcut tablolar | birebir aynı |
+| 7. FAZ 1 öncesi kodla (3310a61) açma (geri dönüş 1. seviye) | Eski `db.connect`, hazır fırsat listesi ve `live_check` çalıştı. Eski panelde Performans, Fırsatlar ve Dashboard **hatasız**. Tahmin tabloları dokunulmadan duruyor. Mevcut tablolar değişmedi. |
+| 8. Tabloları silme (2. seviye) | 2 satırlı tablolar silindi; diğer bütün tablolar silmeden önceki hâliyle aynı |
+| 9. Yedeği geri koyma (3. seviye) | integrity **ok**; göç öncesiyle **birebir aynı**; tahmin tablosu yok |
+
+**Canlı veritabanı kontrolü (sınamadan sonra):**
+
+- tahmin tablosu yok,
+- `data/yedek` içinde defter yedeği yok,
+- `defter.py` canlı klasörde yok.
+
+## D7. Performans farkı
+
+Canlı karar kuralları değişmediği için öneri performansında fark beklenmez. Ek iş, her hazır fırsat kaydında bir
+model hesabı ve bir satırdır; günde en fazla 5–10 kayıt. Panel açılışında defter yalnız okunur.
+
+## D8. Bilinen sınırlar ve eksik işler
+
+1. **İlk sonuçlar zaman ister.** İlk sonuçlanmış tahmin, giriş gününden sonraki ilk değerlendirmede oluşur.
+   Anlamlı ölçüm (30+ sonuç) haftalar ya da aylar sürer.
+2. **Açılıştan sonraki sabah kontrolü:** `ready.morning` açılıştan sonra çalışırsa ve seviyeleri yenilerse tahmin
+   `gec_kayit` olur, ölçülmez; açılıştan önceki tahmin ölçülür. Bu bilinçli bir seçim (Ek C3).
+3. **Kod sürümü:** Geliştirme klasöründe "gelistirme" yazar; gerçek sürüm yalnız kurulu pakette görünür.
+4. **Mevcut `hazir_firsat.model_json` alanı:** Gösterim için kalıyor; ölçümün kaynağı artık defter.
+5. **Kalan aşamalar:** Canlıya alma (canlı veritabanına göç, elle yedekle) ve müşteriye uygulama içi güncelleme
+   ayrı onay bekliyor. FAZ 2 (portföy simülatörü) onay bekliyor.
+
+## D9. Canlıya alma önerisi (onaylanırsa)
+
+1. Canlı veritabanının elle yedeği alınır: `data/yedek/bist_haber_<zaman>_faz1_oncesi.db`.
+2. `faz1-tahmin-defteri` dalı `main`'e birleştirilir; canlı klasöre konur; Halley yeniden başlatılır.
+3. Göç otomatik yedekle çalışır.
+4. Sonraki akşam analizi, sabah kontrolü ve açılış döngüsünde kayıtlar gerçek veride kontrol edilir: satır
+   sayıları, sürüm zinciri, açık / girişsiz.
+5. Müşteri güncellemesi ayrı onayla yayımlanır.

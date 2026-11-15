@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 from streamlit.testing.v1 import AppTest
 
-from bist_haber import config, db, pipeline, watchdog
+from bist_haber import config, db, pipeline, ready, watchdog
 from tests.test_signals import news, weekdays_back
 
 APP = str(Path(__file__).resolve().parents[1] / "app.py")
@@ -270,6 +270,39 @@ class PanelFlowTests(unittest.TestCase):
         caps = [c_.value for c_ in at.caption]
         self.assertTrue(any("%37 — yüksek" in x and "benzer 1465 durumda %31" in x and "haber hesaba katılmaz" in x
                             for x in caps), caps)
+
+    def test_faz1_ledger_panel_and_reruns_do_not_duplicate(self):
+        """2026-11-16 FAZ 1: Performans'ta tahmin defteri bölümü; sayfa defalarca yeniden çalışsa da tahmin sayısı
+        değişmez (panel tahmin YAZMAZ; fill_missing_model yalnız hazır fırsatın gösterim alanını doldurur)."""
+        from bist_haber import defter
+        c = db.connect()
+        sd = c.execute("SELECT MAX(date) FROM prices WHERE ticker='POS'").fetchone()[0]
+        e = c.execute("SELECT close FROM prices WHERE ticker='POS' AND date=?", (sd,)).fetchone()[0]
+        p = {"ticker": "POS", "signal_day": sd, "tur": "geri_cekilme", "kapanis": e, "giris": e, "giris_alt": e * 0.99,
+             "azami_giris": e * 1.01, "sl": e * 0.95, "tp1": e * 1.1, "tp2": e * 1.15, "rr1": 2.0, "vade_lo": 3,
+             "vade_hi": 8, "haber_skoru": 3.0, "teknik_skor": 6, "risk": "orta", "neden": "deneme", "kaynak": "haber",
+             "genel_puan": 55}
+        gday = (date.today() + timedelta(days=1)).isoformat()
+        ready._store(c, p, "aksam", gday, "aday", datetime.now(config.TR_TZ))
+        c.execute("UPDATE hazir_firsat SET model_json=NULL")           # panel açılışında 'eksik olasılık' doldurulsun
+        c.commit()
+        n0 = c.execute("SELECT COUNT(*) FROM tahmin").fetchone()[0]
+        self.assertEqual(n0, 1)
+        c.close()
+        at = self.app("🏁 Performans")
+        for _ in range(3):
+            at.run()
+            self.go(at, "🎯 Fırsatlar")
+            self.go(at, "🏁 Performans")
+        self.assertEqual(len(at.exception), 0, str(at.exception))
+        md_ = " ".join(m.value for m in at.markdown)
+        self.assertIn("Model canlı performansı", md_)
+        self.assertEqual(at.selectbox(key="ml_model").value, "tp1_v1")
+        c = db.connect()
+        self.assertEqual(c.execute("SELECT COUNT(*) FROM tahmin").fetchone()[0], 1)
+        self.assertIsNotNone(c.execute("SELECT model_json FROM hazir_firsat").fetchone()[0])   # gösterim alanı doldu
+        self.assertEqual(defter.ozet(c, "tp1_v1")["sayilar"]["acik"], 1)
+        c.close()
 
     def test_stage5_chart_and_cone_on_stock_page(self):
         """2026-11-15 Aşama 5: Hisse Analizi'nde grafik çizilir, koni açıklaması ve dönem/koni seçimi çalışır."""

@@ -204,10 +204,9 @@ def _window(conn, ticker: str, upto: str) -> List[dict]:
     return [dict(zip(("date", "open", "high", "low", "close", "volume"), tuple(r))) for r in reversed(rows)]
 
 
-def plan_features(conn, plan: Dict) -> Optional[Dict[str, Optional[float]]]:
-    """plan: hazır fırsat (ticker, signal_day, tur, giris, sl, tp1, rr1, risk). Eğitimle AYNI pencere (son 250 gün,
-    endeks de 250 gün) ve aynı fonksiyonlar. Haber girdileri de eklenir (tp1_v1 kullanmaz; sonraki sürümler için).
-    Fiyat geçmişi yetersizse None."""
+def plan_context(conn, plan: Dict) -> Optional[Dict]:
+    """plan_features ile AYNI hesap; ayrıca teknik analiz sonucunu ve teknik skoru da döndürür (FAZ 1 tahmin
+    defteri, olasılık ile göstergeler aynı pencereden dondurulsun diye). {"teknik", "teknik_skor", "girdiler"} | None."""
     from . import ready
     day = plan["signal_day"]
     bars = _window(conn, plan["ticker"], day)
@@ -217,9 +216,18 @@ def plan_features(conn, plan: Dict) -> Optional[Dict[str, Optional[float]]]:
     t = technical.analyze(bars, date.fromisoformat(day), bench or None)
     if not t or not t.get("atr"):
         return None
-    f = features(t, plan, ready.tech_score(t), plan.get("risk") or "orta", market_features(bench))
+    ts = ready.tech_score(t)
+    f = features(t, plan, ts, plan.get("risk") or "orta", market_features(bench))
     f.update(news_features(news_items(conn, plan["ticker"], day), day))
-    return f
+    return {"teknik": t, "teknik_skor": ts, "girdiler": f}
+
+
+def plan_features(conn, plan: Dict) -> Optional[Dict[str, Optional[float]]]:
+    """plan: hazır fırsat (ticker, signal_day, tur, giris, sl, tp1, rr1, risk). Eğitimle AYNI pencere (son 250 gün,
+    endeks de 250 gün) ve aynı fonksiyonlar. Haber girdileri de eklenir (tp1_v1 kullanmaz; sonraki sürümler için).
+    Fiyat geçmişi yetersizse None."""
+    c = plan_context(conn, plan)
+    return c["girdiler"] if c else None
 
 
 def plan_probability(conn, plan: Dict, m: Optional[Dict] = None) -> Optional[Dict]:
