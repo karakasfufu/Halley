@@ -1860,3 +1860,7 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Plan: FAZ 1'e portföy simülatörü + MAE/MFE; FAZ 2 = canlı tahmin defteri (tahmin + tahmin_sonuc, yalnız eklenir,
   tetikleyiciyle korunur) öne alındı; FAZ 5'e bozulma uyarıları (≥50 sonuç, %90 GA, PSI>0,25; otomatik işlem yok).
   Toplam ~10,5–11,5 gün, 0 $.
+
+## 2026-11-16 — Denetim raporu Ek B: nihai plan (kullanıcının sırası), FAZ 1 tasarımı, yedek/geri dönüş (kod değişmedi)
+- Sıra: 1 tahmin defteri · 2 portföy simülatörü · 3 metrikler/MAE-MFE/veri · 4 strateji×rejim · 5 hedefler · 6 bozulma uyarıları/hız · 7 vadeler (~11–11,5 gün, 0 $).
+- FAZ 1: tahmin + tahmin_sonuc (yalnız eklenir, tetikleyicili), plan imzası UNIQUE + INSERT OR IGNORE (rerun/tekrar tek satır), sonuç tahminin dondurulmuş seviyelerinden journal.evaluate ile, aynı mumda TP1+SL → SL + ayni_gun_belirsiz, ölçüme yalnız açılıştan önce kaydedilmiş ve sonradan=0 son tahmin girer. Göç yalnız ekleme; öncesinde otomatik yedek + integrity_check; geri dönüş 3 seviye, kopyada denenecek. Yalnız FAZ 1 için onay istendi.

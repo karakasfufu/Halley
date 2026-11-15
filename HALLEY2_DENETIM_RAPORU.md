@@ -955,3 +955,260 @@ Bu ekle plan iki noktada değişti:
 3. Değiştirilemez yeni `tahmin` ve `tahmin_sonuc` tabloları; göç öncesi yedek alınır.
 4. Bozulma uyarı eşikleri: en az 50 sonuç, %90 güven aralığı, PSI > 0,25. Yalnız uyarı üretilir, otomatik işlem
    yapılmaz.
+
+---
+
+# EK B (16.11.2026) — Nihai geliştirme planı (kullanıcının onayladığı sıra)
+
+Kullanıcı genel yaklaşımı onayladı, faz sırasını değiştirdi ve ek kabul kriterleri verdi. Bu bölüm o karara göre
+yazıldı.
+
+- **Kod hâlâ değiştirilmedi.**
+- Yalnız **FAZ 1** için onay isteniyor.
+- Sonraki her faz ayrı onayla başlar.
+
+## B0. Onaylanan sıra
+
+| Faz | İçerik | Süre | Canlıya etkisi |
+|---|---|---|---|
+| **1** | Canlı tahmin defteri ve değiştirilemez tahmin kayıtları | 2,5 gün | Yeni kayıt ve yeni panel bölümü. Karar kuralları değişmez. |
+| **2** | Portföy bazlı backtest simülatörü | 1,5–2 gün | Yok (araştırma) |
+| **3** | Backtest metrikleri, MAE/MFE, veri güvenilirliği, hayatta kalma yanlılığı araştırması | 2 gün | `prices` tablosuna sütun; yeni metrikler |
+| **4** | Strateji türü × piyasa rejimi araştırması | 1 gün | Yok (araştırma) |
+| **5** | 5/10 günlük hedef araştırması | 1,5 gün | Yok (araştırma) |
+| **6** | Model bozulma uyarıları ve performans optimizasyonu | 2 gün | Yalnız uyarı; otomatik işlem yok |
+| **7** | Farklı vadelerin tasarımı | 0,5 gün | Yok (yalnız tasarım notu) |
+
+**Toplam:** yaklaşık 11–11,5 iş günü. Yapay zekâ (OpenAI) maliyeti bütün fazlarda **0 $**; her şey işlemciyle
+çalışır.
+
+## B1. Üç kavramın ayrımı (kabul kriteri 1)
+
+| Kavram | Ne | Kayıt | Değişir mi? |
+|---|---|---|---|
+| **Tahmin** | Belirli bir anda, belirli plan seviyeleri için modelin söylediği olasılık ve o anki bağlam | **yeni:** `tahmin` | **Hayır.** Yalnız eklenir; veritabanı güncellemeyi ve silmeyi reddeder. |
+| **Tahmin sonucu** | O tahminin, kendi seviyeleriyle gerçek fiyatlarda nasıl sonuçlandığı | **yeni:** `tahmin_sonuc` (tahmin başına en fazla bir satır) | **Hayır.** Yalnız nihai sonuç yazılır. |
+| **Hazır fırsat** | Panelde ve raporda görünen öneri; durum makinesi (aday → onaylandı / iptal → giriş / girişsiz → kapandı) | mevcut: `hazir_firsat` | Evet (bugünkü gibi). Dokunulmaz. |
+| **Sanal işlem** | "Uygun" senaryoların otomatik sanal kaydı | mevcut: `trade_journal` | Evet (bugünkü gibi). Dokunulmaz. |
+
+- Tahmin, hazır fırsata yalnız kimlik (`hazir_firsat_id`) ile bağlanır.
+- Sonuç, hazır fırsatın değişebilen alanlarından değil, **tahminin kendi dondurulmuş seviyelerinden** hesaplanır.
+- Bu sayede hazır fırsat sabah güncellense bile akşamki tahminin sonucu bozulmaz.
+
+## B2. FAZ 1 — Canlı tahmin defteri (ayrıntı)
+
+### Ne zaman tahmin yazılır?
+
+Hazır fırsatı yazan iki yol var; ikisi de bekçinin arka plan görevinde çalışıyor (`kap_worker` → `ready.safe_tick`
+→ `watchdog.run_auto`):
+
+- **akşam analizi:** `ready.evening` → `_store(..., "aday")`
+- **sabah kontrolü:** `ready.morning` → `_store(..., "onaylandi")`. Sabah kontrolü seviyeleri güncel veriyle
+  yenileyebilir.
+
+Tahmin `_store`'un hemen ardından, aynı işlemde yazılır. **Hata olursa hazır fırsat yine kaydedilir.** Bu, bugünkü
+model kaydıyla aynı kural.
+
+### Tekrar kaydı önleme (kabul kriteri 2)
+
+- Her tahminin bir **plan imzası** var: hisse, sinyal günü, giriş günü, tür, giriş, azami giriş, SL, TP1, TP2
+  (4 basamağa yuvarlanmış), model sürümü ve özellik sürümü.
+- `UNIQUE(plan_imzasi)` + `INSERT OR IGNORE` kullanılır. Aynı plan kaç kez hesaplanırsa hesaplansın **tek satır**
+  olur:
+  - Streamlit yeniden çalışması,
+  - bekçinin ikinci çalışması,
+  - elle yeniden kontrol.
+- Plan **anlamlı değişirse** (ör. sabah seviyeler yenilendi) imza değişir ve yeni satır eklenir. Eski satır kalır;
+  yenisi `onceki_tahmin_id` ile eskisine bağlanır.
+- Panelin "eksik model olasılığını doldur" adımı (`fill_missing_model`) deftere **tahmin yazmaz**. O yalnız
+  hazır fırsatın gösterim alanını doldurur.
+
+### `tahmin` tablosu (yeni)
+
+| Alan | Açıklama |
+|---|---|
+| `id`, `plan_imzasi` (benzersiz), `onceki_tahmin_id` | kimlik, tekrar engeli, sürüm zinciri |
+| `hazir_firsat_id`, `ticker`, `signal_day`, `giris_gunu`, `analiz` | bağlam (akşam / sabah) |
+| `tahmin_zamani` | Türkiye saati, ISO |
+| `model_surum`, `ozellik_surum`, `kod_surum`, `parametre_surum` | Model dosyası adı; girdi listesinin parmak izi; kurulu sürüm (`surum.txt`) ya da geliştirme işareti; karar sabitlerinin parmak izi (`ready`, `tradeplan`) |
+| `olasilik`, `bant`, `benzer_n`, `benzer_oran` | modelin söylediği |
+| `tur`, `giris`, `azami_giris`, `sl`, `tp1`, `tp2`, `gecerlilik_gun` | dondurulmuş plan seviyeleri |
+| `genel_puan`, `teknik_skor`, `haber_skoru`, `kaynak`, `risk` | puanlar |
+| `rejim_json` | `regime.regime(conn, signal_day)`: trend, oynaklık, genişlik |
+| `veri_json` | veri uyarıları, son fiyat günü, veri kritik mi |
+| `girdi_json` | modelin girdi değerleri (FAZ 6'daki dağılım uyarısı için) |
+| `sonradan` | 0/1. Tahmin zamanından önce oluşmuş bir plana sonradan eklenen kayıt |
+
+### `tahmin_sonuc` tablosu (yeni)
+
+| Alan | Açıklama |
+|---|---|
+| `tahmin_id` (benzersiz) | tahmin başına en fazla bir nihai sonuç |
+| `sonuc_turu` | `tamamlandi` / `girissiz` (açılış azami girişin üstünde) / `iptal` (hazır fırsat sabah iptal edildi ya da yeniden hesaplamada düştü) / `yerini_aldi` (aynı fırsatın açılıştan önce daha yeni tahmini geldi) / `gec_kayit` (giriş günü açılışından sonra kaydedilmiş; ölçülmez) |
+| `giris_gunu_gercek`, `giris_fiyati` | gerçekleşen giriş (açılış) |
+| `tp1_goruldu`, `sl_goruldu`, `cikis_nedeni`, `islem_gunu` | sonuç |
+| `net_getiri_pct`, `r` | maliyet sonrası |
+| `mae_r`, `mfe_r` | girişten çıkışa kadar en kötü ve en iyi hareket (R cinsinden) |
+| `ayni_gun_belirsiz` | 0/1. TP1 ile SL aynı mumda görüldü mü (kabul kriteri 6) |
+| `degerlendirme_zamani`, `kural_surum` | ne zaman, hangi kuralla |
+
+### Sonuçlandırma kuralları
+
+Yeni `defter.sonuclandir()`, akşam ve sabah analizinin başında çalışır; yani `ready.evaluate_all` ile aynı yerde.
+
+1. **Giriş:** Giriş günü açılışında yapılır. Açılış azami girişin üstündeyse sonuç `girissiz` olur; bu, bugünkü
+   kuralla aynı.
+2. **Çıkış:** Mevcut `journal.evaluate` aynen kullanılır; tek işlem hesabı yeniden yazılmaz.
+   - TP1'de yarı satış, stop girişe çekilir.
+   - TP2, SL, başabaş, en fazla 30 işlem günü.
+   - Komisyon ve kayma ayardan alınır.
+3. **Aynı mumda TP1 ve SL (kabul kriteri 6):**
+   - Günlük mumda gerçekleşme sırası bilinemez. Bu durumda **SL önce sayılır** (muhafazakâr kural). Bu,
+     `journal.evaluate`'in bugünkü kuralıyla aynı.
+   - Ek olarak sonuç satırına `ayni_gun_belirsiz = 1` yazılır.
+   - Raporda bu tahminlerin sayısı ayrıca gösterilir; isteğe bağlı olarak hariç tutulmuş bir ikinci hesap da
+     verilir.
+4. **Sonuçlanmamış tahmin (kabul kriteri 5):**
+   - Sonuç satırı olmayan tahmin "açık" sayılır. Kazanma oranına, beklenen kazanca, Brier'e ya da log loss'a
+     **girmez**; yalnız "açık tahmin sayısı" olarak görünür.
+5. **Tahminden sonraki veri (kabul kriteri 7):**
+   - Tahminin girdileri yalnız sinyal gününe kadarki veridir; model bugün de böyle hesaplıyor.
+   - Ölçüme yalnız **giriş günü açılışından önce kaydedilmiş** tahminler girer: `tahmin_zamani < giris_gunu
+     09:55 TR` ve `sonradan = 0`.
+   - Aynı fırsatın birden fazla tahmini varsa ölçülen, **açılıştan önceki son tahmin**dir. Eskilerinin sonucu
+     `yerini_aldi` olur.
+   - Sonradan eklenen ya da geç kaydedilen tahminler ayrı bir satırda gösterilir, ana hesaba katılmaz.
+   - Bu kural sayesinde bugünkü 2 "sonradan" kaydı (BAHKM, ENERY) ana ölçümü kirletmez.
+
+### Ölçüm ve panel
+
+`defter.ozet(conn)` hesaplar; 🏁 Performans ekranında "🎯 Model canlı performansı (tahmin defteri)" bölümünde
+gösterilir:
+
+- **Sayılar:** tahmin, sonuçlanan, açık, girişsiz, iptal, aynı mumda belirsiz.
+- **Oranlar:** girilen ve tamamlanan tahminlerde kazanma oranı, TP1 oranı, beklenen kazanç (ortalama R ve net %).
+- **Olasılık doğruluğu:** Brier ve log loss. TP1 olayı: yarı satış gerçekleşti mi.
+- **Kalibrasyon tablosu:** her bant (düşük / orta / yüksek) için ortalama tahmin, gerçek oran ve Wilson güven
+  aralığı.
+- **Rejime göre:** trend ve oynaklık.
+- **Geçmiş sınama farkı:** modelin 5 yıllık sınamada aynı bant için gördüğü oran ile canlı oran.
+- **Güven etiketi:** sonuçlanan < 30 "çok az örnek, karar verilmez"; 30–99 "düşük güven"; ≥ 100 "orta güven".
+
+Mevcut `tp1_model.live_check` korunur. Yeni özet onun yerine geçmez; yanında durur.
+
+### Dosyalar
+
+| Dosya | Değişiklik |
+|---|---|
+| `bist_haber/defter.py` | **YENİ.** `kaydet()`, `plan_imzasi()`, `surumler()`, `sonuclandir()`, `ozet()` |
+| `bist_haber/db.py` | Şemaya iki tablo, benzersiz indeksler ve dört tetikleyici: `tahmin` için güncelleme/silme yasağı; `tahmin_sonuc` için güncelleme/silme yasağı. Göçten önce otomatik yedek (B3). |
+| `bist_haber/ready.py` | `_store` sonunda `defter.kaydet(...)` (try/except). `evening` ve `morning` başında `defter.sonuclandir(...)`. Seçim kuralları **değişmez**. |
+| `app.py` | 🏁 Performans'a yeni bölüm (yalnız okuma) |
+| `tests/test_defter.py` | **YENİ** (B4) |
+| `KULLANIM.md`, `NOTLAR.md` | açıklama |
+
+Dokunulmayanlar: `journal.py` (yalnız çağrılır), `tradeplan.py`, `entries.py`, `signals.py`, `trade_journal`,
+`hazir_firsat` şeması.
+
+## B3. Veritabanı göçü: yedekleme ve geri dönüş planı
+
+**Göçün niteliği:**
+
+- Yalnız **ekleme**: iki yeni tablo, indeksler ve tetikleyiciler.
+- Mevcut tablolara ve satırlara dokunulmaz; sütun eklenmez ya da silinmez.
+- Eski Halley sürümleri yeni tabloları görmez ve çalışmaya devam eder.
+
+**Yedekleme:**
+
+1. Göç, `db.connect` içinde `tahmin` tablosu **yoksa** çalışır.
+2. Önce SQLite yedekleme yöntemiyle tutarlı bir kopya alınır:
+   `data/yedek/bist_haber_<zaman>_tahmin_defteri_oncesi.db`
+3. Kopyada `PRAGMA integrity_check` sonucu `ok` değilse göç yapılmaz; panel uyarır ve eski hâliyle devam eder.
+4. Yedek başarılı olursa tablolar tek işlemde (transaction) oluşturulur. Hata olursa işlem geri alınır.
+
+Bu otomatik adım müşteri bilgisayarlarında da çalışır. Ayrıca canlıya almadan önce senin veritabanının elle bir
+yedeği alınır.
+
+**Geri dönüş (üç seviye):**
+
+| Durum | Ne yapılır | Veri kaybı |
+|---|---|---|
+| Yeni kod sorun çıkardı | Uygulama içi "↩️ Önceki sürüme dön" ya da geliştirmede önceki commit. Eski kod yeni tabloları yok sayar. | Yok |
+| Yeni tablolar tamamen kaldırılmak istenirse | `DROP TABLE tahmin_sonuc; DROP TABLE tahmin;` Satır tetikleyicileri tablo silmeyi engellemez. | Yalnız defter kayıtları |
+| Veritabanı bozuldu (beklenmez) | Göç öncesi yedek dosyası geri konur | Göçten sonra eklenen veriler |
+
+Geri dönüş adımı, canlıya almadan önce bir **veritabanı kopyasında** denenecek: göç → kayıt → eski kodla açma →
+tablo silme.
+
+## B4. FAZ 1 testleri ve kabul ölçütleri
+
+**Birim ve bütünleşme testleri** (`tests/test_defter.py`):
+
+1. Tahmin satırı `UPDATE` ve `DELETE` ile değiştirilemiyor; sonuç satırı da öyle. Veritabanı reddediyor (kriter 3).
+2. Aynı plan beş kez kaydedilince tek satır oluşuyor. Seviye değişince yeni satır ve `onceki_tahmin_id`
+   bağlantısı oluşuyor (kriter 2).
+3. Panel yüzlerce kez yeniden çalıştırıldığında (AppTest) tahmin sayısı değişmiyor (kriter 2).
+4. Sabah hazır fırsat seviyeleri değişince akşamki tahminin sonucu kendi seviyeleriyle hesaplanıyor; hazır fırsat
+   güncellemesi onu etkilemiyor (kriter 1, 4).
+5. Açık tahmin metriklere girmiyor; yalnız "açık" sayısında görünüyor (kriter 5).
+6. Aynı mumda TP1 ve SL'ye dokunan yapay seri: SL sayılıyor, `ayni_gun_belirsiz = 1` (kriter 6).
+7. Açılıştan sonra kaydedilen ya da `sonradan` tahmin ana ölçüme girmiyor (kriter 7).
+8. Bilinen 10 tahmin ve sonuçla Brier, log loss, kalibrasyon ve Wilson aralığı elle hesaplananla aynı.
+9. Girişsiz, iptal ve yerini aldı ayrı sayılıyor; isabet hesabına girmiyor.
+10. Göç: yedek dosyası oluşuyor ve `integrity_check` geçiyor. İkinci açılışta göç tekrar çalışmıyor. Eski şemalı
+    bir veritabanı kopyasında göç, ardından tablo silme ile geri dönüş çalışıyor.
+11. Tahmin yazımı hata verirse (zorla bozulmuş model) hazır fırsat yine kaydediliyor.
+12. Mevcut 522 testin hepsi geçiyor.
+
+**Gerçek veride kabul:**
+
+- Canlıya alındıktan sonraki ilk **akşam analizi → sabah kontrolü → açılış** döngüsünde:
+  - tahmin satırları doğru sayıda oluşmuş,
+  - sabah seviye değişikliği varsa yeni sürüm satırı eklenmiş,
+  - panelde "açık tahmin" sayısı doğru.
+- Kanıt olarak satır sayıları ve örnek kayıtlar faz raporunda verilir.
+
+**Not:** İlk sonuçlanmış tahminler ancak giriş gününden sonraki günlerde oluşur. FAZ 1'in kabulü kayıt ve
+sonuçlandırma mekanizmasının doğruluğuna dayanır; anlamlı performans rakamları aylar içinde birikir.
+
+## B5. Sonraki fazların kabul kriterleri (özet)
+
+| Faz | Kabul |
+|---|---|
+| **2. Portföy simülatörü** | Aynı anda açık pozisyonlar, kullanılabilir nakit ve toplam portföy riski hesaba katılıyor. Aynı gün fırsatlar yalnız o gün bilinen bilgiyle sıralanıyor (canlı kural ya da dönem dışı model olasılığı). Elle hesaplanmış küçük senaryo birebir tutuyor. Sınırsız sermayede tek işlem toplamına eşit çıkıyor. Geleceğe ait veri bozulunca geçmiş kararlar değişmiyor. Son 12 ay ve 2024 raporu; varsayımlar açık. Not: geçmiş evren haber şartı içermiyor. |
+| **3. Metrikler / MAE-MFE / veri** | MDD, Sortino, log loss, ardışık kayıp, dağılımlar ve MAE/MFE; eski metrikler (0,605 / 0,612) değişmeden kalıyor. `prices` tablosuna kaynak ve indirme zamanı, yedekli göçle. Borsadan çıkan hisseler için kaynak araştırması: bulunduysa etkisi ölçülmüş, bulunamadıysa açıkça eksik yazılmış. |
+| **4. Strateji × rejim** | Tür × 5 seviyeli rejim tablosu; güven aralıkları; 30'dan az örnekli hücreler "yetersiz". Kural değişikliği önerisi varsa ayrıca onaya sunulur. |
+| **5. 5/10 günlük hedefler** | Hedef listesi işe başlamadan sabitleniyor. Aynı protokol; maliyet sonrası R olarak mevcut modelle karşılaştırma. Kapıyı geçmeyen canlıya alınmaz. |
+| **6. Bozulma uyarıları / hız** | Yapay veride doğru kalibrasyonda uyarı yok, bozulmada var, 20 örnekte hiçbir koşulda yok. Uyarılar hiçbir ayarı ya da modeli değiştirmiyor. Hız ölçümü önce/sonra; yapay zekâ çağrı sayısı değişmiyor. |
+| **7. Vadeler** | Vade başına etiket, kural, model, sınama ve veri yeterliliğini yazan tasarım notu; etkinleştirme yok. |
+
+## B6. Faz sonu rapor biçimi (her fazda)
+
+Her faz sonunda şunlar raporlanır:
+
+- tamamlanan işler,
+- değiştirilen ve yeni dosyalar,
+- veritabanı değişiklikleri ve alınan yedek,
+- yapay zekâ çağrılarındaki değişim (beklenen: yok),
+- test sonuçları: sayı ve çıktı,
+- gerçek veri kanıtı,
+- performans farkı (varsa),
+- bilinen sorunlar, eksik işler.
+
+Kurallar:
+
+- Arayüzde görünmesi tamamlanmış sayılmak için yeterli değildir.
+- Canlıya alma, kurulum paketi ya da uygulama içi güncelleme yayımı faz raporundan **sonra** ve ayrı onayla
+  yapılır.
+
+## B7. Onay istenen
+
+**Yalnız FAZ 1: Canlı tahmin defteri.** Kapsamı B2–B4'te yazılı:
+
+- iki yeni değiştirilemez tablo (otomatik yedekli, yalnız ekleme yapan göç),
+- `bist_haber/defter.py`,
+- `ready.py`'ye iki çağrı,
+- Performans'ta okuma bölümü,
+- testler.
+
+Seçim kuralları, eşikler ve yapay zekâ kullanımı değişmez. Tahmini süre 2,5 gün.
