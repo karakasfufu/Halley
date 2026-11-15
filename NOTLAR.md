@@ -1812,3 +1812,15 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Uçtan uca (gerçek kurulum, 8507, penceresiz): A kur → B paketini hazırla → --yeniden-baslat: sıra 2134→2139, veri ve
   .env korundu, onceki yedeği var, son_islem "guncellendi"; geri dön: sıra 2134, "geri_donuldu"; --kapat temiz.
   Panel içinden tetikleme ve otomatik geri dönüş gerçek kurulumda ayrıca denenmedi (birim testleri var). 522 test OK.
+
+## 2026-11-15 — Açık güncelleme deposu ve ilk yayın (kullanıcı: "Evet, oluştur")
+- Herkese açık depo: karakasfufu/Halley-guncelleme (yalnız README + sürüm dosyaları; kaynak kod yok).
+- İlk sürüm v202611152200 = 2026-11-15 (0dae4a7): Halley_Guncelleme.zip (0,44 MB; 64 dosya, tek .py başlangıç
+  dosyası, data/.env/anahtar yok), surum.json, Halley_Kurulum.exe (SHA-256 bb087c77…9019). Defender: ikisi de temiz.
+- Gerçek adresten doğrulama: eski test kurulumu (sıra 2134) kontrol → "yeni", indirdi, SHA-256 tuttu. Ardından PANELİN
+  İÇİNDEKİ "🔄 Güncelle" düğmesiyle: Halley kapanıp yeni sürümle açıldı (sıra 2200), son_islem "guncellendi", panelde
+  "✅ Halley güncellendi… Verileriniz korundu", veri ve .env korundu. Otomatik geri dönüş (yeni sürüm açılmazsa) gerçek
+  kurulumda denenmedi; birim testleri ve elle geri dönüş denemesi var.
+- Özel depodaki v2026.11.09 sürümüne de aynı kurulum dosyası konuldu (başlık "güncel: 0dae4a7").
+- Yeni sürüm yayımlama adımı (bundan sonra): build_package.py --guncelleme-paketi → surum.json'a not → gh release
+  create v<sıra> -R karakasfufu/Halley-guncelleme (zip + surum.json + kurulum dosyası).
