@@ -218,3 +218,43 @@ def plan_probability(conn, plan: Dict, m: Optional[Dict] = None) -> Optional[Dic
         return None
     p = predict(f, m)
     return {"olasilik": p, "bant": band(p, m), "benzer": similar(f, m), "surum": m.get("surum")}
+
+
+# ---------------------------------------------------------------- gizli kaydın ölçümü (canlı doğrulama)
+def _auc(y: List[int], p: List[float]) -> Optional[float]:
+    pos = [b for a, b in zip(y, p) if a]
+    neg = [b for a, b in zip(y, p) if not a]
+    if not pos or not neg:
+        return None
+    wins = sum((1.0 if a > b else 0.5 if a == b else 0.0) for a in pos for b in neg)
+    return wins / (len(pos) * len(neg))
+
+
+def live_check(conn, min_n: int = 30) -> Dict:
+    """Kapanmış hazır fırsatlarda öneri anındaki model olasılığı (model_json) ile gerçek sonuç (TP1 SL'den önce görüldü
+    mü). Yalnız bilgi; panelde gösterilmez. n < min_n iken isabet (AUC) hesaplanmaz (az örnekte yanıltıcı)."""
+    rows = conn.execute("SELECT model_json, sonuc_json, kaynak FROM hazir_firsat WHERE durum='kapandi' AND "
+                        "model_json IS NOT NULL").fetchall()
+    ys, ps, bands = [], [], {}
+    for mj, sj, _k in rows:
+        try:
+            m, s = json.loads(mj), json.loads(sj or "{}")
+        except ValueError:
+            continue
+        if m.get("olasilik") is None:
+            continue
+        y = 1 if (s.get("tp1_goruldu") or s.get("sonuc") == "TP2") else 0
+        ys.append(y)
+        ps.append(float(m["olasilik"]))
+        b = bands.setdefault(m.get("bant") or "?", [0, 0])
+        b[0] += 1
+        b[1] += y
+    n = len(ys)
+    out = {"kapanan": n, "bantlar": {k: {"n": v[0], "gercek_%": round(100 * v[1] / v[0], 1)} for k, v in bands.items()}}
+    if n:
+        out.update(ort_tahmin_pct=round(100 * sum(ps) / n, 1), gercek_pct=round(100 * sum(ys) / n, 1),
+                   brier=round(sum((p - y) ** 2 for p, y in zip(ps, ys)) / n, 4))
+    out["auc"] = round(_auc(ys, ps), 3) if n >= min_n and _auc(ys, ps) is not None else None
+    if n < min_n:
+        out["not"] = f"{n} kapanan öneri: en az {min_n} olmadan isabet hesaplanmaz"
+    return out

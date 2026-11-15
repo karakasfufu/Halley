@@ -95,6 +95,15 @@ class PlanProbability(unittest.TestCase):
                 ready._store(conn, dict(full, ticker="BBB"), "aksam", "2026-11-17", "aday", now)
             mj = json.loads(conn.execute("SELECT model_json FROM hazir_firsat WHERE ticker='BBB'").fetchone()[0])
             self.assertIn("bozuk", mj["hata"])
+            # canlı doğrulama: kapanan önerilerde tahmin ↔ gerçek
+            chk = tp1_model.live_check(conn)
+            self.assertEqual(chk["kapanan"], 0)
+            conn.execute("UPDATE hazir_firsat SET durum='kapandi', sonuc_json=? WHERE ticker='AAA'",
+                         (json.dumps({"tp1_goruldu": True, "sonuc": "TP2"}),))
+            conn.execute("UPDATE hazir_firsat SET durum='kapandi', sonuc_json='{}' WHERE ticker='BBB'")   # hatalı kayıt
+            chk = tp1_model.live_check(conn, min_n=1)
+            self.assertEqual((chk["kapanan"], chk["gercek_pct"], chk["auc"]), (1, 100.0, None))   # tek sınıf → AUC yok
+            self.assertEqual(tp1_model._auc([1, 0, 1, 0], [0.9, 0.1, 0.6, 0.6]), 0.875)
             conn.close()
 
 

@@ -1741,3 +1741,9 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   gerisinde. 2024'te birleşik eğitilip son 12 ayda: AUC 0,599 → 0,600 (fark −0,01…+0,03, anlamsız); Brier +%1,1–1,2
   (yalnız E2 yeniden ölçeği +%0,6 → Chronos'un payı ~%0,6); en yüksek %20 R'si +0,17 → +0,09–0,11 (kötüleşti).
   Sonuç: katkı yok.
+
+## 2026-11-15 — Denetim (kullanıcı: "tekrar kontrol et bir eksiklik var mı")
+- Canlı panel sağlıklı; model_json panele/tabloya sızmıyor (app Performans tablosu sütunları açık seçilmiş); veri aktarma
+  tüm DB'yi kopyaladığı için sütun korunuyor.
+- Eksik bulundu ve eklendi: gizli kaydı gerçek sonuçla karşılaştıran ölçüm yoktu → `tp1_model.live_check()` (+ test).
+- ASAMA6_RAPOR Ek 3 ve MIMARI_RAPOR aşama 7 satırı güncellendi.

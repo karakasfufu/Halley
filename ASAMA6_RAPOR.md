@@ -233,3 +233,21 @@ Kullanıcı kararı: "Yalnız 1. aşama" (yapay zekâ skoru yok).
 ## Neden beklenen bir sonuç
 - Asıl haberlerin çoğu "Özel Durum Açıklaması (Genel)" konusunda: 5.649 bildirim.
 - İçeriğin iyi mi kötü mü olduğu konu başlığından anlaşılmıyor. Bunu yalnız metin söyler.
+
+---
+
+# Ek 3 (15.11.2026): canlıya alınanlar ve süren iş
+
+- **Gizli kayıt (canlıda):**
+  - Her hazır fırsatın öneri anındaki TP1 olasılığı `hazir_firsat.model_json` sütununa yazılır: olasılık, bant,
+    benzer durum sayısı ve oranı, sürüm, zaman.
+  - Panel, Telegram, seçim ve eşikler değişmedi. Model hatası öneriyi engellemez.
+  - Ölçüm aracı: `tp1_model.live_check(conn)`. Kapanan önerilerde ortalama tahmin, gerçek oran, Brier ve bantlara göre
+    gerçek oranı verir. İsabet (AUC) en az 30 kapanmış öneri birikince hesaplanır.
+- **Hata düzeltmesi:** Hacmi 21 gündür 0 olan hisseler (DUNYH, ISATR, UMPAS) artık likidite engeline takılıyor.
+- **Haber 2. aşama, Python ile (sürüyor):**
+  - 5.649 Özel Durum metni indiriliyor; KAP sınırını paylaşmamak için istekler arasında 6 sn bekleniyor ve hafta içi
+    seans saatlerinde indirme duruyor.
+  - Kurallı okuma ve kelimelerden öğrenen model hazır.
+  - Ara bakış (metinlerin %11'i): "olumlu" okunan metinlerde TP1 oranı %39, diğerlerinde %26–27. Kesin değil; sonuç
+    tam veriyle eklenecek.
