@@ -1779,3 +1779,11 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - `ready.fill_missing_model(conn)`: model_json'u boş AÇIK (aday/onaylandi/giris) kayıtlara olasılık ekler,
   "sonradan": true; kapanmış kayıtlara dokunmaz. Panel her oturumda bir kez çağırır (hata paneli engellemez).
   Test: test_tp1_model (açık kayda eklenir, kapanmışa eklenmez, ikinci çağrı 0). 510 test OK.
+
+## 2026-11-15 — Kurulum dosyası e07601b + Kronos sonucu
+- Kurulum dosyası yeniden oluşturuldu (e07601b): güncelleme testi (eski 1e5dab8 → yeni) veri korundu, açıldı
+  (sağlık OK), kapandı; Defender temiz; SHA-256 852f687c…45b4, 147.180.544 bayt. Sürüm v2026.11.09'a yüklendi,
+  başlık "Halley 2026-11-15 (güncel: e07601b)", notlara model anahtarı ve genel puan notu eklendi.
+- Kronos-mini (2.000 plan, 10 yol, ~4 saat): tek başına AUC 0,52 / 0,52; birleşik son 12 ay 0,595–0,598 (E2 0,601),
+  en yüksek %20 R'si kötüleşti; geçersiz yol %2. Katkı yok → canlıya alınmadı, ince ayar önerilmez
+  (ASAMA7_PLAN.md "Sonuç", MIMARI satırı ⛔).

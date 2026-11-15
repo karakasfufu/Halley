@@ -1,4 +1,4 @@
-# Aşama 7 planı — hazır zaman serisi modelleri (onay bekliyor)
+# Aşama 7 planı — hazır zaman serisi modelleri (deneme bitti; sonuç en altta)
 
 **Soru:** Büyük şirketlerin milyonlarca fiyat serisiyle önceden eğittiği hazır modeller, Halley'in planlarında
 "TP1, SL'den önce gelir mi?" sorusuna bizim modelimizden (tp1_v1) daha iyi ya da ona ek bilgi veriyor mu?
@@ -59,3 +59,23 @@ ilgili: önce TP1 mi, önce SL mi?
 ## Onayın gerekenler
 1. Ayrı araştırma ortamının kurulması ve yukarıdaki ~0,7 GB'lık indirmeler (PyPI ve Hugging Face'in resmî sayfaları).
 2. "Olduğu gibi" denemenin yapılması (3. adım). İnce ayar ayrıca sorulur.
+
+## Sonuç (15.11.2026, "olduğu gibi" deneme bitti)
+Taban: tp1_v1 (E2), her dönemde o dönemden önceki verilerle eğitildi. Planlar hisse başına 14 günde bir.
+
+| | Son 12 ay | 2024 |
+|---|---|---|
+| E2 isabeti (AUC) | 0,601 | 0,585 |
+| Chronos-Bolt-small tek başına (en iyi girdi) | ~0,56 | ~0,58 |
+| Kronos-mini tek başına (en iyi girdi, 10 yol/plan) | 0,52 | 0,52 |
+| Kronos geçersiz yol (ilk gün ±%11'i aşan) | %2,1 | %1,9 |
+
+- **Birleşik (2024'te eğit → son 12 ayda sına):**
+  - Chronos ile: AUC 0,599 → 0,600 (anlamsız). Brier kazancının yarısı yalnız E2'nin yeniden ölçeklenmesinden
+    geliyor. En yüksek %20'nin R'si 0,17 → 0,09–0,11 (kötüleşti).
+  - Kronos ile: AUC 0,595–0,598 (E2: 0,601); fark %90 aralığı [−0,019; +0,003]. Brier +%0,1–0,2 (yalnız ölçekleme
+    +%0,3). En yüksek %20'nin R'si 0,27 → 0,18–0,25 (kötüleşti).
+- **Karar:** iki hazır model de bizim modelimize bilgi eklemedi. Canlıya alınmadı; kurulum dosyasına PyTorch
+  eklenmedi. Kronos tek başına yazı-tura düzeyinde olduğu için ince ayar da önerilmez (yine de istenirse ayrı onay).
+- Çıktılar (gitignore'lu çalışma klasöründe): a7_chronos.csv / a7_chronos_sonuc.json, a7_kronos.csv /
+  a7_kronos_sonuc.json.
