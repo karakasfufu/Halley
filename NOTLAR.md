@@ -1671,3 +1671,14 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Yan bulgu: hacmi tamamen 0 olan hisselerde (DUNYH, ISATR) işlem hacmi "ölçülemedi" (None) sayılıp likidite engeli
   çalışmıyor; düzeltme kullanıcı onayına bırakıldı.
 - Rapor: ASAMA6_RAPOR.md. Kod değişikliği yok (yalnız araştırma betikleri ve belgeler).
+
+## 2026-11-15 — Aşama 6 ikinci tur: geliştirilmiş model, başlangıç sürümü tp1_v1 (kullanıcı: "Modeli geliştir…")
+- Yeni `bist_haber/tp1_model.py`: `features()` + `market_features()` (eğitim ve canlı ORTAK), `predict()`, `band()`,
+  `similar()`; model dosyası `bist_haber/modeller/tp1_v1.json` (8,7 KB, paketle gelir). Panele BAĞLI DEĞİL.
+- `arastirma/asama6/etiketle.py` artık tp1_model.features kullanıyor; yeniden etiketlendi (46.053 sinyal).
+- `arastirma/asama6/egit.py`: artırımlı ağaç (numpy), yakın dönem ağırlığı, Platt, yeni girdili lojistik denendi →
+  kazandırmadı (taban oranı kayıyor). Seçilen E2 = tablo + 10 girdili sade lojistik ortalaması: AUC 0,605 / 0,612,
+  Brier +%2,8 / +%3,8 (son 12 ay / 2024); en yüksek %20 son 12 ayda +0,17 R (diğer −0,08). ~6 varyant aynı sınamaya
+  bakılarak seçildi → hafif iyimserlik; canlı planlarla izlenmeli.
+- Test: tests/test_tp1_model.py (girdiler, kayıtlı model, eğitimdeki tahmin = canlı tahmin 9 basamak).
+- Canlı deneme: BAHKM kırılım %33 (orta), ENERY kırılım %37 (yüksek).

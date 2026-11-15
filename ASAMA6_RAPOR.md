@@ -124,3 +124,65 @@ Betikler `arastirma/asama6/` klasöründe. Sırasıyla:
 - `model.py <etiket.csv> <arastirma.db> <sonuc.json>` (~1 dk)
 
 Hiçbir betik canlı veritabanına yazmaz.
+
+---
+
+# Ek (15.11.2026, ikinci tur): geliştirilmiş model ve başlangıç sürümü (tp1_v1)
+
+Kullanıcı isteği: "Modeli geliştir, başlangıç sürümü eğitilmiş bir model olsun."
+
+## Ne değişti
+- **Ortak girdi fonksiyonu:** `bist_haber/tp1_model.py → features()`. Eğitim (etiketleme) ve canlı kullanım aynı
+  fonksiyonu çağırır; eğitimdeki girdiler canlıdakiyle birebir aynıdır. Piyasa girdileri de canlı gibi son 250 günden
+  hesaplanır. Etiketleme bununla baştan yapıldı; yine 46.053 sinyal çıktı.
+- **Yeni girdiler:** hedef ve stop uzaklığı (ATR cinsinden), 20 günlük ortalamaya uzaklık, 52 haftalık dibe uzaklık,
+  1 günlük getiri.
+- **Denenen modeller:** artırımlı karar ağaçları (yalnız numpy), yakın döneme ağırlık, olasılık kalibrasyonu, yeni
+  girdili lojistik regresyon ve birleşimler. Hepsi aynı iki ileriye dönük sınamada karşılaştırıldı.
+
+## Sonuç
+
+| Model | Son 12 ay isabet (AUC) | 2024 isabet (AUC) | Olasılık doğruluğu (12 ay / 2024) | En yüksek %20'nin sonucu (12 ay / 2024) |
+|---|---|---|---|---|
+| Taban: senaryo türü | 0,546 | 0,577 | +%0,5 / +%1,6 | +0,09 R / +0,36 R |
+| A: benzer durumlar tablosu | 0,583 | 0,593 | +%1,3 / +%0,1 | +0,10 R / +0,19 R |
+| B: lojistik regresyon | 0,583 | 0,590 | +%2,0 / −%0,7 | +0,04 R / +0,25 R |
+| Artırımlı ağaçlar (3 türü) | 0,57–0,59 | 0,56–0,57 | −%3,7 … +%1,4 | ≤ +0,09 R |
+| **Seçilen: tablo + sade lojistik (10 girdi), ortalaması** | **0,605** | **0,612** | **+%2,8 / +%3,8** | **+0,17 R / +0,29 R** |
+
+- **Neden bu model:** Sade birleşim, olasılık doğruluğunu **iki dönemde de** artıran tek model oldu.
+- **Ağaçlar ve kalibrasyon kazandırmadı.** Sebep piyasanın genel başarı oranının dönemden döneme kayması: 2022'de %38,
+  2026'da %24.
+- **Yüzdelerin gerçeğe yakınlığı:** Seçilen model son 12 ayda olasılıkları 2–6 puan yüksek söyledi (tablo 5–9 puan
+  yüksek söylüyordu).
+
+  | Model "yaklaşık şu kadar" dedi | 21 | 26 | 29 | 33 | 41 |
+  |---|---|---|---|---|---|
+  | Gerçekte olan (%) | 18,5 | 19,7 | 23,6 | 28,6 | 38,0 |
+
+- **Ekonomik fark:**
+  - Son 12 ayda modelin en yüksek %20'si +0,17 R kazandırdı, diğerleri −0,08 R'de kaldı. Fark anlamlı (%90 aralık
+    0,02–0,32).
+  - 2024'te fark sınırda (−0,02–0,29). O yıl basit "senaryo türü" tabanının en yüksek %20'si hâlâ daha yüksek R
+    verdi (+0,36).
+- **Dürüst uyarı:** Altı kadar modeli aynı iki sınama dönemine bakarak karşılaştırdım ve en iyisini seçtim. Bu seçim
+  kendisi biraz iyimserlik katar. Gerçek değeri ancak **bundan sonraki canlı planlar** gösterir.
+
+## Başlangıç sürümü: `bist_haber/modeller/tp1_v1.json`
+- 34.579 kapanmış planın tamamıyla eğitildi (Kasım 2022–Ekim 2026, 588 hisse). Dosya 8,7 KB. Yeni kütüphane
+  gerektirmez; kurulum paketine girer.
+- **İçerik:** 45 gruplu benzer durumlar tablosu ve 10 girdili lojistik regresyon. Girdiler: senaryo türü, BIST 100
+  trendi ve 20 günlük getirisi, RSI, teknik skor, TP1 ve SL uzaklığı (ATR), endekse göre güç, 20 günlük getiri.
+- **Kullanım:**
+  - `tp1_model.predict(features)` → olasılık.
+  - `band()` → düşük / orta / yüksek. Sınırlar son 12 ayın alt ve üst %20'si: %22,9 ve %34,0.
+  - `similar()` → "geçmişte benzer N durumda %X".
+- **Canlı deneme (16.11 planları):**
+
+  | Hisse | Plan | TP1 olasılığı | Bant | Benzer geçmiş durum | Gerçekleşen |
+  |---|---|---|---|---|---|
+  | BAHKM | kırılım | %33 | orta | 341 | %27 |
+  | ENERY | kırılım | %37 | yüksek | 1.465 | %31 |
+
+- **Panele bağlı değil.** Seçimi ve eşikleri değiştirmez. Kartlarda bilgi olarak gösterilmesi ayrı onaya bağlı.
+- **Yeniden eğitmek için:** `python arastirma/asama6/egit.py <repo> <etiket.csv> <sonuc.json> --kaydet`

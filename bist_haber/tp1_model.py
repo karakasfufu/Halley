@@ -1,0 +1,130 @@
+"""Aşama 6 (2026-11-15): "TP1, SL'den önce gelir mi?" olasılık modeli — yalnız BİLGİ.
+
+Seçimi, sıralamayı ve eşikleri DEĞİŞTİRMEZ; henüz panele bağlı değildir (kullanıcı kararı bekleniyor).
+Girdiler yalnız teknik veridir (haber yok) ve hepsi plan anında bilinen değerlerdir. Eğitim ve canlı kullanım AYNI
+`features()` fonksiyonunu kullanır (arastirma/asama6/etiketle.py da bunu çağırır) → eğitimdeki ile canlıdaki girdiler
+birebir aynı hesaplanır. Model dosyası: bist_haber/modeller/tp1_v1.json (eğitim: arastirma/asama6/egit.py). Model = benzer durumlar
+tablosu ile 10 girdili sade lojistik regresyonun ortalaması (iki ileriye dönük sınamada en tutarlısı; ASAMA6_RAPOR.md).
+Yapay zekâ kullanılmaz; yalnız standart kütüphane (Python 3.9).
+"""
+import json
+import math
+from pathlib import Path
+from typing import Dict, List, Optional
+
+from . import technical
+
+MODEL_DIR = Path(__file__).with_name("modeller")
+DEFAULT = "tp1_v1.json"
+TURLER = ("kirilim_teyitli", "geri_cekilme", "destek_teyitli")
+WIN = 250                       # canlıdaki 1 yıllık indirmeyle aynı pencere
+
+
+def market_features(bench: Optional[List[dict]]) -> Dict[str, Optional[float]]:
+    """BIST 100 durumu (son 250 gün): trend (+1/0/−1), 20 günlük getiri %, 20 günlük ortalama gerçek aralık %."""
+    bars = [b for b in (bench or []) if b.get("close")][-WIN:]
+    out = {"x_trend": None, "x_perf20": None, "x_atr": None}
+    if len(bars) < 210:
+        return out
+    cl = [b["close"] for b in bars]
+    e50, e200, last = technical.ema(cl, 50), technical.ema(cl, 200), cl[-1]
+    out["x_trend"] = 1.0 if last > e50 > e200 else (-1.0 if last < e50 < e200 else 0.0)
+    out["x_perf20"] = (last / cl[-21] - 1) * 100
+    a = technical.atr(bars[-41:], 20)
+    out["x_atr"] = a / last * 100 if a else None
+    return out
+
+
+def features(t: Dict, plan: Dict, ts: Dict, risk: str, mk: Dict) -> Dict[str, Optional[float]]:
+    """t: technical.analyze; plan: ready.candidates'tan seçilen plan (tur/giris/sl/tp1/rr1); ts: ready.tech_score;
+    risk: "düşük"/"orta"/"yüksek"; mk: market_features. Eksik değer None kalır (model ortanca ile doldurur)."""
+    e, sl, tp1, atr = plan["giris"], plan["sl"], plan["tp1"], t.get("atr") or 0
+    px = t["son_fiyat"]
+    f = {"rr1": plan["rr1"], "stop_%": (e - sl) / e * 100, "tp1_%": (tp1 / e - 1) * 100,
+         "stop_atr": (e - sl) / atr if atr else None, "tp1_atr": (tp1 - e) / atr if atr else None,
+         "skor": ts["skor"], **{"p_" + k: v for k, v in ts["parca"].items()},
+         "rsi": t.get("rsi14"), "atr_%": t.get("atr_%"), "sma50_%": t.get("fiyat_sma50_%"),
+         "sma200_%": t.get("fiyat_sma200_%"), "hacim_orani": t.get("hacim_orani"), "rs20": t.get("rs_20g_%"),
+         "rs60": t.get("rs_60g_%"), "adx": t.get("adx"),
+         "di_fark": (t["arti_di"] - t["eksi_di"]) if t.get("arti_di") is not None and t.get("eksi_di") is not None else None,
+         "macd_hist_%": t["macd_hist"] / px * 100 if t.get("macd_hist") is not None else None,
+         "bb_gen": t.get("bb_genislik_%"), "sikisma": 1.0 if t.get("bb_sikisma") else 0.0,
+         "zirve_%": t.get("zirveye_uzaklik_%"), "dip_%": t.get("dibe_uzaklik_%"),
+         "ema20_atr": (px - t["ema20"]) / atr if t.get("ema20") and atr else None,
+         "perf1": t.get("perf_1g_%"), "perf5": t.get("perf_5g_%"), "perf20": t.get("perf_20g_%"),
+         "log_hacim": math.log10(max(t["islem_hacmi_tl"], 1)) if t.get("islem_hacmi_tl") else None,
+         "kilitli": 1.0 if t.get("son_gun_kilitli") else 0.0,
+         "trend_yuk": 1.0 if str(t.get("trend") or "").startswith("Yükseliş") else 0.0,
+         "trend_dus": 1.0 if t.get("trend") == "Düşüş" else 0.0,
+         "risk_orta": 1.0 if risk == "orta" else 0.0,
+         **{"tur_" + k: 1.0 if plan["tur"] == k else 0.0 for k in TURLER}, **mk}
+    return f
+
+
+# ---------------------------------------------------------------- model dosyası ve tahmin
+_CACHE: Dict[str, Dict] = {}
+
+
+def load(name: str = DEFAULT) -> Optional[Dict]:
+    if name not in _CACHE:
+        try:
+            _CACHE[name] = json.loads((MODEL_DIR / name).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+    return _CACHE[name]
+
+
+def _table_key(f: Dict, tb: Dict) -> str:
+    tur = next((k for k in TURLER if f.get("tur_" + k)), TURLER[1])
+    trend = "Yük" if f.get("trend_yuk") else ("Düş" if f.get("trend_dus") else "Yat")
+    atr = f.get("atr_%") if f.get("atr_%") is not None else tb["atr_ortanca"]
+    rsi = f.get("rsi") if f.get("rsi") is not None else 55.0
+    a = sum(atr >= e for e in tb["atr_sinir"])          # numpy.digitize ile aynı: sınıra eşitse üst dilim
+    r = sum(rsi >= e for e in (45, 70))
+    return f"{tur}|{trend}|a{a}|r{r}"
+
+
+def table_prob(f: Dict, tb: Dict) -> float:
+    """Benzer durumlar tablosu: senaryo türü × trend × oynaklık dilimi × RSI bandı grubunun geçmiş TP1 oranı
+    (küçük gruplar senaryo türü oranına doğru büzülmüş)."""
+    k = _table_key(f, tb)
+    if k in tb["oran"]:
+        return tb["oran"][k]
+    return tb["tur_orani"].get(k.split("|")[0], tb["genel"])
+
+
+def logit_prob(f: Dict, lg: Dict) -> float:
+    z = lg["sabit"]
+    for i, k in enumerate(lg["girdiler"]):
+        v = f.get(k)
+        v = lg["ortanca"][i] if v is None else v
+        v = min(max(v, lg["alt"][i]), lg["ust"][i])
+        z += lg["agirlik"][i] * (v - lg["ort"][i]) / lg["sd"][i]
+    return 1 / (1 + math.exp(-z))
+
+
+def predict(f: Dict, m: Optional[Dict] = None) -> Optional[float]:
+    """TP1'in SL'den önce görülme olasılığı (0–1) = (tablo + sade lojistik) / 2. Model dosyası yoksa None."""
+    m = m or load()
+    if not m:
+        return None
+    return (table_prob(f, m["tablo"]) + logit_prob(f, m["lojistik"])) / 2
+
+
+def similar(f: Dict, m: Optional[Dict] = None) -> Optional[Dict]:
+    """Kartta gösterilecek açıklama: benzer geçmiş durum sayısı ve gerçekleşen oranı."""
+    m = m or load()
+    if not m:
+        return None
+    tb = m["tablo"]
+    k = _table_key(f, tb)
+    return {"grup": k, "n": int(tb["sayi"].get(k, 0)), "gercek": tb["ham"].get(k)}
+
+
+def band(p: Optional[float], m: Optional[Dict] = None) -> Optional[str]:
+    """Olasılığı eğitim dağılımına göre üç banda ayırır: "düşük" / "orta" / "yüksek" (alt/üst %20 sınırları)."""
+    m = m or load()
+    if p is None or not m:
+        return None
+    lo, hi = m["bantlar"]
+    return "düşük" if p < lo else ("yüksek" if p >= hi else "orta")

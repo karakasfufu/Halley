@@ -1,4 +1,4 @@
-"""Aşama 6 etiketleme: geçmişin her günü için Halley'in bugünkü "koşulu sağlanmış plan" kuralları (ready.candidates,
+"""Aşama 6 etiketleme (girdiler bist_haber.tp1_model.features ile, canlıyla aynı): geçmişin her günü için Halley'in bugünkü "koşulu sağlanmış plan" kuralları (ready.candidates,
 yalnız teknik) o güne kadarki 250 günlük veriyle (canlıdaki 1 yıllık indirmeyle aynı pencere) uygulanır.
 Giriş: ertesi işlem gününün AÇILIŞI (azami girişin üstündeyse giriş yok). Çıkış: journal.evaluate (TP1'de yarısı,
 stop girişe; TP2; SL; 30 gün), komisyon %0,2 + kayma %0,1. Etiket: TP1 SL'den önce görüldü mü.
@@ -31,7 +31,7 @@ NEWS0 = {"direction": 0, "score": 0, "confidence": None, "flags": "", "bilanco_r
 
 
 def work(tk):
-    from bist_haber import entries, journal, ready, technical, tracker, tradeplan
+    from bist_haber import entries, journal, ready, technical, tp1_model, tracker, tradeplan
     conn = sqlite3.connect(f"file:{DBP}?mode=ro", uri=True)
     bars = load(conn, tk)
     bench = load(conn, "XU100")
@@ -63,17 +63,12 @@ def work(tk):
         cap = (tp1 + ready.MIN_RR_AT_MAX * sl) / (1 + ready.MIN_RR_AT_MAX)
         azami = max(e, min(e + ready.MAX_ENTRY_ATR * atr, cap))
         nxt = bars[i + 1]
-        row = {"ticker": tk, "tarih": d, "tur": best["tur"], "rr1": round(best["rr1"], 3),
-               "stop_%": round((e - sl) / e * 100, 3), "tp1_%": round((tp1 / e - 1) * 100, 3),
-               "skor": ts["skor"], **{"p_" + k: v for k, v in ts["parca"].items()}, "risk": risk,
-               "trend": t["trend"], "rsi": t["rsi14"], "atr_%": t["atr_%"], "sma50_%": t["fiyat_sma50_%"],
-               "sma200_%": t["fiyat_sma200_%"], "hacim_orani": t["hacim_orani"], "rs20": t["rs_20g_%"],
-               "rs60": t["rs_60g_%"], "adx": t["adx"], "di_fark": (t["arti_di"] or 0) - (t["eksi_di"] or 0),
-               "macd_hist_%": (t["macd_hist"] / t["son_fiyat"] * 100) if t["macd_hist"] is not None else None,
-               "bb_gen": t["bb_genislik_%"], "sikisma": int(bool(t["bb_sikisma"])), "zirve_%": t["zirveye_uzaklik_%"],
-               "perf5": t["perf_5g_%"], "perf20": t["perf_20g_%"], "hacim_tl": t["islem_hacmi_tl"],
-               "kilitli": int(bool(t["son_gun_kilitli"])), "ertesi_kilitli": int(nxt["high"] == nxt["low"]),
-               "acilis_bosluk_%": round((nxt["open"] / t["son_fiyat"] - 1) * 100, 3) if nxt.get("open") else None}
+        mk = tp1_model.market_features(bw)
+        f = tp1_model.features(t, best, ts, risk, mk)       # canlıyla AYNI girdi fonksiyonu
+        row = {"ticker": tk, "tarih": d, "tur": best["tur"], "risk": risk, "trend": t["trend"],
+               "hacim_tl": t["islem_hacmi_tl"], "ertesi_kilitli": int(nxt["high"] == nxt["low"]),
+               "acilis_bosluk_%": round((nxt["open"] / t["son_fiyat"] - 1) * 100, 3) if nxt.get("open") else None,
+               **{k: (round(v, 6) if isinstance(v, float) else v) for k, v in f.items()}}
         if not nxt.get("open") or nxt["open"] > azami + 1e-9:
             row.update(sonuc="girissiz", y="", r="", net="", gun="")
             out.append(row)
