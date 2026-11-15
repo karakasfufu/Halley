@@ -310,12 +310,28 @@ def current(conn, now: Optional[datetime] = None) -> List[Dict]:
     return rows_for(conn, r) if r else []
 
 
+def model_info(conn, p: Dict, now: datetime) -> Optional[str]:
+    """Aşama 6 gizli kayıt (2026-11-15, kullanıcı: "Gizli kayıt başlasın"): öneri anındaki model olasılığı JSON olarak
+    saklanır; seçimi/sıralamayı/eşikleri ETKİLEMEZ, panelde gösterilmez. Amaç: canlı sonuçlarla modeli ölçmek.
+    Hesap başarısız olursa öneri yine kaydedilir (None)."""
+    try:
+        from . import tp1_model
+        r = tp1_model.plan_probability(conn, p)
+    except Exception as e:  # model hatası öneriyi asla engellemesin
+        return json.dumps({"hata": str(e)[:200], "hesaplandi": _iso(now)}, ensure_ascii=False)
+    if not r:
+        return None
+    return json.dumps({"olasilik": round(r["olasilik"], 4), "bant": r["bant"], "benzer_n": r["benzer"]["n"],
+                       "benzer_oran": r["benzer"]["gercek"], "surum": r["surum"], "hesaplandi": _iso(now)},
+                      ensure_ascii=False)
+
+
 def _store(conn, p: Dict, analiz: str, giris_gunu: str, durum: str, now: datetime) -> None:
     conn.execute(
         "INSERT INTO hazir_firsat(olusturuldu,analiz,signal_day,giris_gunu,ticker,tur,kapanis,giris,giris_alt,azami_giris,"
-        "sl,tp1,tp2,rr1,vade_lo,vade_hi,haber_skoru,teknik_skor,risk,neden,durum,guncellendi,kaynak,genel_puan) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(signal_day, ticker) DO UPDATE SET "
-        "kaynak=excluded.kaynak, genel_puan=excluded.genel_puan, "
+        "sl,tp1,tp2,rr1,vade_lo,vade_hi,haber_skoru,teknik_skor,risk,neden,durum,guncellendi,kaynak,genel_puan,model_json) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(signal_day, ticker) DO UPDATE SET "
+        "kaynak=excluded.kaynak, genel_puan=excluded.genel_puan, model_json=excluded.model_json, "
         "tur=excluded.tur, giris=excluded.giris, giris_alt=excluded.giris_alt, azami_giris=excluded.azami_giris, "
         "sl=excluded.sl, tp1=excluded.tp1, tp2=excluded.tp2, rr1=excluded.rr1, vade_lo=excluded.vade_lo, "
         "vade_hi=excluded.vade_hi, haber_skoru=excluded.haber_skoru, teknik_skor=excluded.teknik_skor, "
@@ -323,7 +339,8 @@ def _store(conn, p: Dict, analiz: str, giris_gunu: str, durum: str, now: datetim
         "WHERE hazir_firsat.durum IN ('aday','onaylandi','iptal')",
         (_iso(now), analiz, p["signal_day"], giris_gunu, p["ticker"], p["tur"], p["kapanis"], p["giris"], p["giris_alt"],
          p["azami_giris"], p["sl"], p["tp1"], p["tp2"], p["rr1"], p["vade_lo"], p["vade_hi"], p["haber_skoru"],
-         p["teknik_skor"], p["risk"], p["neden"], durum, _iso(now), p.get("kaynak", "haber"), p.get("genel_puan")))
+         p["teknik_skor"], p["risk"], p["neden"], durum, _iso(now), p.get("kaynak", "haber"), p.get("genel_puan"),
+         model_info(conn, p, now)))
 
 
 def _cancel(conn, rid: int, why: str, now: datetime) -> None:

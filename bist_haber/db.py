@@ -320,6 +320,8 @@ def connect(path=None) -> sqlite3.Connection:
         conn.execute("ALTER TABLE hazir_firsat ADD COLUMN kaynak TEXT NOT NULL DEFAULT 'haber'")
     if "genel_puan" not in hz_cols:
         conn.execute("ALTER TABLE hazir_firsat ADD COLUMN genel_puan REAL")
+    if "model_json" not in hz_cols:   # 2026-11-15 Aşama 6 gizli kayıt: öneri anındaki TP1 olasılığı (panelde gösterilmez)
+        conn.execute("ALTER TABLE hazir_firsat ADD COLUMN model_json TEXT")
     price_cols = {r[1] for r in conn.execute("PRAGMA table_info(prices)")}
     for col in ("open", "high", "low"):  # teknik analiz için (2026-11-07)
         if col not in price_cols:

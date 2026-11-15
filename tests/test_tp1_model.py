@@ -81,6 +81,20 @@ class PlanProbability(unittest.TestCase):
             f = tp1_model.plan_features(conn, plan)
             self.assertEqual((f["h_is"], f["h_var"]), (1.0, 1.0))
             self.assertIsNone(tp1_model.plan_probability(conn, dict(plan, signal_day="2020-01-02")))
+            # gizli kayıt: hazır fırsat kaydına öneri anındaki olasılık yazılır; model hatası kaydı engellemez
+            from datetime import datetime
+            from unittest.mock import patch
+            now = datetime(2026, 11, 16, 18, 25)
+            full = dict(plan, kapanis=e, giris_alt=e * 0.99, azami_giris=e * 1.01, tp2=e + 6 * t["atr"], vade_lo=3,
+                        vade_hi=8, haber_skoru=None, teknik_skor=7, neden="deneme", kaynak="teknik", genel_puan=50)
+            ready._store(conn, full, "aksam", "2026-11-17", "aday", now)
+            mj = json.loads(conn.execute("SELECT model_json FROM hazir_firsat WHERE ticker='AAA'").fetchone()[0])
+            self.assertAlmostEqual(mj["olasilik"], round(want, 4))
+            self.assertEqual((mj["surum"], mj["bant"] in ("düşük", "orta", "yüksek")), ("tp1_v1", True))
+            with patch.object(tp1_model, "plan_probability", side_effect=RuntimeError("bozuk")):
+                ready._store(conn, dict(full, ticker="BBB"), "aksam", "2026-11-17", "aday", now)
+            mj = json.loads(conn.execute("SELECT model_json FROM hazir_firsat WHERE ticker='BBB'").fetchone()[0])
+            self.assertIn("bozuk", mj["hata"])
             conn.close()
 
 

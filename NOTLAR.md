@@ -1703,3 +1703,11 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   ENERY %37,3 (yüksek) = elle hesapla birebir. Test: PlanProbability. Panele bağlı DEĞİL.
 - Ara bakış (metinlerin %11'i, 732 plan; kesin değil): kurallı okuma "olumlu" → TP1 %38,7 / +0,40 R (n=124);
   nötr %26,7 / +0,06 R; "olumsuz" %25,9 / −0,11 R. Metinsiz planlar %29,3. Tam veriyle sınanacak.
+
+## 2026-11-15 — Aşama 6 gizli kayıt (kullanıcı: "Gizli kayıt başlasın")
+- `hazir_firsat.model_json` (yeni sütun, db göçü): her hazır fırsat kaydında/güncellemesinde (akşam aday, sabah
+  onay) `ready.model_info()` → tp1_model.plan_probability: olasılık, bant, benzer sayısı/oranı, sürüm, zaman.
+  Seçim/sıralama/eşik/panel/Telegram DEĞİŞMEDİ. Model hatası öneriyi engellemez ({"hata": ...}).
+- Test: PlanProbability (kayıt + hata durumu). Kopyada akşam→sabah: BAHKM 0,3265 orta, ENERY 0,3728 yüksek yazıldı.
+- Canlı DB yedeği: data/yedek/bist_haber_20261115_gizli_kayit_oncesi.db. Mevcut 2 kayıt Pazartesi sabah analizinde
+  dolacak. Ölçüm: birkaç hafta sonra kapanan önerilerde olasılık ↔ gerçek sonuç.
