@@ -1828,3 +1828,9 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 ## 2026-11-15 — Güncelleme kontrolü her açılışta (kullanıcı: "her açılışta güncelleme var mı diye kontrol etsin")
 - update_banner artık `guncelleme.kontrol(zorla=True)` (her panel oturumu başında); ağ zaman aşımı 6 → 4 sn; ağ
   hatasında son bilinen bilgiyle devam. Ayarlar metni ve KULLANIM.md "🔄 Güncelleme" bölümü eklendi. 522 test OK.
+- Yayın v202611152318 = 2026-11-15 (9ad93a9) açık depoya (zip ae039bd8…, kurulum 62108e46…9019 değil: 62108e46…a060;
+  Defender temiz; ortam/başlatıcı imzası öncekiyle aynı → uygulama içinden güncellenir).
+- Doğrulama (test kurulumu, sıra 2200): eski sürüm "20 saatte bir" kuralıyla bandı göstermedi (beklenen); Ayarlar →
+  "Güncellemeyi şimdi kontrol et" → 🔄 Güncelle → sıra 2318, "guncellendi", veri korundu. Yeni sürümde her oturum
+  açılışında son_kontrol yenileniyor (23:32:03 → 23:32:14). Not: 2200 sürümündeki bir kurulum yeni sürümü en geç
+  ~20 saatte kendiliğinden görür (o sürümün kuralı); müşteride henüz 2200 kurulu değil.
