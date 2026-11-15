@@ -1765,3 +1765,10 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   Pano altyazısı, olumlu haber listesi açıklaması, rapor dipnotu, score_text) "5 yıllık geçmiş sınamada TP1'i öngörmedi
   (yazı-tura düzeyi)" olarak değişti (Aşama 6: AUC 0,49). Kart model olasılığı anahtarı KAPALI kalır; metin sınaması
   sonucu görülünce karar verilecek. 510 test OK.
+
+## 2026-11-15 — Model olasılığı açık hazır fırsatlara sonradan eklendi (kullanıcı: "kullanıcı denemek istiyor")
+- Canlı DB yedeği: data/yedek/bist_haber_20261115_model_sonradan_oncesi.db.
+- Açık (aday) 2 kayda `ready.model_info` ile model_json yazıldı, `"sonradan": true` işaretli: BAHKM %32,7 orta,
+  ENERY %37,3 yüksek (sinyal günü 13.11; hesap yalnız o güne kadarki veriyle → geleceği görme yok).
+- Panel kontrolü (tarayıcı): Ayarlar'da anahtar görünüyor (kapalı), genel puanın yeni notu Pano'da görünüyor.
+  Anahtarı açmak kullanıcıya bırakıldı. Kod değişmedi.
