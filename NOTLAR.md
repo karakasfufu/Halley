@@ -1868,3 +1868,15 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 ## 2026-11-16 — FAZ 1 canlı tahmin defteri (dal: faz1-tahmin-defteri; CANLIYA ALINMADI)
 - defter.py (yeni), db.py göçü (yedek→integrity_check→tek işlem), ready.py iki bağlantı, tp1_model.plan_context, app.py Performans bölümü; 17+1 test. 540 test OK.
 - Gerçek kopya sınaması: 20/20 tablo göç sonrası aynı; BAHKM/ENERY yeni→tekrar; UPDATE/DELETE reddedildi; eski kod (3310a61) hatasız açtı; tablo silme ve yedek geri koyma birebir. Canlı DB: tahmin tablosu yok, yedek yok. Ayrıntı: HALLEY2_DENETIM_RAPORU Ek D.
+
+## 2026-11-16 00:43 — FAZ 1 CANLIYA ALINDI (kullanıcı: "Evet, canlıya al")
+- Sıra: faz1 dalı main'e ileri birleştirildi (ac24f8f), 540 test OK → Halley kapatıldı → elle yedek
+  data/yedek/bist_haber_20261116_004323_faz1_oncesi.db (integrity ok, canlıyla birebir: 20 tablo, 167.412 satır) →
+  kod canlı klasöre → göç TEK süreçte kontrollü çalıştırıldı (otomatik yedek
+  bist_haber_20261116_004339_tahmin_defteri_oncesi.db, integrity ok) → 20 mevcut tablo birebir aynı, canlı integrity
+  ok, 4 tetikleyici yerinde → Halley başlatıldı (sağlık OK, 2 okuyucu, ikinci göç/yedek yok) → Performans'ta defter
+  bölümü hatasız ("henüz tahmin yok").
+- Bekleyen gerçek veri kabulü: 16.11 08:30 sabah kontrolü (BAHKM/ENERY tahminleri), ilk akşam analizi ve açılış
+  sonrası sonuçlandırma. Müşteri güncellemesi YAYIMLANMADI (ayrı onay). FAZ 2 başlamadı.
+- Geri dönüş: önceki commit 3310a61 kodu + gerekirse DROP TABLE tahmin_sonuc, tahmin; ya da elle yedeği geri koymak
+  (Halley kapalıyken).
