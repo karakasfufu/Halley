@@ -1841,3 +1841,13 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   (0,166 → 0,159–0,161). Kelime modeli gürültü öğrendi. Kural tablosu: olumsuz %26,6 / nötr %28,2 / olumlu %31,2 (ara
   bakıştaki %39 tekrar etmedi). Karar: E3 yok, tp1_v1 kalır. ASAMA6_RAPOR Ek 4, MIMARI aşama 6 satırı güncellendi.
 - Sınır: yapay zekâ haber puanıyla karşılaştırma yapılamadı (geçmişte puan yok); canlı kayıtlarla ölçülecek.
+
+## 2026-11-16 — Halley 2.0 denetim raporu (FAZ 0; kullanıcının ilettiği "Master Technical Audit" isteği)
+- HALLEY2_DENETIM_RAPORU.md: istekteki kurallar/sonuçlar kodla ve raporlarla doğrulandı; md. 4–17 için mevcut durum,
+  dosya/fonksiyon, kanıt, eksik, artı/eksi; "kodda var / gerçek veride" tablosu; FAZ 1–6 planı (süre, risk, test,
+  kabul); önerilmeyenler. Kod, veritabanı ve API'ye dokunulmadı (canlı DB salt-okunur sayıldı: hazır fırsat 2 açık /
+  0 kapanmış; sanal işlem 30 kayıt, 3 girişli → 3 SL; takip 3 bekliyor).
+- Başlıca bulgular: merkezi karar akışı ve zorunlu filtreler var (yeni motor gereksiz); signal_log değiştirilemez
+  karar geçmişi; hazir_firsat aynı gün yeniden analizde üzerine yazılıyor; algoritma/parametre sürümü kaydı yok; prices
+  tablosunda kaynak/indirme zamanı yok; MDD/Sortino/log loss/MAE/MFE/portföy simülasyonu yok; hayatta kalma yanlılığı
+  var (araştırma evreni bugünkü 632 hisse); rejimin etkisi ölçülmedi; YZ çağrıları yalnız düğme/zamanlı (rerun'da yok).
