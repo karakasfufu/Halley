@@ -69,6 +69,26 @@ class PanelFlowTests(unittest.TestCase):
         self.assertEqual(at.selectbox(key="hisse_pick").value, "POS")
         self.assertTrue(any("Trend gücü (ADX 14)" in d.value.to_string() for d in at.dataframe))
 
+    def test_hisse_page_html_download(self):
+        """2026-11-15: Hisse Analizi → 📄 HTML olarak indir → tek dosya; ekranla aynı içerik, açık zemin, st geri konur."""
+        at = self.app("🔍 Hisse Analizi")
+        self.assertEqual(at.selectbox(key="hisse_pick").value, "POS")
+        self.assertFalse(at.get("download_button"))                         # hazırlanmadan kaydet düğmesi yok
+        at.button(key="html_mk_POS").click().run()
+        self.assertEqual(len(at.exception), 0, str(at.exception))
+        self.assertEqual(len(at.error), 0, [e.value for e in at.error])
+        dl = at.get("download_button")
+        self.assertEqual(len(dl), 1)
+        self.assertIn("POS_analiz_", dl[0].proto.label)
+        doc = at.session_state["_html_dosya"][1]
+        self.assertTrue(doc.startswith("<!DOCTYPE html>"))
+        for want in ("POS · POS A.Ş.", "Trend gücü (ADX 14)", "Giriş senaryoları", "Mevcut fiyattan girilirse",
+                     "Haberler ve analiz", "vegaEmbed", "yatırım tavsiyesi değildir", "<table"):
+            self.assertIn(want, doc)
+        self.assertNotIn("**", doc)                                          # markdown kalın işaretleri çevrildi
+        # ekran bozulmadı: dosya hazırlandıktan sonra sayfa yine normal çiziliyor
+        self.assertTrue(any("Trend gücü (ADX 14)" in d.value.to_string() for d in at.dataframe))
+
     def test_visual_text_has_no_broken_dollar_or_plus(self):
         """2026-11-09 görünüm kontrolü: iki "$" arası formül gibi bozuluyordu; "+ Takibe Al" düğmesinde + kayboluyordu."""
         import re

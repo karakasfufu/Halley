@@ -2163,12 +2163,34 @@ def page_hisse() -> None:
     with s2:
         takip_ui.follow_button(conn, tk, f"card_{tk}")
     st.markdown(f"<div class='page-h'>{esc(tk)} · {esc(names.get(tk, ''))}</div>", unsafe_allow_html=True)
-    tracked_box(tk)
     r = by.get(tk)
-    if r:
-        stock_details(r)
-    else:
-        generic_details(tk)
+    draw = lambda: (tracked_box(tk), stock_details(r) if r else generic_details(tk))
+    hisse_html_ui(tk, names.get(tk, ""), draw)
+    draw()
+
+
+def hisse_html_ui(tk: str, name: str, draw) -> None:
+    """2026-11-15: Hisse Analizi ekranını tek dosya .html olarak indir. Dosya, ekranı çizen fonksiyonların aynısıyla
+    üretilir (bist_haber/html_export); YZ çağrısı yok. İki adım: hazırla → kaydet (her açılışta boşuna üretilmesin)."""
+    from bist_haber import html_export
+    e1, e2 = st.columns([1.6, 4], vertical_alignment="center")
+    if e1.button("📄 HTML olarak indir", key=f"html_mk_{tk}", width="stretch",
+                 help="Bu ekranın (grafik, senaryolar, teknik görünüm, takvim, haberler) tek dosyalık bir kopyası. "
+                      "Tarayıcıda açılır; grafik için internet gerekir, diğer bölümler çevrimdışı okunur."):
+        now_ = datetime.now(config.TR_TZ)
+        try:
+            body = html_export.capture(globals(), draw, DARK=False)
+            st.session_state["_html_dosya"] = (tk, html_export.page(
+                f"{tk} · {name}", f"Halley · Hisse Analizi · {now_.strftime('%d.%m.%Y %H:%M')} · fiyatlar gecikmelidir",
+                body, "Halley haberleri ve fiyatları kodla özetler; yatırım tavsiyesi değildir. Emir vermez, işlemi siz "
+                      "Midas'tan yaparsınız. Bu dosya oluşturulduğu andaki verileri gösterir; sonradan güncellenmez."),
+                f"{tk}_analiz_{now_.strftime('%Y%m%d_%H%M')}.html")
+        except Exception as ex:
+            st.error(f"HTML dosyası hazırlanamadı: {nice_err(ex)}")
+    got = st.session_state.get("_html_dosya")
+    if got and got[0] == tk:
+        e2.download_button(f"💾 Dosyayı kaydet ({got[2]})", got[1].encode("utf-8"), file_name=got[2],
+                           mime="text/html", key=f"html_dl_{tk}", on_click="ignore")
 
 
 def tracked_box(tk: str) -> None:

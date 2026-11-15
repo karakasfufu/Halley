@@ -1787,3 +1787,13 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Kronos-mini (2.000 plan, 10 yol, ~4 saat): tek başına AUC 0,52 / 0,52; birleşik son 12 ay 0,595–0,598 (E2 0,601),
   en yüksek %20 R'si kötüleşti; geçersiz yol %2. Katkı yok → canlıya alınmadı, ince ayar önerilmez
   (ASAMA7_PLAN.md "Sonuç", MIMARI satırı ⛔).
+
+## 2026-11-15 — Hisse Analizi: .html olarak indirme (kullanıcı isteği)
+- `bist_haber/html_export.py`: Kaydedici (Recorder) — ekranı çizen fonksiyonlar (tracked_box, stock_details /
+  generic_details) aynen çalışır, `st` geçici olarak kaydediciyle değişir (DARK=False: açık zemin); sayılar/metinler
+  ekranla aynı hesaptan. Grafik Vega-Lite olarak gömülür (CDN; internet yoksa not görünür, geri kalanı çevrimdışı).
+  Hata olsa da `st` geri konur. YZ çağrısı yok.
+- Panel: Hisse Analizi'nde "📄 HTML olarak indir" → "💾 Dosyayı kaydet (TK_analiz_YYYYMMDD_HHMM.html)" (iki adım:
+  her açılışta boşuna üretilmesin). KULLANIM.md tablosu güncellendi.
+- Testler: tests/test_html_export.py (3), test_hisse_page_html_download (panel). 514 test OK. Canlı veri kopyasıyla
+  ENERY dosyası üretildi ve tarayıcıda açıldı: grafik, senaryolar, teknik tablo, takvim, haberler, dipnot görünüyor.
