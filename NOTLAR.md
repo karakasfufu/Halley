@@ -1690,3 +1690,11 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - `haber_ekle.py`: etiketlere haber girdileri. Sonuç: haberli %29,2 / haberli olmayan %29,3 TP1; teknik+haber türü
   AUC 0,603 / 0,609 (teknik 0,605 / 0,612) → katkı yok; tp1_v1 değişmedi. Konudan içerik anlaşılmıyor (Özel Durum).
 - 2. aşama için gereken metin sayısı (plan öncesi 5 gün, gürültü hariç): 19.752 (Özel Durum 5.649).
+
+## 2026-11-15 — Aşama 6 haber 2. aşama, Python ile (kullanıcı: "Evet pythonla dene"; API yok, 0 $) — SÜRÜYOR
+- `bist_haber/haber_metin.py` (canlıyla ortak): kurallı okuma (olumlu/olumsuz ifade, güncelleme mi, en büyük tutar /
+  günlük işlem hacmi; USD/EUR o günün kuruyla) + `tokens()` (öğrenen kelime modeli girdisi). Test: test_haber_metin.
+- `arastirma/asama6/metin_indir.py`: plan öncesi 5 gündeki 5.649 Özel Durum metni araştırma DB'sine (kap_metin), karışık
+  sırayla. KAP her ~80 istekte 5 dk sınır uyguluyor (bekleme süresi düşürülmedi) → ~8–9 saat.
+- Kurlar (USDTRY/EURTRY 5 yıl, Yahoo) araştırma DB'sinde `kur`.
+- `metin_model.py`: E2 / +kurallı / +öğrenen kelime / ikisi; metni eksik planlar çıkarılır. Sonuç indirme bitince.
