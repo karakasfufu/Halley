@@ -646,3 +646,312 @@ Ortak kurallar:
 
 > Bu rapordaki performans rakamları geçmiş veri sınamasıdır; gelecek getiri garantisi değildir. Halley emir
 > vermez, yatırım tavsiyesi değildir.
+
+---
+
+# EK A (16.11.2026) — Portföy backtest, canlı model izleme ve bozulma tespiti
+
+Bu ek, "HALLEY 2.0 – Ek Geliştirme Kararı" isteğine göre yazıldı. Yöntem aynı:
+
+- **Kod değiştirilmedi.**
+- Yalnız kod ve canlı veritabanı (salt-okunur) incelendi.
+- Uygulama onay bekliyor.
+
+## A1. Portföy bazlı backtest
+
+### Mevcut durum (kodda doğrulandı)
+
+| Bileşen | Ne yapıyor | Ne yapmıyor |
+|---|---|---|
+| `journal.evaluate` (sanal ve gerçek işlem) | Tek işlemin girişini, çıkışını, maliyet sonrası getirisini, R'sini ve süresini hesaplıyor. Kurallar: giriş ertesi açılışta ya da limitte; TP1'de yarı satış ve stop girişe; en fazla 30 gün; komisyon ve kayma düşülür. | Sermaye, nakit, adet ya da aynı anda açık pozisyon sınırı yok. MAE/MFE hesaplanmıyor. |
+| `journal.record_auto` | "Uygun" görünen her hissenin en uygun senaryosunu sanal işlem olarak kaydediyor. Aynı hissede açık kayıt varken yenisini açmıyor. | Kaç işlemin aynı anda açık olabileceğine ve hangisinin seçileceğine karar vermiyor; her uygun hisse kaydediliyor. |
+| `journal.metrics` | Kazanma oranı, kâr faktörü, işlem başına Sharpe. 30'dan az işlemde "yetersiz örnek" işaretleniyor. | Sermaye eğrisi, azami düşüş ve Sortino yok. |
+| `journal.position_size` | Tek işlem için adet ve tutar hesaplıyor: sermaye, risk %, giriş, SL ve maliyetten. Kartta 🧮 olarak gösteriliyor. | Diğer açık pozisyonları ve kalan nakdi hesaba katmıyor. |
+| `sectors.CONC_WARN` | Açık işlemlerin yarısı ya da fazlası tek ana sektördeyse uyarıyor. | Sınır koymuyor. |
+| Araştırma sınaması (`arastirma/asama6`) | 5 yıllık plan evreninde tek işlem bazında isabet, Brier ve en yüksek %20'nin R'si. | Portföy simülasyonu yok. |
+
+### Sonuç
+
+**Evet, ayrı bir portföy simülatörüne gerçekten ihtiyaç var.** Gerekçeler:
+
+- Bugünkü bütün rakamlar "her plana eşit, sınırsız sermayeyle girilseydi" varsayımına dayanıyor.
+- Gerçekte aynı gün birden fazla fırsat geliyor, sermaye sınırlı ve pozisyonlar üst üste biniyor.
+- Bu yüzden portföy getirisi ve düşüşü, tek işlem ortalamasından **farklı** olur 💭.
+
+Mevcut kod tekrar yazılmamalı. Simülatör, tek işlem sonuçlarını üreten `journal.evaluate`'i **aynen kullanmalı**.
+Yeni olan yalnız sermaye ve sıra yönetimi.
+
+### Önemli uyarı: geçmiş evren canlı listeyle aynı değil
+
+- Canlı hazır fırsat **olumlu haber** (skor ≥ 1,50) şartı istiyor.
+- 5 yıllık geçmişte yapay zekâ haber puanı yok. Bu yüzden araştırma evreni, haber şartı olmayan **teknik plan
+  evreni** (34.579 plan).
+- Yani portföy simülasyonu "yalnız teknik" kuralların portföy sonucunu verir; **haberli canlı listeninkini değil.**
+- Haberli listenin portföy sonucu ancak canlı kayıtlar biriktikçe ölçülebilir (A2).
+
+### Tasarım: `arastirma/asama6/portfoy.py` (yalnız araştırma)
+
+1. **Olay sırası**
+   - Simülasyon gün gün ilerler.
+   - Her gün önce açık pozisyonların o günkü fiyatıyla çıkışlar işlenir, sonra yeni girişler yapılır.
+   - Giriş ertesi açılışta yapılır; açılış azami girişin üstündeyse girilmez.
+   - Gün içinde stop ve hedef aynı anda görülürse stop önce sayılır. Bu, `journal.evaluate`'teki temkinli kuralla
+     aynı.
+2. **Aynı gün birden fazla fırsat:** Sıralama yalnız o gün bilinen bilgiyle yapılır. İki yöntem ayrı ayrı
+   raporlanır:
+   - (a) Canlıdaki seçim kuralı: risk seviyesi, teknik skor, risk/getiri.
+   - (b) TP1 modelinin **o dönem için dışarıda tutulmuş** olasılığı. Model ileriye dönük eğitilir; aynı yılın
+     verisiyle eğitilmiş model kullanılmaz.
+3. **Sermaye kuralları:** Hepsi ayarlanabilir; varsayılanlar Halley'in bugünkü ayarlarından gelir.
+   - başlangıç sermayesi,
+   - işlem başına risk % (adet `journal.position_size` ile hesaplanır),
+   - en fazla 5 eşzamanlı pozisyon (canlıdaki "en fazla 5" ile aynı),
+   - azami toplam açık risk (ör. %6),
+   - tek ana sektörde en fazla N pozisyon.
+
+   Nakit yetmezse işlem atlanır ve atlanan işlem sayılır.
+4. **Maliyet:** Komisyon %0,2 ve kayma %0,1, mevcut kurallarla aynı. Düşük likiditede ek kayma isteğe bağlı.
+5. **Çıktılar**
+   - günlük sermaye eğrisi (gerçekleşmemiş kâr/zarar dahil; açık pozisyonlar o günün kapanışıyla değerlenir),
+   - azami düşüş ve süresi,
+   - Sortino ve Sharpe (günlük),
+   - kâr faktörü, beklenen kazanç, kazanma oranı,
+   - ardışık kayıp, ortalama süre,
+   - atlanan fırsat sayısı ve nedeni (nakit, risk sınırı, sektör, pozisyon sınırı),
+   - tek işlem bazındaki sonuçla yan yana karşılaştırma.
+
+   Son 12 ay ve 2024 ayrı raporlanır.
+6. **Geleceği görme engeli**
+   - Pozisyon seçiminde yalnız sinyal gününe kadarki veri kullanılır.
+   - Sermaye, o güne kadar **gerçekleşmiş** sonuçlardan hesaplanır.
+   - Test: geleceğe ait bir fiyat bozulduğunda geçmiş günlerin kararları değişmemeli.
+
+### Canlı portföy görünümü (isteğe bağlı, sonraya)
+
+Aynı simülatör canlıdaki hazır fırsat kayıtlarına uygulanabilir: "Önerilerin hepsine bu kurallarla girilseydi
+sermaye eğrisi". Bu yalnız gösterimdir; yeterli kapanmış öneri birikince anlamlı olur.
+
+### Süre ve test
+
+**Tahmini süre:** Araştırma simülatörü ve rapor 1,5 gün. Canlı görünüm 0,5 gün, sonraya bırakılabilir.
+
+**Testler:**
+
+1. Elle hesaplanmış 3–4 işlemlik küçük senaryoda nakit, adet, düşüş ve gerçekleşmemiş kâr/zarar birebir tutmalı.
+2. Sermaye ve pozisyon sınırsızken işlem başına sonuç, `journal.evaluate` toplamıyla aynı çıkmalı.
+3. Geleceğe ait veri bozulduğunda geçmiş kararlar değişmemeli.
+4. Aynı girdiyle iki çalıştırma aynı sonucu vermeli.
+
+**Kabul:** Son 12 ay ve 2024 için portföy raporu; tek işlem / portföy farkı ve varsayımlar açıkça yazılmış.
+
+## A2. Canlı tahmin ve model performans izleme
+
+### Mevcut durum (kodda doğrulandı)
+
+- **Gizli kayıt:** `hazir_firsat.model_json` alanında olasılık, bant, benzer durum sayısı ve oranı, model sürümü ve
+  hesaplanma zamanı tutuluyor. Yazan: `ready._store` → `ready.model_info`.
+- **Sonuç** aynı satırda tutuluyor: `ready.evaluate_all` → `durum`, `sonuc_json`. İçeriği:
+  - giriş olup olmadığı,
+  - TP1 görüldü mü, TP2, SL, başabaş ya da süre doldu,
+  - net getiri ve R,
+  - işlem günü.
+- **Ölçüm:** `tp1_model.live_check(conn)` kapanan öneri sayısını, bantlara göre gerçek oranı, ortalama tahmini,
+  gerçek oranı ve Brier'i veriyor. 30'dan az örnekte isabeti hesaplamıyor. Panelde gösterilmiyor.
+- **Canlı veri (16.11):** 2 açık kayıt, 0 kapanmış. İkisi de "sonradan" işaretli.
+
+### Eksikler (isteğe göre)
+
+| İstenen | Durum | Not |
+|---|---|---|
+| Tahmin kimliği, hisse, zaman, model sürümü, olasılık | ✅ var | `hazir_firsat.id`, `model_json` |
+| Tahmin edilen sonuç (bant) | ✅ var | düşük / orta / yüksek |
+| Giriş, stop ve TP1 seviyeleri | ✅ var | aynı satırda |
+| Fırsat puanı | ✅ var | `genel_puan` |
+| **Özellik sürümü** | 🔲 yok | Modelin girdi listesi ve kod sürümü kayda yazılmıyor. |
+| **Piyasa rejimi** | 🔲 yok | Rejim yalnız bekçi çalıştırma özetinde. |
+| **Veri kalitesi** | 🔲 yok | Veri uyarıları kayda yazılmıyor. |
+| **Girdi değerleri** | 🔲 yok | Dağılım değişikliğini ölçmek için gerekli (A3). |
+| **Değiştirilemezlik** | ❌ yok | Aynı gün yeniden analizde `ON CONFLICT DO UPDATE` model_json'u **değiştirebiliyor**; sonradan ekleme de güncelleme ile yapılıyor. |
+| **Sonucun ayrı kayıt olması** | ❌ yok | Sonuç tahminle aynı satırda, güncellenerek tutuluyor. |
+| MAE / MFE | 🔲 yok | `journal.evaluate` hesaplamıyor (FAZ 1'de eklenecek). |
+| Win rate, beklenen kazanç | 🟡 kısmen | `ready.performance` var; modelle ilişkilendirilmemiş. |
+| Log loss, kalibrasyon, rejime göre başarı, backtest–canlı farkı | 🔲 yok | |
+| Açık tahminin hesaba katılmaması | ✅ var | `live_check` yalnız `durum='kapandi'` olanları sayıyor. |
+| Düşük örneklem uyarısı | 🟡 kısmen | `live_check` 30'un altında isabet vermiyor; panelde gösterilmiyor. |
+
+### Tasarım
+
+Yöntem, mevcut **bekçi karar defteri** (`signal_log`) ile aynı: kayıt yalnız eklenir, veritabanı tetikleyicisi
+güncellemeyi ve silmeyi engeller.
+
+1. **`tahmin` tablosu** (yeni; yalnız eklenir, değiştirilemez, silinemez). Her hazır fırsat ilk kaydedildiğinde
+   bir satır yazılır. Alanlar:
+   - kimlik, `hazir_firsat_id`, hisse, sinyal günü, tahmin zamanı (Türkiye saati),
+   - model sürümü, özellik sürümü (girdi listesinin parmak izi), kod sürümü, parametre sürümü (FAZ 2'deki
+     `params_version()`),
+   - olasılık, bant, benzer durum sayısı ve oranı,
+   - tür, giriş, azami giriş, SL, TP1, TP2, geçerlilik,
+   - genel puan, teknik skor, haber skoru,
+   - rejim (trend, oynaklık, genişlik),
+   - veri uyarıları,
+   - girdi değerleri (JSON),
+   - `sonradan` bayrağı: güncellemeden önceki kayıtlara eklenenler ayrı tutulur ve istenirse ölçümden çıkarılır.
+
+   Aynı gün yeniden analizde plan anlamlı değiştiyse (tür, giriş, SL ya da TP) **yeni** satır eklenir, eskisi
+   kalır. Değişmediyse satır eklenmez.
+2. **`tahmin_sonuc` tablosu** (yeni; yalnız eklenir). Değerlendirmenin her adımında değil, yalnız **nihai sonuç**
+   kesinleştiğinde bir satır yazılır. Alanlar:
+   - giriş oldu mu, giriş günü ve fiyatı,
+   - TP1 görüldü mü, SL görüldü mü, TP2,
+   - çıkış nedeni, işlem günü,
+   - net getiri, R, MAE, MFE,
+   - değerlendirme zamanı, değerlendirme kuralı sürümü.
+
+   "Giriş olmadı" ve "sabah iptal" de birer sonuçtur. Bunlar isabet hesabında **ayrı** sayılır; model yalnız
+   girilen planlarda ölçülür.
+3. **Yazan yerler**
+   - Tahmin satırını `ready._store` yazar.
+   - Nihai sonuç satırını `ready.evaluate_all`, `ready.morning` ve `opening_check` yazar.
+   - Mevcut `hazir_firsat` akışı ve ekranı değişmez; yeni tablolar onun yanına eklenir.
+4. **Ölçüm** (yeni modül yok; `tp1_model.live_check` genişletilir)
+   - tahmin sayısı; sonuçlanan, açık, girişsiz ve iptal sayıları,
+   - win rate, beklenen kazanç (R ve net %),
+   - Brier, log loss,
+   - kalibrasyon: bantlara göre tahmin ve gerçek oran, güven aralığıyla,
+   - rejime göre sonuç,
+   - aynı model için geçmiş sınamanın beklediği oranla canlı oranın farkı, güven aralığıyla.
+5. **Güvenilirlik etiketi:** Bütün oranlar Wilson ya da bootstrap güven aralığıyla gösterilir.
+   - Sonuçlanan < 30: "çok az örnek, karar verilmez".
+   - 30–99: "düşük güven".
+   - ≥ 100: "orta güven".
+6. **Panel:** 🏁 Performans'ta "Model canlı performansı" bölümü. Yalnız okuma; kararları etkilemez.
+
+### Gerçekçi beklenti (örneklem)
+
+- Hazır fırsat günde 0–5 tane çıkıyor ve sonuçlanması 30 işlem gününe kadar sürebiliyor.
+- 💭 30 sonuçlanmış tahmin için 1–2 ay, 100 için 3–6 ay gerekebilir.
+- Bu yüzden **kayda erken başlamak**, ölçümün kendisinden daha önemli.
+
+### Veritabanı değişiklikleri
+
+- Yeni tablolar: `tahmin` ve `tahmin_sonuc`, değiştirilemezlik tetikleyicileriyle.
+- Yeni sütun yok; mevcut tablolara dokunulmaz.
+- Göçten önce yedek alınır.
+- Mevcut `model_json` alanı geriye uyumluluk için kalır.
+
+### Süre ve test
+
+**Tahmini süre:** 2 gün (kayıt ve sonuç 1 gün; ölçüm ve panel 1 gün).
+
+**Testler:**
+
+1. Tahmin satırı güncellenmeye ya da silinmeye çalışılınca veritabanı reddetmeli.
+2. Aynı gün değişmeyen yeniden analiz yeni satır üretmemeli; değişen analiz üretmeli.
+3. Açık tahmin ölçüme girmemeli.
+4. Bilinen 10 tahmin ve sonuçla Brier, log loss ve kalibrasyon elle hesaplananla aynı çıkmalı.
+5. Girişsiz ve iptal ayrı sayılmalı.
+6. Mevcut 522 test geçmeli.
+7. Gerçek bir akşam, sabah ve açılış döngüsünde kayıtlar doğru oluşmalı.
+
+**Kabul:** Gerçek veride en az bir döngü doğrulanmış olmalı; panel yalnız gerçekten sonuçlanmış tahminleri saymalı.
+
+## A3. Model performansında bozulma tespiti
+
+### Mevcut durum
+
+Yok 🔲. Bugün yalnız `live_check` var. Aylık yeniden eğitim betiğinin "kapısı" (`yeniden_egit.py`) **yeni**
+modeli eski modelle karşılaştırıyor; canlı bozulmayı izlemiyor.
+
+### Tasarım
+
+Sistem yalnız **uyarı** üretir; modeli otomatik olarak yeniden eğitmez ya da devre dışı bırakmaz. Dört uyarı türü:
+
+| Uyarı | Ölçü | Yanlış alarm koruması |
+|---|---|---|
+| **Performans düşüşü** | Girilen planlarda gerçek TP1 oranı ve R, geçmiş sınamanın beklediğinden düşük mü? | En az 50 sonuçlanmış tahmin. Fark %90 güven aralığının dışında olmalı ve ardışık iki değerlendirmede tekrar etmeli. |
+| **Kalibrasyon bozulması** | Bant başına tahmin ile gerçek arasındaki fark; toplam Brier'in geçmiş sınamaya göre değişimi | Bant başına en az 20 sonuç; bootstrap güven aralığı. |
+| **Piyasa rejimi değişikliği** | `regime.py`'nin trendi ya da oynaklık yüzdeliği, modelin eğitildiği dönemde nadir görülen bir bölgeye geçti mi? | Yalnız bilgi notu: "Model bu koşulda az sınandı". Fiyattan hemen hesaplanır, örnek beklemez. |
+| **Girdi dağılımı değişikliği** | Modelin 10 girdisinin son 60 işlem günündeki dağılımı ile eğitim dağılımı arasındaki fark (PSI). Girdi değerleri A2'deki tahmin satırında saklanır. | Girdi başına PSI > 0,25 ve en az 100 tahmin. |
+
+- **Gösterim:** Uyarılar 🏁 Performans'ta ve haftalık raporda sarı ya da kırmızı not olarak çıkar. Telegram
+  isteğe bağlıdır, varsayılan kapalı. Açıklama sade olur: "Son 60 sonuçta model %37 dedi, gerçek %22 çıktı; fark
+  anlamlı. Modeli yeniden eğitmeyi ya da kartta göstermeyi kapatmayı düşünün."
+- **Eylem kullanıcıda:** Yeniden eğitim mevcut `yeniden_egit.py` ile yapılır; kapıdan geçerse ve onayla.
+
+### Bağımlılık ve süre
+
+- Uyarıların A2'nin kayıtlarına ihtiyacı var.
+- Girdi dağılımı ve rejim uyarısı, tahmin kaydı başlar başlamaz çalışabilir.
+- Performans ve kalibrasyon uyarıları ancak 50'den fazla sonuçla anlamlı olur. O zamana kadar panelde "henüz
+  yeterli sonuç yok" yazar.
+
+**Tahmini süre:** 1 gün.
+
+**Testler:**
+
+1. Yapay verilerle:
+   - kalibrasyonu doğru 200 tahminde **uyarı çıkmamalı**,
+   - tahmin %35, gerçek %15 olan 200 tahminde uyarı çıkmalı,
+   - 20 tahminde hiçbir koşulda uyarı çıkmamalı.
+2. PSI elle hesaplananla aynı olmalı.
+3. Hiçbir uyarı modeli ya da ayarı değiştirmemeli.
+
+## A4. Güncellenmiş yol haritası (Ek A dahil)
+
+Bu ekle plan iki noktada değişti:
+
+- **Canlı tahmin defteri öne alındı.** Canlı kanıt yalnız zamanla birikiyor; kayıt ne kadar erken başlarsa
+  doğrulama o kadar erken mümkün olur.
+- **Portföy simülatörü FAZ 1'e girdi.** Zaten planlanmıştı; bu ekle kapsamı netleşti.
+
+| Faz | İçerik | Süre | Ön koşul |
+|---|---|---|---|
+| **FAZ 1** | Backtest metrikleri (MDD, Sortino, log loss, ardışık kayıp, dağılımlar) · `journal.evaluate`'e **MAE/MFE** · **portföy simülatörü (A1)** · hayatta kalma yanlılığı araştırması · `prices` tablosuna kaynak ve indirme zamanı | 3–3,5 gün | — |
+| **FAZ 2** | **Canlı tahmin defteri (A2)**: değiştirilemez `tahmin` ve `tahmin_sonuc` tabloları · özellik, kod ve parametre sürümü (`params_version()`) · anlamlı değişiklikte yeni sürüm · Performans'ta "Model canlı performansı" · kartta "engelleyen riskler / eksik veri" | 2,5–3 gün | MAE/MFE (FAZ 1) |
+| **FAZ 3** | Strateji türü × rejim (5 seviye) tablosu, yalnız araştırma · portföy simülatörüyle türe göre portföy sonucu | 1 gün | FAZ 1 |
+| **FAZ 4** | 5 ve 10 günlük getiri, MAE/MFE ve alternatif TP/SL hedefleri, yalnız araştırma | 1,5 gün | FAZ 1 |
+| **FAZ 5** | **Bozulma tespiti (A3)** · hız ölçümü · kritik sınırlarda `TypedDict` | 2 gün | FAZ 2 ve zamanla birikmiş sonuç |
+| **FAZ 6** | Farklı vadeler, yalnız tasarım notu | 0,5 gün | — |
+
+- **Toplam:** yaklaşık 10,5–11,5 iş günü. Önceki plan 7–8 gündü; ek iş yaklaşık 3,5 gün.
+- **Maliyet:** Yapay zekâ maliyeti **0 $**; her şey işlemciyle çalışır.
+
+**Dosya özeti**
+
+- **Değişecek dosyalar:**
+  - `bist_haber/journal.py`: MAE/MFE, metrikler
+  - `bist_haber/ready.py`: tahmin ve sonuç kayıtları
+  - `bist_haber/tp1_model.py`: `live_check` genişletmesi
+  - `bist_haber/db.py`: yeni tablolar, `prices` sütunları
+  - `bist_haber/prices.py`
+  - `app.py`: Performans bölümü, kart başlıkları
+  - `arastirma/asama6/model.py`, `etiketle.py`
+- **Yeni dosyalar:**
+  - `arastirma/asama6/portfoy.py`
+  - `arastirma/asama8/strateji_rejim.py`
+  - `arastirma/asama8/hedefler.py`
+  - `bist_haber/izleme.py` (bozulma uyarıları)
+  - `bist_haber/sozlesmeler.py`
+  - testler
+
+## A5. Artılar ve eksiler
+
+| Konu | Artı | Eksi / risk |
+|---|---|---|
+| Portföy simülatörü | Gerçek düşüşü ve sermaye kısıtını gösterir; tek işlem ortalamasının yanıltıcılığını giderir. | Yeni varsayımlar gerekir (pozisyon sınırı, risk %) ve sonuç bunlara duyarlıdır; birkaç ayar birlikte raporlanmalı. Haberli canlı listeyi değil, teknik evreni ölçer. |
+| Canlı tahmin defteri | Gerçek kanıt üretir. Geçmiş sınama ile canlı sonuç arasındaki fark ilk kez ölçülür. Değiştirilemez kayıt güven verir. | Örnek birikmesi aylar sürer; ilk aylarda "yetersiz örnek" görülür. Kayıt hacmi küçük, diske etkisi önemsiz. |
+| Bozulma uyarıları | Modelin sessizce kötüleşmesini yakalar. | Az örnekte yanlış alarm riski var; eşikler bu yüzden sıkı. İlk aylarda performans uyarısı çıkmaz. |
+| Planın genel etkisi | Canlı karar kuralları değişmez; yalnız ekran ve kayıt eklenir. | Veritabanına iki yeni tablo eklenir; göç ve yedek gerekir. |
+
+## A6. Onayınızı bekleyenler (Ek A)
+
+1. Güncellenmiş faz sırası: FAZ 1 → FAZ 2 → FAZ 3 → FAZ 4 → FAZ 5 → FAZ 6.
+2. Portföy simülatörünün varsayılanları (yalnız simülasyonda kullanılır, canlı kuralları değiştirmez):
+   - başlangıç sermayesi: Halley ayarındaki değer,
+   - işlem başına risk: %1,
+   - en fazla 5 eşzamanlı pozisyon,
+   - toplam açık risk: %6,
+   - tek ana sektörde en fazla 2 pozisyon.
+3. Değiştirilemez yeni `tahmin` ve `tahmin_sonuc` tabloları; göç öncesi yedek alınır.
+4. Bozulma uyarı eşikleri: en az 50 sonuç, %90 güven aralığı, PSI > 0,25. Yalnız uyarı üretilir, otomatik işlem
+   yapılmaz.

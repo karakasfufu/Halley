@@ -1851,3 +1851,12 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   karar geçmişi; hazir_firsat aynı gün yeniden analizde üzerine yazılıyor; algoritma/parametre sürümü kaydı yok; prices
   tablosunda kaynak/indirme zamanı yok; MDD/Sortino/log loss/MAE/MFE/portföy simülasyonu yok; hayatta kalma yanlılığı
   var (araştırma evreni bugünkü 632 hisse); rejimin etkisi ölçülmedi; YZ çağrıları yalnız düğme/zamanlı (rerun'da yok).
+
+## 2026-11-16 — Denetim raporuna Ek A: portföy backtest, canlı model izleme, bozulma tespiti (kod değişmedi)
+- Bulgular: journal sermaye/nakit/eşzamanlı pozisyon tutmuyor (yalnız tek işlem + position_size); MAE/MFE yok;
+  hazir_firsat.model_json aynı gün yeniden analizde güncellenebiliyor ve sonuç aynı satırda tutuluyor (değiştirilemez
+  tahmin kaydı yok); live_check yalnız kapananları sayıyor (doğru) ama log loss/rejim/backtest farkı yok; araştırma
+  evreni haber şartı içermiyor (geçmiş YZ puanı yok) → portföy simülasyonu teknik evreni ölçer.
+- Plan: FAZ 1'e portföy simülatörü + MAE/MFE; FAZ 2 = canlı tahmin defteri (tahmin + tahmin_sonuc, yalnız eklenir,
+  tetikleyiciyle korunur) öne alındı; FAZ 5'e bozulma uyarıları (≥50 sonuç, %90 GA, PSI>0,25; otomatik işlem yok).
+  Toplam ~10,5–11,5 gün, 0 $.
