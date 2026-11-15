@@ -1727,3 +1727,17 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   TTM-r2 (Apache-2.0, ~0,8 M). Python 3.9 kısıtı: PyTorch 2.9+ ve chronos-forecasting 2.x Python ≥3.10 ister →
   ayrı araştırma ortamı (Python 3.9, PyTorch 2.8 CPU, chronos-forecasting 1.5.3; requires_python >=3.9 doğrulandı).
   Halley'e/pakete eklenmez. İndirme ~0,7 GB, disk ~2 GB, YZ 0 $. Taban çizgisi tp1_v1.
+
+## 2026-11-15 — Aşama 7 "olduğu gibi" deneme (kullanıcı: "o zaman devam edelim"; sonra "ilerleyebildiğin kadar ilerle")
+- Ayrı araştırma ortamı: `%USERPROFILE%\.venvs\halley-arastirma` (Python 3.9.13, torch 2.8.0+cpu, transformers 4.53.3,
+  chronos-forecasting 1.5.3, python-dotenv). Halley ortamı/paketi DEĞİŞMEDİ. Kronos kodu (MIT, shiyu-coder/Kronos @67b630e)
+  `%USERPROFILE%\.venvs\kronos_kod`; çalıştırmadan önce okundu (ağ/dosya erişimi yok).
+- `arastirma/asama7/planlar.py`: sınama planları (son 12 ay 3.264 + 2024 3.212; hisse başına 14 günde bir). Mutlak
+  seviyeler etiketlerden geri hesaplandı → gerçek barlarla 300/300 etiket birebir.
+- Bulgu: **Kronos-small** fiyatı yılda ~3 kat artmış hisselerde ertesi gün −%30…−%40 öngörüyor (MOBTL, ASELS; resmî
+  `KronosPredictor.predict` ile de) → BIST ±%10 sınırına aykırı. **Kronos-mini** makul ve ~5 kat hızlı → deneme
+  mini ile (10 yol × 20 gün, dönem başına 1.000 plan, ilk günü ±%11'i aşan yol geçersiz). Sürüyor.
+- **Chronos-Bolt-small** (6.476 plan, 3 dk): tek başına AUC 0,56 (son 12 ay) / 0,58 (2024) — E2'nin (0,60 / 0,58)
+  gerisinde. 2024'te birleşik eğitilip son 12 ayda: AUC 0,599 → 0,600 (fark −0,01…+0,03, anlamsız); Brier +%1,1–1,2
+  (yalnız E2 yeniden ölçeği +%0,6 → Chronos'un payı ~%0,6); en yüksek %20 R'si +0,17 → +0,09–0,11 (kötüleşti).
+  Sonuç: katkı yok.
