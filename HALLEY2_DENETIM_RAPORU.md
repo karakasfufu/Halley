@@ -4750,7 +4750,8 @@ onay gerekir.
 - **Zaman sıralı bölüm ve ambargo:** Ambargo ≥ hedef penceresi + tutma süresi. Örnek: V3'te 60 işlem günü ≈ 90 takvim
   günü; V4'te ≥ 365 takvim günü. Ön işleme ve ayarlar yalnız eğitimden (FAZ 5 yöntemi).
 - **Örtüşen hedefler:** Günlük sinyaller 60–250 günlük pencerelerde neredeyse tamamen örtüşür.
-  - Etkin örnek sayısı, **örtüşmeyen pencere sayısı** ve bağımsız gün ile raporlanır.
+  - **Örtüşmeyen pencere sayısı** ve bağımsız gün sayısı, bağımlılığı değerlendirmek için **yardımcı ölçü** olarak
+    raporlanır. Bunlar kesin etkin örneklem büyüklüğü değildir (Ek N2).
   - Aralıklar gün **ve** hisse kümesine dayanıklı olmalıdır (FAZ 4/5'teki tekrar payı uyarısı).
 - **Yeterlilik:**
   - V3: 5 yılda ~20 örtüşmeyen çeyrek; sınırda.
@@ -4771,8 +4772,8 @@ onay gerekir.
 - **Başarı:** İki zaman sınamasında da ön kayıtlı olasılık ölçütü geçilmeli **ve** maliyet sonrası tekil net R
   referanslardan iyi olmalı (%90 alt sınır > 0). Portföy simülasyonu (FAZ 2 yöntemi) ayrıca raporlanır; tekil
   sonuçtan portföy getirisi çıkarılmaz.
-- **Durdurma kriterleri:**
-  - örtüşmeyen pencere < 30 ya da bağımsız gün < 60;
+- **Durdurma kriterleri** (tasarım önerisi; eşikler ön kayıtta kesinleşir):
+  - yardımcı ölçüler: örtüşmeyen pencere < 30 ya da bağımsız gün < 60;
   - ön kayıtlı ölçüt iki sınamada geçilmezse;
   - mekanik referansa üstünlük yoksa;
   - gerekli veri (V4 temel veri, borsadan çıkanlar) edinilemezse.
@@ -4855,3 +4856,160 @@ onay gerektirir.
 
 - 16.11 20:06 salt-okunur: 5 tahmin, 0 sonuç, 0 değerlendirme, 0 olay; son çalıştırma aksam 2026-11-16 18:23.
 - Bekleyen: 17.11 sabah kontrolü ve gerçek sonuçlandırma. **FAZ 1 kabul edilmedi.**
+
+
+---
+
+# EK N2 (16.11.2026) — FAZ 7 KABUL KAYDI
+
+**Kabul:** Kullanıcı FAZ 7'yi commit **`b061eff`** kapsamındaki **tasarım belgesi** olarak kabul etti (etiket
+`faz7-kabul`). Yeni vade uygulamasına başlanmadı.
+
+**Kesinleştirmeler:**
+
+- Belgedeki örnek **risk payları** (ör. %6 = %4 + %2), **bir hissede tek pozisyon** tercihi ve **araştırma
+  eşikleri** (örtüşmeyen pencere < 30, bağımsız gün < 60 vb.) yalnız **tasarım önerisidir**. Hiçbiri canlı kural
+  olarak onaylanmış değildir; uygulanırsa ayrı onay ve ön kayıt ister.
+- **Örtüşmeyen pencere sayısı** kesin etkin örneklem büyüklüğü değildir. Bağımlılığı değerlendiren **yardımcı bir
+  ölçüdür.** Gerçek belirsizlik gün ve hisse kümesine dayanıklı aralıklarla ölçülür. N.7 ve N.8 bu doğrultuda
+  düzeltildi.
+- FAZ 5 bulgusu korunur: kısa hedeflerde ekonomik katkı gösterilmedi. Vade eklemek başarı artışı değildir.
+
+
+---
+
+# EK O (16.11.2026) — Müşteriye sunulabilir sürüm için TEK entegrasyon planı (Ek M'nin uygulama planı)
+
+**Konumu:**
+
+- Bu, Ek M'deki zorunlu düzeltmelerin ve ürün entegrasyonlarının **uygulama sırasıdır**. Ayrı ya da genişleyen bir
+  plan değildir; isteğe bağlı araştırmalar (İ1–İ5) ve yeni vadeler dahil değildir.
+- **Yalnız plandır:** Kod değişikliği, ücretli çağrı, model eğitimi ya da canlıya geçiş yapılmadı. Her adım ayrı
+  uygulama onayı ister.
+
+**Dal durumu (salt-okunur doğrulandı):**
+
+- Fazlar doğrusal bir zincir oluşturuyor: `main` (`6a95652`) ⊂ `faz2-portfoy` ⊂ `faz3-metrik` ⊂ `faz4-rejim-temiz`
+  ⊂ `faz5-hedef` ⊂ `faz6-izleme` ⊂ `faz7-vade`.
+- `main`'de olup zincirde olmayan tek commit `2e21b66` (`.gitignore` kuralı).
+- `faz7-vade`, `main`'e göre canlıyı etkileyebilecek 7 dosya değiştiriyor: `app.py`, `defter.py`, `fiyat_izi.py`,
+  `izleme.py`, `izleme_ref`, `journal.py`, `regime.py`.
+
+**Ortak canlıya geçiş koşulları** (her adım için; FAZ 1 v2 yöntemi):
+
+1. Kullanıcı onayı.
+2. Tam takım OK.
+3. Canlı veritabanı **kopyasında** prova: eski tablolar birebir aynı, yeni davranış beklenen.
+4. Yedek (kod + veritabanı, `integrity_check`).
+5. Aktif iş yokken durdur → kod → başlat → sağlık kontrolü.
+6. Geri dönüş: önceki kod. Yedek yalnız geçişten sonra yeni kullanıcı verisi yoksa geri yüklenir.
+7. Canlı rapor ve veri Git'e gönderilmez.
+
+## O.1 Adımlar
+
+### O1 — FAZ 1'in kalan canlı kabul kanıtları (Z4)
+
+| | |
+|---|---|
+| **Kapsam** | Kod yok. Salt-okunur gözlem ve kanıt raporu: 17.11 sabah kontrolü; BAHKM ve ENERY (giriş 16.11) ile 17.11 girişlilerin gerçek sonuçlandırması (TP1/TP2/SL/30 gün) ve sonuç satırlarının s2 sözleşmesiyle yazılması; girişsiz ve iptal yolları gerçekleşirse onlar da. Ek B4 ölçütleri gerçek kayıtlarla. |
+| **Bağımlılık** | Takvim. İlk TP ya da SL birkaç gün ile 30 iş günü sürebilir. |
+| **Dosyalar** | Yok. Rapor eki ve NOTLAR. Gerçek rapor dosyası Git'e konmaz. |
+| **Test** | Mevcut `test_defter` ve `test_faz1_dogrulama` (değişmez) + canlı kayıtların sayım ve değişmezlik kontrolü (tetikleyiciler, v1 sütun özeti). |
+| **Canlıya geçiş** | Yok (zaten canlı). |
+| **Not** | s1 → s2 yeniden değerlendirme yolu canlıda gözlenemeyebilir: s1 sonucu yok. Bu yol kopyada kanıtlandı (Ek F) ve öyle raporlanır; canlıda gözlenmiş sayılmaz. |
+| **Kabul** | FAZ 1 kabulü kullanıcı kararı. **O2'nin canlıya geçişi bu kanıta bağlı:** en az bir gerçek sonuçlandırma gözlenmeli. |
+
+### O2 — Stop altı gerçekleşme (Z1) ve risk hesabı (Z2) düzeltmeleri
+
+| | |
+|---|---|
+| **Kapsam — gerçekleşme (s3)** | Yeni önerilerde açılış ≤ SL → **girişsiz** (`ready.opening_check`, `ready.evaluate_all`). Tahmin defteri **s3 kural sürümü**: yeni s3 değerlendirme satırları; s2 satırları değişmez (s1 → s2 mekanizması). `journal.evaluate` canlı çağrılarında `kural="s3"`. Kullanıcının kaydettiği alışta kayıt korunur; çıkış "varsayımsal" olarak etiketlenir. Paneldeki gerçek alış kayıtlarında "kurala göre hesaplanan sonuç (satış girilmedi)" notu. |
+| **Kapsam — risk (Z2)** | Panelde adet ve "SL'de en fazla kayıp" **azami girişe göre** (en kötü durum). İsteğe bağlı: kullanıcının gireceği gerçek alış fiyatıyla yeniden hesap. Açıklama metni eklenir. `journal.position_size` değişmez; çağıran fiyatı seçer. |
+| **Bağımlılık** | O1 (gerçek sonuçlandırma gözlemi). Z2 için **Midas emir türlerinin kullanıcı tarafından doğrulanması** (azami limitli emir). Doğrulanmazsa "gerçek fiyatla yeniden hesap" seçeneği kullanılır. |
+| **Dosyalar** | `bist_haber/journal.py` (canlı çağrılarda s3; varsayılan parametre kararı), `ready.py`, `defter.py` (`KURAL_SURUM = "s3"`, girişsiz nedeni, ayrı değerlendirme), `tracker.py` (çağrı), `app.py` (etiketler, adet ve azami kayıp gösterimi). Şema değişikliği **yok**. |
+| **Test** | Mevcut `test_kural_s3` (21) + yeni: `ready` alt sınırı (stop altı, eşit, üstü); defter s3 değerlendirmesinin s2 satırlarını değiştirmediği; `trade_journal` `sonuc_json`'da `kural` ve `gerceklesme` alanları; panel adet ve azami kayıp gösterimi (azami girişte başlangıç riski ≤ bütçe); `test_panel_flows`. |
+| **Canlıya geçiş** | Ortak koşullar. Ek olarak kopyada: mevcut tahmin ve sonuç satırlarının SHA-256 özeti değişmez; s3 satırları yalnız eklenir. Etkilenen canlı kayıt sayısı raporlanır (bugün 0). |
+| **Araştırma → arayüz** | **Bağlanır:** s3 gerçekleşme kuralı ve "varsayımsal çıkış" etiketi; azami girişe göre risk gösterimi. **Bağlanmaz:** FAZ 2 portföy simülatörü ve senaryo karşılaştırmaları (araştırma). |
+
+### O3 — Haber güncellik göstergesi ve bütçeli haber politikası (Ek L2.4–L2.5)
+
+| | |
+|---|---|
+| **Kapsam — gösterge** | Panelde: son haber analizi zamanı, bekleyen analiz sayısı (metni hazır / metni yok), güncellik uyarısı (son analiz 2 iş gününden eskiyse). Ücretli çağrı başlatmaz. |
+| **Kapsam — politika** | Toplu ya da düğmeyle yapılan analizlerde: yalnız **son 2 iş günü**; analizden önce `content_hash` ile **tekrar eleme**; **günlük bütçe sınırı** (öneri ~0,50 $; aylık 10 $ korunur); 2 iş gününden eski haber otomatik analiz edilmez. Sonradan analiz edilen haber **geçmiş tahmin, hazır fırsat ya da haber puanına eklenmez**; "sonradan analiz" işareti taşır. Bekçide yapay zekâ analizi **kapalı kalır** (10.11 kararı). |
+| **Bağımlılık** | Yok. Eşik ve bütçe değerleri kullanıcı onayıyla kesinleşir. |
+| **Dosyalar** | `app.py` (gösterge, uyarı), `bist_haber/analyzer.py` (`pending` yaş süzgeci, tekrar eleme, günlük sınır), `pipeline.py` (yeni ayar: günlük haber bütçesi). Şema: `news` alanlarıyla yetinilir; "sonradan analiz" için `note` ya da `analyses.created_at` ile `published_at` karşılaştırması. Yeni sütun gerekirse yalnız ekleme ve yedekli. |
+| **Test** | Göstergenin veritabanıyla eşleşmesi; eşik sınırı; yaş süzgeci; tekrar eleme; günlük sınırın analizi durdurması (yapay zekâ sahte nesneyle; ağ engelli); eski haberin geçmiş kayda eklenmediği; panel testleri. **Testte ücretli çağrı yok.** |
+| **Canlıya geçiş** | Ortak koşullar. Canlıda **ilk analiz kullanıcının düğmesiyle** ve maliyet tahmini gösterildikten sonra yapılır; kuyruk topluca işlenmez. |
+| **Araştırma → arayüz** | **Bağlanır:** gösterge ve politika (teşhis Ek L.9). |
+
+### O4 — Fiyat izlenebilirliğinin entegrasyonu (Ü2, FAZ 3)
+
+| | |
+|---|---|
+| **Kapsam** | `fiyat_izi_v1` göçü (yalnız ekleme, yedekli). `prices.update` yazımı `fiyat_izi.yaz` üzerinden: indirme kaydı, değişen satırın eskisi, `indirme_id`. Eski satırlarda NULL = "bilinmiyor". Araştırma veri kümeleri için `anlik_goruntu` yalnız araştırma tarafında. |
+| **Bağımlılık** | Yok. Müşteri bilgisayarında göçün otomatik ve yedekli olması O6'ya bağlı. |
+| **Dosyalar** | `bist_haber/prices.py` (`update` → `fiyat_izi.yaz`; ayarlar `period`, `interval`, `auto_adjust` kayda), `db.py` (açılışta `fiyat_izi.migrate` çağrısı, `migrate_tahmin` gibi yedekli; hata olursa uygulama bugünkü gibi çalışır), `fiyat_izi.py` (değişmez). |
+| **Test** | Mevcut `test_fiyat_izi` (7) + yeni: `prices.update` sahte yfinance verisiyle indirme kaydı ve değişen satır günlüğü; göç hatasında uygulamanın çalışması; eski kod uyumu; kopyada göç provası tekrarı (`kopyada_goc.py`). |
+| **Canlıya geçiş** | Ortak koşullar + kopyada prova (Ek I.5'teki gibi). Disk payı izlenir: düzeltme olayı başına ~250 satır/hisse. |
+| **Araştırma → arayüz** | **Kısmen:** panelde yalnız "son fiyat indirmesi: zaman, kaynak" bilgisi (isteğe bağlı). Metrik ve MAE/MFE araştırma betikleri **bağlanmaz**. |
+
+### O5 — Kabul edilmiş izleme bileşenleri; K1 kapalı (Ü1, FAZ 6)
+
+| | |
+|---|---|
+| **Kapsam** | `izleme.kontrol_et` bekçide akşam sonuçlandırmasından sonra, günde bir kez çağrılır; kayıtlar yerelde. Panel bölümü salt-okur. **K1 kapalı:** uyarı **üretmez**, kayda geçiş yazmaz; panelde "deneysel — başarısız doğrulama, uyarı üretmez" ya da hiç gösterilmez (kullanıcı seçer). P1 satırında düşük tespit gücü notu: "yalnız ters sıralamayı yakalar". P2 notu: "yalnız yapay senaryolarda sınandı; canlıda doğrulanmadı". R1 ve G1 yalnız bilgi. Rejim önbelleği zaten dalda. |
+| **Bağımlılık** | FAZ 6 kısmi kabulü (var). K1 v2 (Ek L2.3) bu adımın şartı **değildir**. |
+| **Dosyalar** | `bist_haber/izleme.py` (K1'i uyarı dışı bırakan bayrak), `watchdog.py` (çağrı; hata bekçiyi durdurmaz), `app.py` (notlar). `.gitignore`'da yerel kayıtlar var. |
+| **Test** | K1'in hiçbir koşulda olay üretmediği; P1 ve P2 notlarının panelde göründüğü; bekçi çağrısının hata yalıtımı ve günde bir kez çalışması; mevcut `test_faz6_izleme` (17). |
+| **Canlıya geçiş** | Ortak koşullar. Harici bildirim yok. |
+| **Araştırma → arayüz** | **Bağlanır:** P2, R1, G1 ve not açıklamalı P1. **Bağlanmaz:** K1 uyarısı, yapay seri araçları. |
+
+### O6 — Kontrollü birleştirme, müşteri kurulumu, yedekleme ve geri dönüş (Ü4)
+
+| | |
+|---|---|
+| **Kapsam — birleştirme** | `main`'den `entegrasyon` dalı açılır. `faz7-vade` (bütün fazları içerir) birleştirilir; `.gitignore` çakışması elle çözülür. O2–O5 bu dalda ayrı commit'ler olur. Tam takım ve panel testleri yapılır, ardından `main`'e birleştirilir. Kabul etiketleri (`faz2-kabul` … `faz7-kabul`) değişmez. |
+| **Kapsam — paket** | `paket/build_package.py --guncelleme-paketi`. Paket içeriği denetlenir: `data/`, `.env`, veritabanı, gerçek rapor ve `arastirma/` yok (gerekiyorsa paket listesi düzeltilir). Müşteri panelinde sürüm notu, haber güncellik göstergesi ve "tek vade: kısa vade (2–30 işlem günü)" açıklaması. |
+| **Kapsam — kurulum ve güncelleme** | Temiz bir klasörde iki deneme: sıfırdan kurulum ve mevcut müşteri sürümünden (v202611152318) uygulama içi güncelleme. Müşteri verisi (`data/`) korunur; göçler (tahmin defteri **ilk kez**, `fiyat_izi`) otomatik yedekle çalışır. |
+| **Kapsam — yayın** | Kendi canlı bilgisayarına önce (ortak koşullar), sonra `Halley-guncelleme` sürümü. Bu herkese açık bir yayındır; **ayrı açık onay** gerekir. |
+| **Kapsam — geri dönüş** | Önceki sürüm paketi yayında kalır. Müşteri için geri dönüş adımı belgelenir: önceki sürümü kur; `data/yedek`'teki göç öncesi yedek, yalnız göçten sonra yeni veri yoksa geri yüklenir. |
+| **Bağımlılık** | O2–O5'in kararları (her biri dahil ya da hariç). O1 kanıtı. |
+| **Dosyalar** | Birleştirme; `paket/build_package.py` (gerekirse içerik listesi); `app.py` (sürüm ve açıklama metinleri); `DEVIR.md`, `NOTLAR.md`, rapor. |
+| **Test** | Tam takım; panel testleri; paket içerik denetimi; kurulum ve güncelleme denemesi (temiz klasör); göç öncesi ve sonrası tablo özetleri; Windows Defender ve Smart App Control notu (bilinen durum). |
+| **Canlıya geçiş** | Ortak koşullar + müşteriye yayın için açık onay. |
+| **Araştırma → arayüz** | Bu adımda yeni araştırma bağlanmaz. |
+
+## O.2 Araştırma sonuçlarının arayüze bağlanma ayrımı
+
+| Kaynak | Müşteri arayüzüne bağlanır mı? |
+|---|---|
+| FAZ 1 tahmin defteri ve panel | **Evet** (zaten canlı; müşteri paketinde ilk kez) |
+| FAZ 2 s3 kuralı ve risk gösterimi | **Evet** (O2) |
+| FAZ 2 portföy simülatörü ve sonuçları | **Hayır** (araştırma) |
+| FAZ 3 `fiyat_izi` | **Evet, altyapı** (O4); panelde yalnız isteğe bağlı indirme bilgisi |
+| FAZ 3 metrik, MAE/MFE, veri envanteri | **Hayır** |
+| FAZ 4 rejim × strateji tabloları | **Hayır.** İsteğe bağlı Ü3 tekrar uyarısı bu planın dışında. |
+| FAZ 5 aday modeller | **Hayır** (etkinleştirilmez) |
+| FAZ 6 izleme (P1 notlu, P2, R1, G1), rejim önbelleği | **Evet** (O5) — **K1 hariç** |
+| FAZ 7 vade tasarımı | **Hayır.** Yalnız "tek vade" açıklaması. |
+| Haber teşhisi | **Evet:** gösterge ve politika (O3) |
+
+## O.3 Sıra, bağımlılık ve emek
+
+| Sıra | Adım | Bağımlılık | Emek (kaba) |
+|---|---|---|---|
+| 1 | O1 kanıt gözlemi (sürekli) | takvim | 0 gün kod; gözlem ve rapor ~0,25 gün |
+| 2 | O3 haber göstergesi ve politika | — | 1–1,25 gün |
+| 3 | O4 fiyat izlenebilirliği | — | 1 gün |
+| 4 | O5 izleme (K1 kapalı) | — | 0,5–0,75 gün |
+| 5 | O2 s3 ve risk | O1 + Midas doğrulaması | 2–2,5 gün |
+| 6 | O6 birleştirme, paket, kurulum, yayın | O2–O5 kararları | 1,5 gün + müşteri desteği |
+| | **Toplam** | | **≈ 6–7 iş günü** + FAZ 1 kanıt bekleme süresi |
+
+- O3, O4 ve O5 O1'i beklemeden dalda hazırlanabilir. Canlıya geçişler ise ortak koşullarla, tek tek ya da tek bir
+  bakım penceresinde yapılır.
+- Yapay zekâ maliyeti 0 $. Canlıdaki ilk haber analizi kullanıcının düğmesiyle ve bütçe sınırı içinde yapılır.
+
+**Onay beklenen:** Her adımın uygulanması için ayrı onay. Bu plan kapsamında hiçbir kod değişikliği, ücretli çağrı,
+model eğitimi ya da canlıya geçiş yapılmadı.

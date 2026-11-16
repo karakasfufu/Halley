@@ -2006,3 +2006,7 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Ek N: V0 gün içi (önerilmez), V1 1–5 gün (araştırma gerekli; FAZ 5'te katkı yok), V2 bugünkü kısa vade (mevcut altyapı), V3 1–3 ay (ek veri + araştırma), V4 uzun (ek veri + araştırma; bağımsız yıl az).
 - Çelişki sunumu (birleşik puan yok), ortak portföy (tek hisse tek pozisyon, vade başına risk bütçesi), vade alanı ve ayrı sözleşme, vade_firsat tablosu, ambargo ≥ pencere, mekanik ve endeks referansı, durdurma ölçütleri, şema/dosya taslağı, emek tahmini.
 - Müşteri pilotu: yalnız V2 + Ek M zorunluları; diğer vadeler isteğe bağlı. Kod, test, simülasyon yok.
+
+## 2026-11-16 — FAZ 7 KABUL EDİLDİ (tasarım belgesi; commit b061eff, etiket faz7-kabul) + tek entegrasyon planı (Ek O)
+- Ek N2: risk payları, tek pozisyon ve araştırma eşikleri yalnız tasarım önerisi (canlı kural değil); örtüşmeyen pencere sayısı yardımcı bağımlılık ölçüsü, kesin etkin örneklem değil (N.7/N.8 düzeltildi).
+- Ek O: Ek M'nin uygulama sırası — O1 FAZ 1 kanıtları, O2 s3 + risk gösterimi, O3 haber göstergesi + bütçeli politika, O4 fiyat_izi, O5 izleme (K1 kapalı), O6 birleştirme/paket/kurulum/yayın; ~6–7 iş günü. Yalnız plan; kod/çağrı/eğitim/canlı geçiş yok.
