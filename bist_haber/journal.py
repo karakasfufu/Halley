@@ -150,7 +150,7 @@ def evaluate(rec: Dict, bars: List[Dict], commission_pct: float = DEFAULT_COMMIS
         h, l, o = hl(b)
         if j == 0 and limit_day:
             if kural == "s3" and fill <= stop + 1e-12:
-                legs.append((1.0, fill, "SL (alış stopun altında)"))
+                legs.append((1.0, fill, "SL varsayımı (alış stopun altında)"))
                 break
             if l <= stop:
                 legs.append((1.0, stop, "SL (alış günü)"))
@@ -212,6 +212,17 @@ def evaluate(rec: Dict, bars: List[Dict], commission_pct: float = DEFAULT_COMMIS
                r=round(r_mult - cost / 100 * fill / risk, 3) if r_mult is not None else None,
                acilis_sl_alti=fill <= sl,
                islem_gunu=exit_idx + 1)
+    if kural == "s3":
+        # Ek H5: gerçek bilgi ile varsayımı ayır. Kullanıcı satış fiyatı girmez; bütün çıkışlar KURALA GÖRE hesaplanır.
+        out.update(kural="s3", gerceklesme={
+            "alis": "kullanici_kaydi" if rec["kaynak"] == "gercek" else "kural_simulasyonu",
+            "cikis": "varsayimsal_kural_simulasyonu",
+            "not": "Satış fiyatı kullanıcı tarafından girilmedi; çıkış fiyatları günlük mumlarla kurala göre hesaplandı. "
+                   f"Maliyet varsayımı: komisyon %{commission_pct:g} + kayma %{slippage_pct:g} (gidiş-dönüş)."})
+        if final.startswith("SL varsayımı"):
+            out["cikis_varsayimi"] = ("Alış fiyatı SL'ye eşit ya da altında: stopun alışla birlikte tetiklendiği "
+                                      "VARSAYILDI; satış fiyatı = alış fiyatı, ek kayma genel kayma varsayımı içinde. "
+                                      "Gerçekleşmiş satış değildir.")
     return out
 
 

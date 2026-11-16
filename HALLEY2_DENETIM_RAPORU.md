@@ -2885,3 +2885,168 @@ teknik · 12 ay: planlanan + önceden emir −%28,7; azami + açılışı görü
 **Testler:** `tests.test_kural_s3` 14 / 14 OK; tam takım (ağ engelli) **596 test OK**, ağ denemesi 0. Varsayılan kuralla orijinal (Ek H5) ve Ek H3 metrikleri birebir yeniden üretildi.
 
 **Onay beklenen:** canlı değişiklik (H4.6) ve FAZ 2 nihai kabulü. FAZ 3 yok.
+
+
+---
+
+# Ek H9 — FAZ 2 son kapsam: gerçek / varsayım ayrımı, emir modeli, senaryo sınıflaması (16.11.2026, dal `faz2-portfoy`)
+
+**Konumu:** Geriye dönük doğrulamadır. Dönem dışı başarı kanıtı değildir ve canlı kullanım için başarı kanıtı da
+sayılmaz.
+
+- Canlı değişiklik yok; s3 canlıya alınmadı. Parametre değişmedi; senaryo otomatik seçilmedi.
+- **FAZ 2 kabul ölçütü** (kullanıcı tanımı): Simülatörün belgelenmiş varsayımlarla doğru çalışması. Stratejinin kârlı
+  olması değil.
+
+## H9.1 Gerçek alış ile varsayımsal çıkış ayrıldı (`journal.evaluate`, yalnız s3)
+
+- **Varsayılan s2 çıktısı birebir aynı.** Test `test_s2_output_has_no_s3_fields` s3'ün eklediği alanların s2'de
+  bulunmadığını doğrular.
+- **Kullanıcı satış fiyatı girmez.** `trade_journal` tablosunda satış fiyatı alanı yoktur. Bu yüzden bütün çıkışlar,
+  gerçek alış kayıtlarında da, günlük mumlarla **kurala göre hesaplanır**.
+- s3 her kapanmış sonuca şu ayrımı yazar:
+  - `gerceklesme.alis` = `kullanici_kaydi` (gerçek bilgi) ya da `kural_simulasyonu`;
+  - `gerceklesme.cikis` = `varsayimsal_kural_simulasyonu`;
+  - `gerceklesme.not` = kullanılan maliyet ve kayma (örnek: "komisyon %0.2 + kayma %0.1, gidiş-dönüş").
+- **Alış ≤ SL durumu:** Bacak adı "SL **varsayımı** (alış stopun altında)". Ek olarak `cikis_varsayimi` metni yazılır:
+  "stopun alışla birlikte tetiklendiği VARSAYILDI; satış fiyatı = alış fiyatı … Gerçekleşmiş satış değildir."
+- **Canlı için not (uygulanmadı):** Bugünkü panel, gerçek alış kayıtlarının kurala göre hesaplanan sonucunu ayrıca
+  etiketlemiyor. Canlı değişiklik sırasında panelde "kurala göre hesaplanan sonuç (satış girilmedi)" ayrımı gerekir.
+  Gerçek satış fiyatı alanı eklemek bir şema değişikliği olur ve ayrı karar ister.
+
+## H9.2 Girişsiz adayın yerine alınan adayın seçim zamanı
+
+**Bulgu (doğrulandı):** Önceki bütün koşularda simülatör adayları sırayla dolaşıyordu. Açılış fiyatına bakarak eleme
+yapıyordu (azami üstü, s3'te SL altı) ve elenen adayın yerine sıradaki adayı **aynı açılış fiyatından** alıyordu. Bu,
+açılışı görüp başka hisse seçmek ve onu da aynı açılıştan almak demektir; gerçekte mümkün değildir.
+
+- Test `test_theoretical_model_substitutes_after_seeing_open`: AAA açılışı azami üstünde → BBB aynı açılıştan alınmış
+  sayıldı.
+- Ayrıca planlanan girişe göre adette nakit sınırı **açılış fiyatıyla** hesaplanıyordu.
+
+**Düzeltme:** Yeni `emir_modeli="onceden_limit"`.
+
+- Emir listesi açılıştan **önce**, yalnız d−1 bilgisiyle kurulur: yer, sektör, adet, nakit (azami fiyatla ayrılır),
+  toplam risk.
+- Her emir azami giriş limitlidir. Açılış ≤ azami ise açılış fiyatından dolar.
+- Değilse **dolmaz** ve yerine başka aday alınmaz. Dolmayan emrin yeri ve ayrılan nakdi o gün başka emre verilmez.
+- Açılış SL'nin altındaysa emir yine dolar (s3: zarar = maliyet). Açılışı gören süzgeç bu modelle kullanılamaz;
+  kullanılırsa hata verir.
+- **Testler:**
+  - `test_preplaced_order_no_substitution`;
+  - `test_preplaced_orders_independent_of_open_prices`: 5 farklı açılış fiyatı kümesinde verilen emirler aynı;
+  - `test_preplaced_below_stop_fills_no_profit`;
+  - `test_preplaced_cannot_use_open_filter`.
+- **Eski model korundu:** `emir_modeli="acilisi_gorup"` varsayılan. Artık açıkça **teorik** olarak etiketli.
+
+## H9.3 Senaryo sınıflaması
+
+| Sınıf | Senaryo | Neden |
+|---|---|---|
+| **Uygulanabilirliği doğrulanmış** | **Yok** | Hiçbir emir yolu gerçek aracı kurumda doğrulanmadı. Günlük veri, açılıştan sonraki gerçek alış fiyatını bilemez. |
+| **Emir altyapısına bağlı** | **E**: önceden limit emir, yerine aday yok (`onceden_limit`). Her iki adet yöntemiyle. | Şu koşullara bağlı: Midas'ta BIST açılış seansına limit emir verilebilmesi; nakdin limit fiyatıyla bloke edilmesi; dolumun açılış seansı fiyatından olması (Yahoo açılışıyla aynı varsayıldı); kısmi dolum olmaması. **Hiçbiri doğrulanmadı.** |
+| **Teorik günlük veri senaryosu** | **T1**: açılışı görüp, azami ve SL süzgeci, yerine aday aynı açılıştan (Ek H4 `mevcut_s3`). | Açılışı görmek ve aynı açılıştan almak birlikte mümkün değil. |
+| | **T2**: açılışı görüp, yalnız azami süzgeci, yerine aday aynı açılıştan. Ek H4'teki `alternatif_s3` ve `ayr_planlanan_onceden_emir_s3` koşuları. | Ek H4'te "önceden emir" diye adlandırılmıştı. Yerine aday seçimi açılışa baktığı için **teoriktir** (H9.2). Ad düzeltildi. |
+| | Bütün s2 koşuları: Ek H bölüm H5 ana sonuçları, Ek H2, Ek H3. | Hem stop altı yapay kâr hem T2 seçim varsayımı içerir. |
+
+## H9.4 Sonuçlar: adet yöntemi × giriş/gerçekleşme yöntemi (kural s3)
+
+Yalnız E satırları yeni koşudur (`emir_modeli_karsilastirma.py`). T1 ve T2 Ek H4 koşularıdır. Kod değişikliğinden
+sonra Ek H4'ün 24 koşusunun hepsi aynı metrikleri verdi (regresyon: **True**).
+
+**canli_ortak · son 12 ay (2025-11-14 … 2026-11-13)**
+
+| Giriş/gerçekleşme modeli (sınıf) | Planlanan girişe göre adet | Azami girişe göre adet |
+|---|---|---|
+| **E** önceden limit emir (emir altyapısına bağlı) | **−%25,2**, düşüş −%35,6, PF 0,67, başlangıç aşımı 52, kayıp aşımı 42 | **−%21,7**, düşüş −%31,6, PF 0,67, başlangıç aşımı **0**, kayıp aşımı 2 |
+| T1 açılışı görüp + SL süzgeci (teorik) | −%14,4, düşüş −%30,7 | −%9,9, düşüş −%26,1 |
+| T2 açılışı görüp, yalnız azami (teorik) | −%25,5, düşüş −%36,2 | −%22,1, düşüş −%32,2 |
+
+**canli_ortak · 2024**
+
+| Model | Planlanan | Azami |
+|---|---|---|
+| **E** (altyapıya bağlı) | **+%22,9**, düşüş −%19,8, PF 1,20, başlangıç aşımı 54, kayıp aşımı 33 | **+%19,5**, düşüş −%16,4, PF 1,21, başlangıç aşımı **0**, kayıp aşımı 4 |
+| T1 (teorik) | +%35,1, düşüş −%15,7 | +%28,3, düşüş −%12,7 |
+| T2 (teorik) | +%35,6, düşüş −%15,3 | +%28,7, düşüş −%12,4 |
+
+**yalniz_teknik**
+
+| Model | 12 ay planlanan | 12 ay azami | 2024 planlanan | 2024 azami |
+|---|---|---|---|---|
+| **E** (altyapıya bağlı) | −%31,9 | −%27,3 | +%10,4 | +%8,9 |
+| T1 (teorik) | −%24,6 | −%19,5 | +%25,9 | +%20,2 |
+| T2 (teorik) | −%28,7 | −%22,8 | +%25,9 | +%20,2 |
+
+**E modelinin ayrıntıları (canli_ortak):**
+
+| | 12 ay planlanan | 12 ay azami | 2024 planlanan | 2024 azami |
+|---|---|---|---|---|
+| Açılan / kapanan | 135 / 130 | 135 / 130 | 128 / 123 | 128 / 123 |
+| Dolmayan emir (açılış azami üstünde) | 23 | 23 | 12 | 12 |
+| Toplam maliyet (TL) | 6.633 | 5.771 | 8.018 | 6.418 |
+| Giriş anı portföy riski en yüksek | %5,55 | %4,39 | %5,48 | %4,44 |
+| Stop altı dolan / kârlı yazılan / net (TL) | 4 / 0 / −184 | 4 / 0 / −157 | 4 / 0 / −248 | 4 / 0 / −204 |
+| Ortalama R | −0,23 | −0,23 | +0,18 | +0,18 |
+
+**Okuma (ölçüm, öneri değil):**
+
+- **Adet yönteminin karşılaştırması yalnız aynı satırda geçerlidir.** E modelinde azami girişe göre adet 12 ayda
+  +3,5 puan, 2024'te −3,4 puan. Bu orantılı küçülmedir; R ve kâr faktörü neredeyse aynı. Başlangıç riski aşımı 52–54'ten
+  **0**'a iniyor.
+- **Ek H4'teki "−%14,4 ile −%22,1" karşılaştırması bir adet karşılaştırması değildi:** T1 ile T2 farklı giriş
+  kurallarıdır. Burada ayrıldı.
+- **Teorik T modelleri, uygulanabilir olabilecek E modelinden belirgin iyi** (2024'te +%35,1 ile +%22,9). Fark,
+  açılışı görüp yerine aday seçmekten geliyor. Bu iyimserlik önceki bütün rapor sonuçlarında vardı.
+
+## H9.5 FAZ 2 kabul önerisi
+
+**Öneri: FAZ 2, simülatör olarak kabul edilebilir.** Ölçüt "belgelenmiş varsayımlarla doğru çalışma"dır:
+
+- Tek kaynak kuralları kullanılıyor: `journal`, `position_size`, sektör, sıralama.
+- Zaman sırası testli: d−1 bilgisiyle karar, d içinde çıkış, aynı gün nakit kullanılmıyor.
+- Geleceğe bakmama testli ve gerçek veride 5.244 işlemle tekil mutabakat yapıldı.
+- Muhasebe özdeşliği tutuyor; risk tanımları ayrıştırıldı.
+- Yapay kâr giderildi (s3).
+- Açılışa bakan seçim, ayrı ve teorik olarak etiketlenmiş bir model hâline geldi; önceden emir modeli eklendi.
+- Bütün varsayılan koşular birebir yeniden üretiliyor. Tam takım OK (H9.7).
+
+**Kabul, strateji başarısı anlamına gelmez.** Altyapıya bağlı E modelinde son 12 ay iki adet yönteminde de zararlı
+(−%22 – −%25, kâr faktörü 0,67). 2024 kârlı. Haber şartı yok.
+
+## H9.6 Kalan sınırlamalar
+
+1. **Uygulanabilirliği doğrulanmış senaryo yok.** E modeli Midas'ın açılış seansı limit emri, nakit blokesi, dolum
+   fiyatı ve kısmi dolum davranışına bağlı; hiçbiri doğrulanmadı.
+2. **Günlük veri:** Gün içi sıra bilinmiyor. Açılış seansı fiyatı Yahoo açılışıyla aynı varsayıldı. Likidite ve derinlik
+   modellenmedi.
+3. **Hayatta kalma yanlılığı:** Yalnız bugün işlem gören hisseler var; sonuçlar iyimser olabilir. **Sektör listesi
+   güncel**, tarihsel değil.
+4. **Haber puanı yok:** Canlıdaki haberli hazır fırsat listesi bu evrenle eşdeğer değil.
+5. **Model sıralaması denenmedi:** Dönem dışı tahmin kaydı yok.
+6. **Çıkışlar kurala göre:** Gerçek alış kayıtlarında da çıkış varsayımsal. Canlıda satış fiyatı alanı yok (H9.1).
+7. **Stop boşluğu adet hesabıyla önlenemez:** Kalan %1 üstü kayıplar bundan geliyor.
+8. **Diğer:** Plan sayısında önceki etiket dosyasıyla 316 fark var ve doğrulanmadı. XU100'de 3 adet 25 Aralık eksik.
+   Tek adette TP1 yuvarlaması var.
+9. **Geriye dönüklük:** Bütün düzeltmeler sonuçlar görüldükten sonra yapıldı. Dönem dışı doğrulama sayılmaz.
+10. **Canlıya alınmadı:** s3 ve adet değişikliği canlıda değil. Canlıdaki "%1 risk" ve gerçek kayıt sonuçları s2
+    davranışındadır (Ek H3, H4).
+
+## H9.7 Değişen dosyalar ve testler
+
+- `bist_haber/journal.py`: s3'e `gerceklesme` ve `cikis_varsayimi` alanları, bacak adı "SL varsayımı …". s2 değişmedi.
+- `arastirma/asama6/portfoy.py`: `emir_modeli` (`acilisi_gorup` varsayılan, teorik | `onceden_limit`); `emirler`
+  listesi. Varsayılan sonuç birebir.
+- `arastirma/asama6/emir_modeli_karsilastirma.py` (yeni). Çıktısı `sonuclar_faz2/emir_modeli.json`.
+- `tests/test_kural_s3.py`: +7 test (gerçek / varsayım alanları 2, önceden limit 5), 21 test.
+- Bu ek ve `NOTLAR.md`.
+
+**Testler:** `tests.test_kural_s3` 21 / 21, `tests.test_portfoy` 23 / 23; tam takım (ağ engelli) **603 test OK**, ağ denemesi 0.
+
+## H9.8 FAZ 1 canlı kabul durumu (ayrı)
+
+- 16.11 12:30 (salt-okunur): 2 tahmin, 0 sonuç, 0 değerlendirme, 0 olay. Geçişten sonra akşam/sabah çalıştırması henüz yok.
+- Bekçiler bu akşamki analizi (16.11) ve yarın sabahki kontrolü (17.11) bekliyor (oturuma bağlı).
+- **FAZ 1 kabul edilmedi.**
+
+**Onay beklenen:** FAZ 2 kabulü (H9.5). s3 ve adet değişikliği canlıya alınmadı. Sonraki faz için kullanıcı kararı bekleniyor.

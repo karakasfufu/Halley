@@ -51,7 +51,16 @@ from typing import Dict, List, Optional
 
 VARSAYILAN = {"baslangic_sermaye": 100000.0, "risk_pct": 1.0, "azami_pozisyon": 5, "azami_toplam_risk_pct": 6.0,
               "azami_sektor": 2, "komisyon_pct": 0.20, "kayma_pct": 0.10, "sabit_adet": None, "sinirsiz": False,
-              "adet_temeli": "planlanan_giris", "kural": "s2", "stop_alti_girissiz": False}
+              "adet_temeli": "planlanan_giris", "kural": "s2", "stop_alti_girissiz": False,
+              "emir_modeli": "acilisi_gorup"}
+# emir_modeli (Ek H5):
+#   "acilisi_gorup"  TEORİK GÜNLÜK VERİ SENARYOSU (önceki bütün koşular): adaylar sırayla açılış fiyatına bakılarak
+#                    elenir (azami üstü / SL altı) ve yerine sıradaki aday AYNI açılıştan alınmış sayılır. Gerçekte
+#                    açılışı görmek ile aynı açılıştan almak birlikte mümkün değildir; uygulanabilir strateji değildir.
+#   "onceden_limit"  EMİR ALTYAPISINA BAĞLI: emir listesi açılıştan ÖNCE yalnız d−1 bilgisiyle kurulur (yer, sektör,
+#                    adet, nakit azami fiyatla ayrılır, risk); her emir azami giriş limitlidir. Açılış ≤ azami ise
+#                    açılıştan dolar, değilse DOLMAZ ve yerine başka aday ALINMAZ. Açılış SL altındaysa da dolar
+#                    (stop_alti_girissiz bu modelle kullanılamaz). Açılış seansı limit emri doğrulanmadı.
 # kural / stop_alti_girissiz (Ek H4, gerçekleşme düzeltmesi; varsayılanlar = önceki sonuçlar):
 #   kural="s3": journal.evaluate s3 — alış fiyatı SL'ye eşit/altındaysa alış günü satışı alış fiyatından (yapay kâr yok).
 #   stop_alti_girissiz=True: açılışı GÖRÜP elle alım (mevcut akış): açılış ≤ SL ise yeni öneri girişsiz (journal.giris_kosulu).
@@ -115,6 +124,11 @@ def simule(planlar: List[Dict], bars: Dict[str, List[Dict]], takvim: List[str], 
         return sum(x["kalan"] * max(0.0, x["fill"] - x["stop"]) + x["kalan"] * x["fill"] * c2 for x in pozlar)
 
     azami_temel = a["adet_temeli"] == "azami_giris"
+    onceden = a["emir_modeli"] == "onceden_limit"
+    if a["emir_modeli"] not in ("acilisi_gorup", "onceden_limit"):
+        raise ValueError("emir_modeli: acilisi_gorup | onceden_limit")
+    if onceden and a["stop_alti_girissiz"]:
+        raise ValueError("önceden verilen limit emir açılışı göremez: stop_alti_girissiz kullanılamaz")
     if a["adet_temeli"] not in ("planlanan_giris", "azami_giris"):
         raise ValueError("adet_temeli: planlanan_giris | azami_giris")
 
@@ -124,23 +138,26 @@ def simule(planlar: List[Dict], bars: Dict[str, List[Dict]], takvim: List[str], 
         nakit_kullanilabilir = nakit
         risk_bas = acik_risk(acik)
         bugun = []
+        emirler = []          # verilen emirler (açılışı görerek modelde = alınanlar; önceden limitte dolmayanlar dahil)
         for p in sorted(adaylar.get(pd_, []), key=siralama_anahtari):
             tk = p["ticker"]
             neden = None
-            if any(x["ticker"] == tk for x in acik + bugun):
+            if any(x["ticker"] == tk for x in acik + emirler):
                 neden = "zaten açık pozisyon"
             bar = bars.get(tk, [])[idx[tk][d]] if tk in idx and d in idx[tk] else None
-            if not neden and bar is None:
-                neden = "giriş günü fiyat yok"
-            if not neden and (bar.get("open") or bar["close"]) > p["azami"] + 1e-9:
-                neden = "açılış azami girişin üstünde"
-            if not neden and a["stop_alti_girissiz"] and                     journal.giris_kosulu(bar.get("open") or bar["close"], p["azami"], p["sl"]):
-                neden = "açılış stopun altında veya eşit (girişsiz)"
-            if not neden and not a["sinirsiz"] and len(acik) + len(bugun) >= a["azami_pozisyon"]:
+            if not onceden:                                     # TEORİK: açılışa bakarak eleme
+                if not neden and bar is None:
+                    neden = "giriş günü fiyat yok"
+                if not neden and (bar.get("open") or bar["close"]) > p["azami"] + 1e-9:
+                    neden = "açılış azami girişin üstünde"
+                if not neden and a["stop_alti_girissiz"] and \
+                        journal.giris_kosulu(bar.get("open") or bar["close"], p["azami"], p["sl"]):
+                    neden = "açılış stopun altında veya eşit (girişsiz)"
+            if not neden and not a["sinirsiz"] and len(acik) + len(emirler) >= a["azami_pozisyon"]:
                 neden = "pozisyon sınırı"
             sek = sektor_fn(tk)
             if not neden and not a["sinirsiz"] and \
-                    sum(1 for x in acik + bugun if x["sektor"] == sek) >= a["azami_sektor"]:
+                    sum(1 for x in acik + emirler if x["sektor"] == sek) >= a["azami_sektor"]:
                 neden = "sektör sınırı" + (" (sektör bilinmiyor)" if sek == "bilinmiyor" else "")
             adet = 0
             if not neden:
@@ -156,8 +173,8 @@ def simule(planlar: List[Dict], bars: Dict[str, List[Dict]], takvim: List[str], 
                     neden = "risk bütçesiyle 0 adet"
             kucuk = False
             if not neden:                                       # nakit sınırı: son adet (d−1 sonu nakit)
-                acilis = bar.get("open") or bar["close"]
-                fiyat_n = p["azami"] if azami_temel else acilis     # alternatif: nakit limit fiyatıyla ayrılır
+                fiyat_n = p["azami"] if (azami_temel or onceden) else (bar.get("open") or bar["close"])
+                # azami temelli adette ve önceden limit emirde nakit limit (azami) fiyatıyla ayrılır
                 if adet * fiyat_n * (1 + c2) > nakit_kullanilabilir + 1e-9 and not a["sinirsiz"]:
                     adet2 = math.floor(nakit_kullanilabilir / (fiyat_n * (1 + c2)))
                     if adet2 <= 0:
@@ -167,17 +184,27 @@ def simule(planlar: List[Dict], bars: Dict[str, List[Dict]], takvim: List[str], 
             if not neden:                                       # toplam açık risk: son adetle
                 e_r = p["azami"] if azami_temel else p["giris"]
                 risk_aday = adet * ((e_r - p["sl"]) + e_r * (kom + kay) / 100)
-                if not a["sinirsiz"] and risk_bas + sum(x["risk_giris"] for x in bugun) + risk_aday > \
+                if not a["sinirsiz"] and risk_bas + sum(x["risk_giris"] for x in emirler) + risk_aday > \
                         a["azami_toplam_risk_pct"] / 100 * ozsermaye_onceki + 1e-9:
                     neden = "toplam risk sınırı"
             if neden:
                 atlanan.append({"gun": d, "sinyal_gunu": pd_, "ticker": tk, "tur": p["tur"], "neden": neden})
                 continue
+            emirler.append({"ticker": tk, "sektor": sek, "risk_giris": risk_aday})
+            if onceden:                                         # emir verildi: nakit limit fiyatıyla ayrıldı
+                nakit_kullanilabilir -= adet * p["azami"] * (1 + c2)
+                if bar is None or (bar.get("open") or bar["close"]) > p["azami"] + 1e-9:
+                    atlanan.append({"gun": d, "sinyal_gunu": pd_, "ticker": tk, "tur": p["tur"],
+                                    "neden": "emir dolmadı: " + ("giriş günü fiyat yok" if bar is None
+                                                                 else "açılış azami girişin üstünde")})
+                    continue                                    # yerine başka aday ALINMAZ (karar açılıştan önceydi)
+            acilis = bar.get("open") or bar["close"]
             if kucuk:
                 kucultulen += 1
             alis_maliyet = adet * acilis * c2
             nakit -= adet * acilis + alis_maliyet
-            nakit_kullanilabilir -= adet * acilis + alis_maliyet
+            if not onceden:
+                nakit_kullanilabilir -= adet * acilis + alis_maliyet
             bugun.append({"ticker": tk, "plan": p, "giris_gunu": d, "fill": acilis, "adet": adet, "kalan": adet,
                           "stop": p["sl"], "tp1_satildi": False, "sektor": sek, "maliyet": alis_maliyet,
                           "bacaklar": [], "nakit_kucultme": kucuk, "eksik_gun": 0,

@@ -1928,3 +1928,9 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Etki: canlıda etkilenen kayıt 0 (salt-okunur); eğitim planlarının 293/39.112'si (hepsi y=0, etiket değişmez). Defter için s3 ayrı kural sürümü tasarlandı, uygulanmadı.
 - Düzeltilmiş bağımsız koşular (ortak 12 ay): mevcut_s3 −%14,4 (yol bağımlılığı: 27 işlem değişti), alternatif_s3 −%22,1 (saf düzeltme etkisi −2,4 puan); başlangıç riski aşımı 56 vs 0. Önceki raporlara 'hatalı gerçekleşme varsayımı' notu.
 - test_kural_s3 (14); 596 test OK. Ayrıntı: HALLEY2_DENETIM_RAPORU Ek H4.
+
+## 2026-11-16 — FAZ 2 Ek H9: son kapsam (dal faz2-portfoy; araştırma, canlı değişiklik yok)
+- journal s3: gerçek alış (kullanici_kaydi) ile varsayımsal çıkış (kural simülasyonu) ayrı alanlarda; alış ≤ SL bacağı 'SL varsayımı'. s2 çıktısı birebir.
+- Bulgu: simülatör açılışa bakıp elenen adayın yerine sıradakini aynı açılıştan alıyordu (teorik). Yeni emir_modeli=onceden_limit: emir listesi açılıştan önce, dolmayan emrin yerine aday yok. Eski model varsayılan, teorik etiketli.
+- Sınıflama: doğrulanmış yok; emir altyapısına bağlı = önceden limit (Midas doğrulanmadı); teorik = açılışı görüp (T1/T2) ve bütün s2 koşuları.
+- E modeli (ortak): 12 ay −%25,2 / −%21,7 (planlanan / azami), 2024 +%22,9 / +%19,5; teorik T1 2024 +%35,1. Ek H4 24 koşu regresyonu aynı. 603 test OK. FAZ 2 simülatör olarak kabul önerildi; strateji başarısı değil.

@@ -28,6 +28,12 @@ def rec(fill, kaynak="gercek", senaryo="kirilim_teyitli", sl=95.0):
 
 
 MALIYET = 0.20 + 0.10
+S3_EK = ("kural", "gerceklesme", "cikis_varsayimi")
+
+
+def s2_alanlari(d):
+    """s3'ün eklediği açıklama alanları (gerçek/varsayım ayrımı) dışındaki sonuç."""
+    return {k: v for k, v in d.items() if k not in S3_EK}
 
 
 class GirisKosulu(unittest.TestCase):
@@ -56,11 +62,29 @@ class GerceklesmisAlis(unittest.TestCase):
         r = journal.evaluate(rec(94.0), bars, kural="s3")
         self.assertEqual(r["durum"], "kapandı")
         self.assertEqual((r["giris_gunu"], r["giris_fiyati"]), (D[1], 94.0))     # gerçek alış korunur
-        self.assertEqual(r["bacaklar"], [{"pay": 1.0, "fiyat": 94.0, "neden": "SL (alış stopun altında)"}])
+        self.assertEqual(r["bacaklar"], [{"pay": 1.0, "fiyat": 94.0, "neden": "SL varsayımı (alış stopun altında)"}])
         self.assertEqual(r["sonuc"], "SL")
         self.assertTrue(r["acilis_sl_alti"])
         self.assertAlmostEqual(r["net_getiri_pct"], -MALIYET, places=6)          # yalnız maliyet
         self.assertLessEqual(r["net_getiri_pct"], 0)
+        # Ek H5: gerçek alış ile varsayımsal çıkış ayrı ve açıkça etiketli
+        self.assertEqual(r["gerceklesme"]["alis"], "kullanici_kaydi")
+        self.assertEqual(r["gerceklesme"]["cikis"], "varsayimsal_kural_simulasyonu")
+        self.assertIn("kayma %0.1", r["gerceklesme"]["not"])
+        self.assertIn("VARSAYILDI", r["cikis_varsayimi"])
+        self.assertIn("Gerçekleşmiş satış değildir", r["cikis_varsayimi"])
+
+    def test_s2_output_has_no_s3_fields(self):
+        r = journal.evaluate(rec(100.0), [bar(D[1], 100, 101, 99, 100), bar(D[2], 85, 86, 84, 85)])
+        self.assertFalse(set(S3_EK) & set(r))
+
+    def test_s3_marks_every_exit_hypothetical(self):
+        """Stop üstü normal SL çıkışında da satış kullanıcıdan gelmez: çıkış varsayımsal, ama özel stop altı notu yok."""
+        r = journal.evaluate(rec(100.0), [bar(D[1], 100, 101, 99, 100), bar(D[2], 85, 86, 84, 85)], kural="s3")
+        self.assertEqual(r["gerceklesme"]["cikis"], "varsayimsal_kural_simulasyonu")
+        self.assertNotIn("cikis_varsayimi", r)
+        r2 = journal.evaluate(rec(None, kaynak="takip", senaryo="geri_cekilme"), [bar(D[1], 94, 96, 93, 95)], kural="s3")
+        self.assertEqual(r2["gerceklesme"]["alis"], "kural_simulasyonu")
 
     def test_s3_fill_equal_to_stop(self):
         r = journal.evaluate(rec(95.0), [bar(D[1], 95, 97, 94, 96)], kural="s3")
@@ -71,7 +95,7 @@ class GerceklesmisAlis(unittest.TestCase):
         """Stop üstü alış: alış günü stopa değerse SL fiyatından (gün içi sıra bilinmez, mevcut kural) — s2 ile aynı."""
         for bars in ([bar(D[1], 96, 97, 94, 95)],                               # alış günü stop görüldü
                      [bar(D[1], 100, 101, 99, 100), bar(D[2], 100, 111, 99, 110), bar(D[3], 110, 121, 109, 120)]):
-            self.assertEqual(journal.evaluate(rec(bars[0]["open"]), bars, kural="s3"),
+            self.assertEqual(s2_alanlari(journal.evaluate(rec(bars[0]["open"]), bars, kural="s3")),
                              journal.evaluate(rec(bars[0]["open"]), bars, kural="s2"))
 
     def test_random_fills_above_stop_never_differ(self):
@@ -87,7 +111,7 @@ class GerceklesmisAlis(unittest.TestCase):
             fill = bars[0]["open"]
             a, b = journal.evaluate(rec(fill), bars, kural="s2"), journal.evaluate(rec(fill), bars, kural="s3")
             if fill > 95.0:
-                self.assertEqual(a, b)
+                self.assertEqual(a, s2_alanlari(b))
             elif a.get("durum") == "kapandı":                                     # stop altı/eşit: s3'te kâr yok
                 self.assertLessEqual(b["net_getiri_pct"], 0)
 
@@ -174,6 +198,57 @@ class PortfoyS3(unittest.TestCase):
                       dict(self.AYAR, kural="s3", stop_alti_girissiz=True), SEK)
         self.assertEqual(a["islemler"], b["islemler"])
         self.assertEqual(a["egri"], b["egri"])
+
+
+class OncedenLimitEmir(unittest.TestCase):
+    """Ek H5: emir listesi açılıştan ÖNCE kurulur; dolmayan emrin yerine açılışa bakılarak başka aday alınmaz."""
+    AYAR = {"baslangic_sermaye": 100000, "risk_pct": 1.0, "azami_pozisyon": 1, "kural": "s3"}
+
+    def _bars(self, a_acilis, b_acilis):
+        return {"AAA": [bar(D[0], 100, 100, 100, 100), bar(D[1], a_acilis, a_acilis + 1, a_acilis - 1, a_acilis),
+                        bar(D[2], 100, 101, 99, 100)],
+                "BBB": [bar(D[0], 100, 100, 100, 100), bar(D[1], b_acilis, b_acilis + 1, b_acilis - 1, b_acilis),
+                        bar(D[2], 100, 101, 99, 100)]}
+
+    def _planlar(self):
+        a = dict(plan("AAA", D[0]), teknik_skor=9)                               # sıralamada önde
+        return [a, plan("BBB", D[0])]
+
+    def test_theoretical_model_substitutes_after_seeing_open(self):
+        """TEORİK (eski) model: AAA açılışı azami üstünde → BBB AYNI açılıştan alınmış sayılır."""
+        r = pf.simule(self._planlar(), self._bars(105, 100), D[:3], D[1], D[2], self.AYAR, SEK)
+        self.assertEqual([t["ticker"] for t in r["islemler"] + r["acik_son"]], ["BBB"])
+
+    def test_preplaced_order_no_substitution(self):
+        r = pf.simule(self._planlar(), self._bars(105, 100), D[:3], D[1], D[2],
+                      dict(self.AYAR, emir_modeli="onceden_limit"), SEK)
+        self.assertEqual(r["islemler"] + r["acik_son"], [])
+        self.assertEqual({x["ticker"]: x["neden"] for x in r["atlanan"]},
+                         {"AAA": "emir dolmadı: açılış azami girişin üstünde", "BBB": "pozisyon sınırı"})
+
+    def test_preplaced_orders_independent_of_open_prices(self):
+        """Hangi emirlerin verildiği (dolan + dolmayan) d günü açılışlarından bağımsız."""
+        ayar = dict(self.AYAR, emir_modeli="onceden_limit", azami_pozisyon=2)
+        verilen = []
+        for a_o, b_o in ((100, 100), (105, 100), (100, 106), (105, 106), (94, 100)):
+            r = pf.simule(self._planlar(), self._bars(a_o, b_o), D[:3], D[1], D[2], ayar, SEK)
+            dolan = {t["ticker"] for t in r["islemler"] + r["acik_son"]}
+            dolmayan = {x["ticker"] for x in r["atlanan"] if x["neden"].startswith("emir dolmadı")}
+            self.assertFalse(dolan & dolmayan)
+            verilen.append(dolan | dolmayan)
+        self.assertTrue(all(v == {"AAA", "BBB"} for v in verilen))
+
+    def test_preplaced_below_stop_fills_no_profit(self):
+        r = pf.simule(self._planlar(), self._bars(94, 100), D[:3], D[1], D[2],
+                      dict(self.AYAR, emir_modeli="onceden_limit"), SEK)
+        t = r["islemler"][0]
+        self.assertEqual((t["ticker"], t["acilis_sl_alti"]), ("AAA", True))
+        self.assertLess(t["net_tl"], 0)
+
+    def test_preplaced_cannot_use_open_filter(self):
+        with self.assertRaises(ValueError):
+            pf.simule(self._planlar(), self._bars(100, 100), D[:3], D[1], D[2],
+                      dict(self.AYAR, emir_modeli="onceden_limit", stop_alti_girissiz=True), SEK)
 
 
 if __name__ == "__main__":
