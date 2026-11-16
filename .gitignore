@@ -22,3 +22,10 @@ data/gunluk/
 data/firsat_gecmisi.json
 data/takip_durum.json
 data/hazir_durum.json
+
+# Canlı bekçi/döngü raporları ve canlı veriden üretilen rapor çıktıları (GitHub'a yüklenmez; 16.11.2026 olayı sonrası)
+dongu_*.txt
+**/faz1_aksam_*.txt
+**/faz1_sabah_*.txt
+**/*canli_rapor*
+**/*bekci_rapor*

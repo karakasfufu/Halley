@@ -3847,3 +3847,11 @@ içinde.
 - **FAZ 1 kabul edilmedi.**
 
 **Onay beklenen:** FAZ 4 kabul kararı. FAZ 5'e geçilmedi; canlıya alma yok.
+
+---
+
+# EK J2 (16.11.2026) — FAZ 4 KABUL KAYDI ve rapor dosyası olayı
+
+- **Kabul:** Kullanıcı FAZ 4'ü commit `2538d28` kapsamındaki **betimleyici araştırma** olarak kabul etti (etiket `faz4-kabul`). Strateji veya rejim filtresinin canlıya alınması **onaylanmadı**. Sonradan eklenen rapor dosyası (31dbcf7) kabulün parçası değildir.
+- **Olay:** Canlı bekçi raporu `faz4-rejim` dalına gönderildi (31dbcf7) ve kaldırıldı (63f88a5). Depo herkese açık. İçerik işlem raporudur; kimlik bilgisi, API anahtarı veya kişisel veri içermez. Geçmiş temizliği kullanıcı adımıdır; temiz dal `faz4-rejim-temiz` hazırlandı.
+- **Önleme:** `.gitignore` kuralları eklendi; geçmişteki dosyayı temizlemez.

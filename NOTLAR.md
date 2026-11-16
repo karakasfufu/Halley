@@ -1965,3 +1965,18 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Ön kayıt c1a4192 (sonuçlardan önce); rejim = canlı regime.py trend × oynaklık (karar anına kadarki veri; genişlik kullanılmadı); 30.470 tekil işlem (canli_ortak, s3 stop altı 217 çıkarıldı); gün kümesi bootstrap %95; n<30 / gün<20 YETERSİZ.
 - 23 ana grup, 15 yeterli; 8'inde R aralığı sıfırı dışlıyor ama aynı hisse 10 gün içinde tekrar %54–83 → bağımlı; anlamlılık iddiası yok. Kırılım tekil R +0,33 > geri çekilme +0,07; geri çekilme × yükseliş × yüksek oynaklık −0,35; dönemler arasında değişken; düşüş rejimi az.
 - Sonuç: uygulanabilir katkı yok; hipotez olarak kaydedildi. Portföy metriği çıkarılmadı. 629 test OK. Ayrıntı: Ek J.
+
+## 2026-11-16 — FAZ 4 KABUL EDİLDİ (betimleyici araştırma; commit 2538d28, etiket faz4-kabul)
+- Kapsam: strateji türü × rejim tekil işlem betimlemesi (Ek J). Strateji/rejim filtresinin canlıya alınması ONAYLANMADI. Sonradan eklenen rapor dosyası kabulün parçası değil.
+
+## 2026-11-16 18:25 — FAZ 1 canlı kanıtı: v2 sonrası ilk akşam analizi (yalnız özet; gerçek rapor repoya konmaz)
+- Akşam çalıştırması 18:21–18:23 gözlendi; fiyatlar 16.11'e güncellendi; bütünlük ok.
+- 3 yeni s2 sözleşmeli tahmin kaydedildi; kural, komisyon, kayma, maliyet protokolü alanları dolu (gözlendi).
+- 16.11 girişli 2 eski tahmin açık; nihai sonuç yok. Eski (v1) sütun özeti değişmedi. Sonuç/değerlendirme/olay 0.
+- GÖZLENMEDİ: sabah kontrolü (17.11), gerçek sonuçlandırma (TP/SL/30 gün), s1→s2 yeniden değerlendirme. FAZ 1 kabul edilmedi.
+
+## 2026-11-16 — Olay: gerçek bekçi raporu GitHub'a gönderildi (faz4-rejim, 31dbcf7; 63f88a5'te kaldırıldı)
+- Depo HERKESE AÇIK (06.11.2026'dan beri; önceki notlardaki 'özel/gizli' ifadesi yanlıştı).
+- İçerik sınıfı: işlem raporu (hisse kodları, tarih, fiyat, model olasılığı, çalıştırma zamanı). Kimlik bilgisi/API anahtarı/kişisel veri YOK (desen taraması 0).
+- Geçmiş temizliği zorla gönderme gerektiriyor; izin denetimi engelledi, aşılmadı. Temiz dal: faz4-rejim-temiz (2538d28 üstüne, dosyasız). Eski dalın silinmesi kullanıcı adımı.
+- .gitignore: dongu_*.txt, faz1_aksam/sabah_*.txt, *canli_rapor*, *bekci_rapor* — yalnız GELECEKTEKİ eklemeleri önler, geçmişi temizlemez.

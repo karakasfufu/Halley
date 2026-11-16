@@ -1,7 +1,7 @@
 # Halley — Claude / sonraki geliştirici için devir
 
 Tarih: 6 Kasım 2026, Türkiye saati.
-Depo: https://github.com/karakasfufu/Halley (gizli), ana dal: `main`.
+Depo: https://github.com/karakasfufu/Halley (DİKKAT: GitHub'da HERKESE AÇIK — 06.11.2026'dan beri; "gizli" değil), ana dal: `main`.
 Bu devirden önceki son kod commit'i: `c7bd4d576b0867a589b9e3de645ab4532e9f0066`.
 
 ## Önce oku
