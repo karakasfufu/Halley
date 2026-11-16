@@ -1,0 +1,103 @@
+{
+ "not": "Bu ölçüm eşiklerin CANLI veride doğrulandığı anlamına gelmez.",
+ "tekrar": 500,
+ "gun": 250,
+ "degisim_gunu": 100,
+ "tohum": 20261116,
+ "normal": {
+  "birikimli|P1": {
+   "yanlis_alarm_orani_250_gun": 0.0,
+   "gecikme_medyan_gun": null,
+   "degisimden_once_alarm_orani": 0.0
+  },
+  "birikimli|P2": {
+   "yanlis_alarm_orani_250_gun": 0.004,
+   "gecikme_medyan_gun": null,
+   "degisimden_once_alarm_orani": 0.0
+  },
+  "birikimli|K1": {
+   "yanlis_alarm_orani_250_gun": 0.144,
+   "gecikme_medyan_gun": null,
+   "degisimden_once_alarm_orani": 0.0
+  },
+  "son_60_gun|P1": {
+   "yanlis_alarm_orani_250_gun": 0.0,
+   "gecikme_medyan_gun": null,
+   "degisimden_once_alarm_orani": 0.0
+  },
+  "son_60_gun|P2": {
+   "yanlis_alarm_orani_250_gun": 0.004,
+   "gecikme_medyan_gun": null,
+   "degisimden_once_alarm_orani": 0.0
+  },
+  "son_60_gun|K1": {
+   "yanlis_alarm_orani_250_gun": 0.212,
+   "gecikme_medyan_gun": null,
+   "degisimden_once_alarm_orani": 0.0
+  }
+ },
+ "ayirt_yok": {
+  "birikimli|P1": {
+   "tespit_orani_150_gun": 0.0,
+   "gecikme_medyan_gun": null,
+   "degisimden_once_alarm_orani": 0.0
+  },
+  "birikimli|P2": {
+   "tespit_orani_150_gun": 0.096,
+   "gecikme_medyan_gun": 128.0,
+   "degisimden_once_alarm_orani": 0.0
+  },
+  "birikimli|K1": {
+   "tespit_orani_150_gun": 0.126,
+   "gecikme_medyan_gun": 61,
+   "degisimden_once_alarm_orani": 0.09
+  },
+  "son_60_gun|P1": {
+   "tespit_orani_150_gun": 0.068,
+   "gecikme_medyan_gun": 94.0,
+   "degisimden_once_alarm_orani": 0.0
+  },
+  "son_60_gun|P2": {
+   "tespit_orani_150_gun": 0.686,
+   "gecikme_medyan_gun": 83,
+   "degisimden_once_alarm_orani": 0.0
+  },
+  "son_60_gun|K1": {
+   "tespit_orani_150_gun": 0.16,
+   "gecikme_medyan_gun": 81.0,
+   "degisimden_once_alarm_orani": 0.1
+  }
+ },
+ "kalibrasyon": {
+  "birikimli|P1": {
+   "tespit_orani_150_gun": 0.0,
+   "gecikme_medyan_gun": null,
+   "degisimden_once_alarm_orani": 0.0
+  },
+  "birikimli|P2": {
+   "tespit_orani_150_gun": 0.0,
+   "gecikme_medyan_gun": null,
+   "degisimden_once_alarm_orani": 0.0
+  },
+  "birikimli|K1": {
+   "tespit_orani_150_gun": 0.834,
+   "gecikme_medyan_gun": 80,
+   "degisimden_once_alarm_orani": 0.11
+  },
+  "son_60_gun|P1": {
+   "tespit_orani_150_gun": 0.0,
+   "gecikme_medyan_gun": null,
+   "degisimden_once_alarm_orani": 0.0
+  },
+  "son_60_gun|P2": {
+   "tespit_orani_150_gun": 0.016,
+   "gecikme_medyan_gun": 101.5,
+   "degisimden_once_alarm_orani": 0.0
+  },
+  "son_60_gun|K1": {
+   "tespit_orani_150_gun": 0.892,
+   "gecikme_medyan_gun": 57.0,
+   "degisimden_once_alarm_orani": 0.102
+  }
+ }
+}

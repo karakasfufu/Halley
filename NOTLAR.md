@@ -1989,3 +1989,9 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 ## 2026-11-16 — FAZ 5 KABUL EDİLDİ (araştırma teslimi; commit 6c7e7a2, etiket faz5-kabul)
 - Ayrımlar: TP1 olay hedefleri ön kayıtlı ölçütü geçti; mekanik uzaklık referansı sonradan incelendi, ek katkı/ekonomik fayda kanıtlanmadı; getiri hedeflerinde katkı yok; dönemler bağımsız değil.
 - '+%3,7' = Brier becerisi (R1'e göre GÖRELİ azalma), yüzde puan değil. Kabul kaydı arastirma/faz5/kabul_kaydi.json; yeniden üretim SHA-256 birebir aynı. Etkin model/kurallar değişmedi.
+
+## 2026-11-16 — FAZ 6: model izleme + hız (dal faz6-izleme; canlı değişmedi; ÖNERİ: KISMİ KABUL)
+- Ön kayıt 1a492a3, değişiklik 1 c141c71 (sonuçlardan önce: kümeli analitik aralıklar). izleme.py: P1/P2/K1 uyarı, R1/G1 bilgi; yetersiz veri; teyit (≥20 yeni gün), bastırma; salt-okur panel; yerel kayıt (gitignore). defter.olculen_kayitlar ortak seçim.
+- Yapay seri (500 tekrar, 250 gün, tohum 20261116, ~29 dk): K1 BAŞARISIZ — normal seride 250 günlük izlemde %14,4/%21,2 en az bir yanlış alarm (günlük oran değil); P2 son 60 gün ayırt kaybını %69 yakalıyor (yanlış alarm %0,4); P1 düşük güç. Eşikler değiştirilmedi; K1 canlıya alınmaz; yeniden tasarım ayrı ön kayıt + ayrı doğrulama serisi.
+- Hız: regime önbelleği — 5 çağrılık aynı-gün iş yükü 2,51 → 1,06 sn, sonuç aynı; bütün uygulama ölçülmedi. API: 09.11'den beri ücretli çağrı yok — tasarım (bekçi ai=False, sabah haber kontrolü kapalı); 733 analize uygun haber bekliyor; bu ay 2,29 $.
+- Ek M: yedi faz değerlendirmesi (zorunlu Z1–Z5, entegrasyon Ü1–Ü5, isteğe bağlı İ1–İ5; tavan olasılığı ayrı İ4). 656 test OK.
