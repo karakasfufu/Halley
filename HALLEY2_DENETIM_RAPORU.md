@@ -2449,3 +2449,201 @@ yalniz_teknik için aynı liste `sonuclar_faz2/yalniz_teknik/*_acik_son.csv` iç
 - FAZ 1 kabul edilmedi.
 
 **Onay beklenen:** FAZ 2'nin kabulü. Canlıya alma yok; FAZ 3'e geçilmedi.
+
+
+---
+
+# Ek H3 — Risk hesabındaki farkın kesinleştirilmesi (16.11.2026, dal `faz2-portfoy`, yalnız araştırma)
+
+**Konumu:** Bu ek **geriye dönük doğrulamadır**. Önceki sonuçlar (Ek H5, H2) görüldükten sonra yapıldı ve **dönem
+dışı başarı kanıtı sayılmaz**.
+
+- Orijinal sonuçlar değiştirilmedi: `sonuclar_faz2/*` dosyalarına dokunulmadı. Varsayılan davranışla yeniden
+  çalıştırınca dört simülasyonun metrikleri `kayit.json` ile birebir aynı çıktı.
+- Canlı kural değişmedi. Parametre optimizasyonu yapılmadı. Senaryolar arasında otomatik seçim yok.
+
+## H3.1 Önceki "sınırlar aşılmadı" ifadesi hangi tanıma dayanıyordu?
+
+1. **İşlem başı %1:** Simülatörde ayrıca denetlenen bir sınır değildi. Adet `journal.position_size` ile **planlanan
+   girişe** göre hesaplanır: adet × ((plan girişi − SL) + plan girişi × %0,3) ≤ %1. Gerçek dolumla başlangıç riski
+   hiç ölçülmemişti. Ek H2.5'te bunun aşıldığı zaten belirtildi.
+2. **Toplam %6 sınırı:** Girişte, adayın **planlanan girişle** hesaplanan riskiyle denetleniyordu. Ek H2'deki
+   %5,52 / %5,55 değerleri ise **gün sonu** açık riskiydi: gerçek dolumla, ama o günün çıkışlarından ve TP1 stop
+   çekilmesinden **sonra**. Giriş anının ölçüsü değildi.
+3. **Yeni ölçü (bu ek):** Giriş anındaki portföy riski, o günün çıkışlarından önce ve gerçek dolumla hesaplandı:
+   - yeni pozisyonlar: adet × ((dolum − SL) + dolum × %0,3),
+   - eski pozisyonlar: kalan × max(0, dolum − güncel stop) + kalan satış maliyeti.
+
+## H3.2 Gerçek dolumla başlangıç riski ve portföy riski
+
+| | ortak · 12 ay | ortak · 2024 | teknik · 12 ay | teknik · 2024 |
+|---|---|---|---|---|
+| **Mevcut:** başlangıç riski bütçeyi aşan işlem | **57 / 141** | **48 / 110** | **57 / 143** | **50 / 115** |
+| Mevcut: en yüksek başlangıç riski (bütçenin katı) | 1,33 (GSDDE) | 1,37 (DESPC) | 1,33 | 1,37 |
+| **Alternatif:** başlangıç riski bütçeyi aşan | **0** | **0** | **0** | **0** |
+| Alternatif: en yüksek kat | 0,997 | 0,994 | 0,997 | 0,992 |
+| Giriş anı portföy riski en yüksek (mevcut / alternatif) | %5,56 / %4,40 | %5,60 / %4,50 | %5,41 / %4,53 | %5,39 / %4,34 |
+| Giriş anında %6'yı aşan gün (iki senaryo) | 0 | 0 | 0 | 0 |
+
+- **Portföy düzeyi:** Gerçek dolum temelinde de %6 sınırı hiç aşılmadı. Gerekçe: adayların çoğu pozisyon sınırına
+  takılıyor, risk sınırına değil.
+- **İşlem düzeyi:** Mevcut davranışta işlemlerin yaklaşık %40'ında başlangıç riski %1'i aştı (en çok %1,37).
+
+## H3.3 %1'i aşan gerçekleşen kayıpların nedenleri (kapanan işlemler)
+
+**Tanımlar.** L = kayıp, B = bütçe (önceki gün özsermayesinin %1'i).
+
+| Bileşen | Hesap | Anlamı |
+|---|---|---|
+| P | adet × ((plan girişi − SL) + plan girişi × %0,3) | planlanan kayıp; her zaman P ≤ B |
+| E | adet × (dolum − plan girişi) | giriş farkı |
+| G | stop bacaklarında satılan × (stop − çıkış fiyatı) | stop altında çıkış |
+| C | adet × (dolum − plan girişi) × %0,3 | maliyetin planlanandan farkı |
+| K | L − (P + E + G + C) | kalan; tam SL'de ≈ 0 |
+
+**Neden etiketi:** E > 0 ve G > 0 olanlar listelenir. Maliyet yalnız tek başına belirleyiciyse eklenir
+(P + E + G ≤ B < P + E + G + C).
+
+| Mevcut davranış | ortak · 12 ay | ortak · 2024 | teknik · 12 ay | teknik · 2024 |
+|---|---|---|---|---|
+| Kaybı %1'i aşan / kapanan | **43 / 136** | **31 / 105** | **49 / 141** | **33 / 110** |
+| Yalnız giriş farkı | 27 | 16 | 27 | 22 |
+| Yalnız stop altı çıkış | 4 | 5 | 7 | 2 |
+| Giriş farkı + stop altı çıkış | 12 | 10 | 15 | 9 |
+| Maliyet belirleyici | 0 | 0 | 0 | 0 |
+| Bütçe üstü toplam aşım (L − B, TL) | 5.300 | 8.055 | 7.784 | 5.009 |
+| Bileşen toplamı: E / G / C (TL) | 3.864 / 1.973 / 11,6 | 3.552 / 4.516 / 10,7 | 4.615 / 3.524 / 13,9 | 3.991 / 1.091 / 12,0 |
+
+| Alternatif | ortak · 12 ay | ortak · 2024 | teknik · 12 ay | teknik · 2024 |
+|---|---|---|---|---|
+| Kaybı %1'i aşan / kapanan | **1 / 136** | **4 / 105** | **3 / 141** | **1 / 110** |
+| Neden | stop altı çıkış (GOLTS, 2,30 kat) | stop altı 2, giriş farkı + stop altı 2 (TEZOL 1,94 kat) | stop altı 3 | giriş farkı + stop altı 1 |
+
+- Alternatifte P + E + C her zaman ≤ B olur, çünkü dolum azami girişi geçemez. Bu yüzden kalan aşımın **tamamı**
+  stop boşluğundan gelir.
+- **Maliyetler** hiçbir işlemde aşımın belirleyicisi olmadı. Planlanan maliyet adet hesabında zaten var; fark yalnız
+  dolum farkının %0,3'ü kadar.
+
+## H3.4 İki senaryo (aynı dönem, aynı diğer ayarlar)
+
+**Mevcut:** Adet, planlanan girişe göre hesaplanır. Nakit kontrolü açılış fiyatıyla yapılır. Canlı paneldeki adet
+hesabı budur.
+
+**Alternatif — "azami girişle önceden adet":**
+
+- Adet, nakit ayırma ve aday riski **açılıştan önce bilinen azami girişle** hesaplanır.
+- **Emir zamanlaması:** Sabah planı açılıştan önce hazır olur. Emir BIST açılış seansına (emir toplama yaklaşık
+  09:40–09:55) **azami giriş fiyatından limitli** verilir.
+- Açılış fiyatı ≤ azami ise emir açılış fiyatından dolar; > azami ise dolmaz. Bu, canlıdaki "açılış azami girişin
+  üstündeyse alma" kuralıyla aynıdır.
+- **Fiyat varsayımı:** Dolum = günlük mumun açılış fiyatı (iki senaryoda aynı). Açılış fiyatı adet kararında
+  **kullanılmaz**.
+- **Doğrulanmayanlar:** Açılış seansında kısmi dolum, derinlik ve Yahoo açılışı ile seans fiyatı farkı modellenmedi.
+  Midas'ta açılış seansına limit emir girilebildiği bu çalışmada **doğrulanmadı**; kullanıcının kontrol etmesi
+  gerekir.
+
+**Değerlendirilip seçilmeyen yöntem — "fiyatı gördükten sonra işlem":**
+
+- Canlıda açılış 15 dk gecikmeli görülür. Alış o andaki fiyattan olurdu; bu fiyat günlük veride yok.
+- Açılıştan alış yaptırmak, açılışı önceden biliyormuş gibi davranmak olur (yasaklanan varsayım).
+- Kapanıştan alış ise giriş modelini değiştirir.
+- Gün içi veri olmadan dürüstçe test edilemediği için seçilmedi.
+
+| | Mevcut · ortak 12 ay | Alternatif · ortak 12 ay | Mevcut · ortak 2024 | Alternatif · ortak 2024 |
+|---|---|---|---|---|
+| Bitiş özsermayesi (TL) | 77.270 | 80.252 | 135.873 | 128.914 |
+| Net getiri | −%22,7 | −%19,8 | +%35,9 | +%28,9 |
+| Azami düşüş | −%34,1 | −%30,3 | −%15,2 | −%12,3 |
+| Sortino | −1,45 | −1,51 | 2,19 | 2,18 |
+| Kâr faktörü | 0,718 | 0,714 | 1,344 | 1,350 |
+| Ortalama R / kazanma oranı | −0,19 / %27,9 | aynı | +0,26 / %39,0 | aynı |
+| Kapanan / sonda açık | 136 / 5 | 136 / 5 | 105 / 5 | 105 / 5 |
+| Nakitle küçültülen alış | 16 | 0 | 7 | 0 |
+| Atlananlar | — | birebir aynı | — | birebir aynı |
+
+| | Mevcut · teknik 12 ay | Alternatif · teknik 12 ay | Mevcut · teknik 2024 | Alternatif · teknik 2024 |
+|---|---|---|---|---|
+| Bitiş özsermayesi (TL) | 75.290 | 80.408 | 125.911 | 120.187 |
+| Net getiri | −%24,7 | −%19,6 | +%25,9 | +%20,2 |
+| Azami düşüş | −%39,3 | −%33,3 | −%15,2 | −%12,8 |
+| Sortino / kâr faktörü | −1,54 / 0,761 | −1,46 / 0,767 | 1,79 / 1,237 | 1,71 / 1,234 |
+
+**Okuma:**
+
+- Aynı işlemler seçildi; alternatif yalnız pozisyonları küçülttü.
+- Risk ayarlı ölçüler (Sortino, kâr faktörü, R) neredeyse aynı kaldı.
+- Kötü yılda kayıp ve düşüş azaldı, iyi yılda getiri de azaldı.
+- Bu bir performans iyileştirmesi değil, **risk tanımının tutarlılığı** sorunudur.
+
+## H3.5 Stopun altında açılan girişler: mevcut sistem nasıl ele alıyor?
+
+**Kod davranışı (değiştirilmedi):**
+
+- `ready.opening_check` ve `evaluate_all` yalnız "açılış > azami" durumunda girişi iptal eder. **Alt sınır yok:**
+  açılış SL'nin altında olsa da alış yapılmış sayılır.
+- `journal.evaluate`, gerçek giriş kaydında alış gününü "gün içi sıra bilinmez" kabul eder. O gün en düşük fiyat ≤ SL
+  ise satışı **SL fiyatından** yazar ("SL (alış günü)").
+- Dolum SL'nin altındaysa bu satış, alış fiyatının **üstünde** bir fiyattan yazılmış olur. Sonuç "SL" görünür ama net
+  **kâr** kaydedilir. Gerçekte stop emri açılışta tetiklenir ve satış açılış civarından olurdu. Bu yüzden kayıt
+  **iyimserdir**.
+- Test: `test_open_below_stop_current_handling` (açılış 94, SL 95 → satış 95'ten, net kâr).
+
+**Gerçek veride sıklık:**
+
+| | ortak · 12 ay | ortak · 2024 | teknik · 12 ay | teknik · 2024 |
+|---|---|---|---|---|
+| Portföyde stop altı açılış (iki senaryoda) | 6 | 1 | 5 | 0 |
+| Bu işlemlere yazılan "stoptan satış" kârı, mevcut (TL) | +3.739 | +249 | +5.566 | 0 |
+| Aynı kâr, alternatif (TL) | +2.966 | +197 | +4.490 | 0 |
+| Kısıtsız evrende stop altı açılış / girilen | 32 / 2.639 | 22 / 2.752 | 24 / 1.691 | 20 / 1.781 |
+
+- Kısıtsız evrende bu işlemlerin 30 / 32 ve 21 / 22'si kârlı yazıldı. Örnekler:
+  - TERA 2026-04-21: tavan/taban kilitli mum, açılış = en düşük = 321, SL 336;
+  - BAKAB 2024-02-01: açılış 48,08, SL 89,28 → büyük olasılıkla bölünme ya da veri hatası.
+- Yaklaşık etki: portföy sonuçları bu işlemlerde **en çok** yukarıdaki tutarlar kadar iyimser. Bu, yeniden simülasyon
+  değil üst sınır tahminidir. Ortak 12 ay için yaklaşık 3,7 puan getiri.
+
+## H3.6 Testler (ayrı ayrı)
+
+| Test | Kanıtladığı |
+|---|---|
+| `test_default_is_current_behavior` | Varsayılan = mevcut davranış; bilinmeyen seçenek hata verir. |
+| `test_initial_risk_exceeds_budget_only_in_current` | Başlangıç riski aşımı: mevcutta 18 adet → 131,5 TL > 100; alternatifte 13 adet → 94,98 ≤ 100. Boşluksuz stopta kayıp = başlangıç riski; ayrıştırma "giriş farkı", K ≈ 0. |
+| `test_gap_loss_exceeds_budget_even_in_alternative` | Stop boşluğu aşımı: alternatifte başlangıç riski bütçe içinde, ama açılış 85'te kayıp bütçeyi aşar; aşımın tamamı G. |
+| `test_open_below_stop_current_handling` | Stop altı açılışın iki senaryodaki mevcut ele alınışı (yukarıda). |
+
+**Sonuç:** Portföy testleri **23 / 23 OK**; tam takım (ağ engelli) **582 test OK**, ağ denemesi 0.
+
+## H3.7 Öneri (teknik gerekçeyle; karar kullanıcının)
+
+1. **Adet hesabı: risk hesabının değiştirilmesini öneriyorum** (alternatif yöntem: azami girişle önceden adet).
+   Bu bir **canlı kural değişikliğidir** ve ayrı onay ister. Gerekçeler:
+   - "İşlem başı %1 risk" kuralı mevcut hesapla işlemlerin yaklaşık %40'ında ihlal ediliyor (en çok %1,37), üstelik
+     kullanıcı paneldeki "SL'de en fazla kayıp" rakamına güveniyor.
+   - Alternatif başlangıç riski aşımını **tamamen** kaldırıyor. Kalan aşım yalnız stop boşluğundan geliyor; bu, adet
+     hesabıyla önlenemez.
+   - Risk ayarlı sonuçlar değişmiyor. Bu nedenle seçim performansa göre değil tanım tutarlılığına göre yapılmış olur.
+   - Bedeli: daha küçük pozisyon, iyi dönemde daha düşük getiri (2024: +%35,9 → +%28,9).
+   - Daha sade bir eşdeğer seçenek de var: paneldeki adedi "azami girişe göre" göstermek ve "SL'de en fazla kayıp"
+     rakamını azami girişle hesaplamak.
+2. **Stop altı açılış: ayrı bir düzeltme gerekiyor.** İki parça var:
+   - açılış ≤ SL ise alım önerilmemesi (sabah açılış kontrolüne alt sınır),
+   - journal'ın alış günü kuralında, dolum SL'nin altındaysa satışın açılıştan sayılması.
+
+   Bunlar canlı kural ve kayıt değişikliğidir, ayrı onay ister. FAZ 1 defterinin s2 sözleşmesini etkileyebileceği
+   için önce etki analizi gerekir.
+3. **Mevcut davranış korunursa** en azından raporlarda ve panelde "%1 risk" ifadesinin **planlanan giriş** için
+   geçerli olduğu açıkça yazılmalıdır.
+
+Hiçbiri uygulanmadı. FAZ 2 kabulü ve olası canlı değişiklik için kullanıcı kararı bekleniyor.
+
+## H3.8 Değişen dosyalar
+
+- `arastirma/asama6/portfoy.py`:
+  - yeni `adet_temeli` seçeneği (varsayılan `planlanan_giris` = mevcut);
+  - tanılama alanları: `butce_tl`, `risk_bas_gercek_tl`, `risk_bas_plan_tl`, `acilis_sl_alti`, `planlanan_giris`,
+    `sl`, `azami` (işlemler ve sonda açıklar), `giris_ani_risk_gercek` ve `ozsermaye_onceki` (eğri).
+  - Karar mantığı varsayılanda değişmedi.
+- `arastirma/asama6/risk_ayristirma.py` (yeni): ayrıştırma ve iki senaryo. Çıktısı `sonuclar_faz2/risk_h3.json`.
+- `tests/test_portfoy.py`: `RiskTemeli` (4 test).
+- Bu ek ve `NOTLAR.md`.

@@ -24,7 +24,8 @@ SIRALAMA: (risk sırası, −(teknik skor + 2·min(haber,5) + min(r/g,4)), hisse
 MALİYET: komisyon_pct ve kayma_pct alış+satış TOPLAMIDIR (Halley ayarı gibi). journal.evaluate ile AYNI toplam maliyet
   için: alışta adet × giriş fiyatı × (k+s)/200; her satış bacağında satılan adet × GİRİŞ fiyatı × (k+s)/200 (satış
   tutarı değil — tekil işlem sonuçlarıyla birebir mutabakat için). Toplam = adet × giriş × (k+s)/100; iki kez düşülmez.
-RİSK: aday işlem riski = adet × ((plan girişi − SL) + plan girişi × (k+s)/100) (journal.position_size ile aynı).
+RİSK (Ek H3 tanılama: her işlemde gerçek dolumla başlangıç riski ve giriş anı portföy riski de kaydedilir;
+  kararları değiştirmez): aday işlem riski = adet × ((plan girişi − SL) + plan girişi × (k+s)/100) (journal.position_size ile aynı).
   Açık pozisyon riski = kalan adet × max(0, giriş fiyatı − güncel stop) + kalan adet × giriş fiyatı × (k+s)/200
   (TP1 sonrası stop girişe çekildiği için yalnız kalan satış maliyeti kalır). Toplam risk sınırı, d−1 sonu özsermayenin
   yüzdesidir.
@@ -49,7 +50,12 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 VARSAYILAN = {"baslangic_sermaye": 100000.0, "risk_pct": 1.0, "azami_pozisyon": 5, "azami_toplam_risk_pct": 6.0,
-              "azami_sektor": 2, "komisyon_pct": 0.20, "kayma_pct": 0.10, "sabit_adet": None, "sinirsiz": False}
+              "azami_sektor": 2, "komisyon_pct": 0.20, "kayma_pct": 0.10, "sabit_adet": None, "sinirsiz": False,
+              "adet_temeli": "planlanan_giris"}
+# adet_temeli (Ek H3, araştırma senaryosu): "planlanan_giris" = MEVCUT davranış (canlı panel gibi plan girişiyle adet;
+# nakit kontrolü açılış fiyatıyla). "azami_giris" = ALTERNATİF: adet, nakit ayırma ve aday riski açılıştan ÖNCE bilinen
+# azami girişle hesaplanır; emir açılış seansına azami giriş limitli verilir, açılış fiyatından (≤ azami) dolar. Açılış
+# fiyatı adet kararında KULLANILMAZ. Dolum ≤ azami olduğundan gerçek başlangıç riski bütçeyi aşamaz.
 
 
 def _mods():
@@ -103,6 +109,10 @@ def simule(planlar: List[Dict], bars: Dict[str, List[Dict]], takvim: List[str], 
     def acik_risk(pozlar):
         return sum(x["kalan"] * max(0.0, x["fill"] - x["stop"]) + x["kalan"] * x["fill"] * c2 for x in pozlar)
 
+    azami_temel = a["adet_temeli"] == "azami_giris"
+    if a["adet_temeli"] not in ("planlanan_giris", "azami_giris"):
+        raise ValueError("adet_temeli: planlanan_giris | azami_giris")
+
     for d in gunler:
         # ---- 1) girişler: yalnız d−1 sonu bilgisiyle
         pd_ = onceki.get(d)
@@ -131,8 +141,8 @@ def simule(planlar: List[Dict], bars: Dict[str, List[Dict]], takvim: List[str], 
                     adet = int(a["sabit_adet"])
                 else:
                     try:
-                        adet = journal.position_size(ozsermaye_onceki, a["risk_pct"], p["giris"], p["sl"],
-                                                     kom + kay)["adet"]
+                        adet = journal.position_size(ozsermaye_onceki, a["risk_pct"],
+                                                     p["azami"] if azami_temel else p["giris"], p["sl"], kom + kay)["adet"]
                     except ValueError:
                         neden = "geçersiz seviye (SL ≥ giriş)"
                 if not neden and adet <= 0:
@@ -140,14 +150,16 @@ def simule(planlar: List[Dict], bars: Dict[str, List[Dict]], takvim: List[str], 
             kucuk = False
             if not neden:                                       # nakit sınırı: son adet (d−1 sonu nakit)
                 acilis = bar.get("open") or bar["close"]
-                if adet * acilis * (1 + c2) > nakit_kullanilabilir + 1e-9 and not a["sinirsiz"]:
-                    adet2 = math.floor(nakit_kullanilabilir / (acilis * (1 + c2)))
+                fiyat_n = p["azami"] if azami_temel else acilis     # alternatif: nakit limit fiyatıyla ayrılır
+                if adet * fiyat_n * (1 + c2) > nakit_kullanilabilir + 1e-9 and not a["sinirsiz"]:
+                    adet2 = math.floor(nakit_kullanilabilir / (fiyat_n * (1 + c2)))
                     if adet2 <= 0:
                         neden = "nakit yetersiz"
                     else:
                         adet, kucuk = adet2, True
             if not neden:                                       # toplam açık risk: son adetle
-                risk_aday = adet * ((p["giris"] - p["sl"]) + p["giris"] * (kom + kay) / 100)
+                e_r = p["azami"] if azami_temel else p["giris"]
+                risk_aday = adet * ((e_r - p["sl"]) + e_r * (kom + kay) / 100)
                 if not a["sinirsiz"] and risk_bas + sum(x["risk_giris"] for x in bugun) + risk_aday > \
                         a["azami_toplam_risk_pct"] / 100 * ozsermaye_onceki + 1e-9:
                     neden = "toplam risk sınırı"
@@ -162,8 +174,13 @@ def simule(planlar: List[Dict], bars: Dict[str, List[Dict]], takvim: List[str], 
             bugun.append({"ticker": tk, "plan": p, "giris_gunu": d, "fill": acilis, "adet": adet, "kalan": adet,
                           "stop": p["sl"], "tp1_satildi": False, "sektor": sek, "maliyet": alis_maliyet,
                           "bacaklar": [], "nakit_kucultme": kucuk, "eksik_gun": 0,
-                          "risk_giris": adet * ((p["giris"] - p["sl"]) + p["giris"] * (kom + kay) / 100)})
+                          "risk_giris": risk_aday,
+                          # Ek H3 tanılama (kararı etkilemez): bütçe ve gerçek dolumla başlangıç riski
+                          "butce_tl": ozsermaye_onceki * a["risk_pct"] / 100,
+                          "risk_bas_gercek_tl": adet * ((acilis - p["sl"]) + acilis * (kom + kay) / 100),
+                          "acilis_sl_alti": acilis <= p["sl"] + 1e-12})
         acik.extend(bugun)
+        giris_ani_risk = acik_risk(acik) + sum(x["kalan"] * x["fill"] * c2 for x in bugun)   # alış bacağı dahil (gerçek dolum)
         # ---- 2) çıkışlar: journal.evaluate yalnız d dahil o güne kadarki mumlarla
         kalan_acik = []
         for x in acik:
@@ -201,7 +218,10 @@ def simule(planlar: List[Dict], bars: Dict[str, List[Dict]], takvim: List[str], 
                                  "maliyet_tl": round(x["maliyet"], 2), "net_tl": round(net, 2), "r": res.get("r"),
                                  "journal_net_%": res.get("net_getiri_pct"), "islem_gunu": n,
                                  "ayni_mum_belirsiz": bool(bel), "belirsiz_gunler": bel,
-                                 "nakit_kucultme": x["nakit_kucultme"], "eksik_fiyat_gunu": x["eksik_gun"]})
+                                 "nakit_kucultme": x["nakit_kucultme"], "eksik_fiyat_gunu": x["eksik_gun"],
+                                 "planlanan_giris": p["giris"], "sl": p["sl"], "azami": p["azami"],
+                                 "butce_tl": round(x["butce_tl"], 4), "risk_bas_gercek_tl": round(x["risk_bas_gercek_tl"], 4),
+                                 "risk_bas_plan_tl": round(x["risk_giris"], 4), "acilis_sl_alti": x["acilis_sl_alti"]})
                 continue
             if res.get("tp1_goruldu") and not x["tp1_satildi"]:
                 b = bs[idx[tk][d]] if tk in idx and d in idx[tk] else None
@@ -222,13 +242,17 @@ def simule(planlar: List[Dict], bars: Dict[str, List[Dict]], takvim: List[str], 
         piyasa = sum(x["kalan"] * son_kapanis.get(x["ticker"], x["fill"]) for x in acik)
         ozsermaye = nakit + piyasa
         egri.append({"gun": d, "nakit": round(nakit, 2), "piyasa_degeri": round(piyasa, 2),
-                     "ozsermaye": round(ozsermaye, 2), "acik_pozisyon": len(acik), "acik_risk": round(acik_risk(acik), 2)})
+                     "ozsermaye": round(ozsermaye, 2), "acik_pozisyon": len(acik), "acik_risk": round(acik_risk(acik), 2),
+                     "giris_ani_risk_gercek": round(giris_ani_risk, 2), "ozsermaye_onceki": round(ozsermaye_onceki, 2)})
         ozsermaye_onceki = ozsermaye
     acik_son = [{"ticker": x["ticker"], "giris_gunu": x["giris_gunu"], "adet_bas": x["adet"], "kalan": x["kalan"],
                  "giris_fiyati": x["fill"], "son_kapanis": son_kapanis.get(x["ticker"], x["fill"]),
                  "tp1_satildi": x["tp1_satildi"], "gerceklesen_tl": round(sum(b["adet"] * (b["fiyat"] - x["fill"]) for b in x["bacaklar"]), 2),
                  "gerceklesmemis_tl": round(x["kalan"] * (son_kapanis.get(x["ticker"], x["fill"]) - x["fill"]), 2),
-                 "eksik_fiyat_gunu": x["eksik_gun"]} for x in acik]
+                 "eksik_fiyat_gunu": x["eksik_gun"], "planlanan_giris": x["plan"]["giris"], "sl": x["plan"]["sl"],
+                 "azami": x["plan"]["azami"], "butce_tl": round(x["butce_tl"], 4),
+                 "risk_bas_gercek_tl": round(x["risk_bas_gercek_tl"], 4), "risk_bas_plan_tl": round(x["risk_giris"], 4),
+                 "acilis_sl_alti": x["acilis_sl_alti"]} for x in acik]
     return {"ayar": a, "bas": bas, "son": son, "egri": egri, "islemler": islemler, "atlanan": atlanan,
             "acik_son": acik_son, "kucultulen": kucultulen, "eksik_fiyat": dict(eksik_fiyat),
             "metrik": metrikler(egri, islemler, atlanan, a["baslangic_sermaye"], acik_son, kucultulen)}

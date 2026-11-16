@@ -1,0 +1,1018 @@
+{
+ "not": "Geriye dönük doğrulama; önceki sonuçlar görüldükten sonra yapıldı. Dönem dışı başarı kanıtı değildir. Senaryo otomatik seçilmez.",
+ "canli_ortak/son_12_ay/mevcut": {
+  "metrik": {
+   "bitis_ozsermaye": 77270.42,
+   "toplam_getiri_%": -22.73,
+   "azami_dusus_%": -34.07,
+   "sortino_yillik": -1.449,
+   "kar_faktoru": 0.718,
+   "ort_R": -0.192,
+   "kapanan_islem": 136,
+   "kazanma_orani_%": 27.9,
+   "nakitle_kucultulen": 16,
+   "sonda_acik_pozisyon": 5,
+   "sonda_gerceklesmemis_tl": 2552.3,
+   "atlanan": {
+    "açılış azami girişin üstünde": 1112,
+    "pozisyon sınırı": 6454,
+    "zaten açık pozisyon": 271,
+    "sektör sınırı": 54
+   }
+  },
+  "acilan": 141,
+  "baslangic_riski_butceyi_asan": 57,
+  "baslangic_riski_en_yuksek_butce_kati": 1.3338,
+  "baslangic_riski_ornek": [
+   [
+    1.334,
+    "GSDDE",
+    "2026-09-16"
+   ],
+   [
+    1.265,
+    "GESAN",
+    "2026-07-27"
+   ],
+   [
+    1.24,
+    "ADEL",
+    "2026-03-31"
+   ]
+  ],
+  "giris_ani_portfoy_riski_gercek_en_yuksek_%": 5.556,
+  "gunu": "2026-07-27",
+  "giris_ani_portfoy_riski_%6_asan_gun": 0,
+  "gun_sonu_acik_risk_en_yuksek_%": 5.523,
+  "kaybi_butceyi_asan_kapanan": 43,
+  "kapanan": 136,
+  "kaybi_asan_nedenleri": {
+   "giriş farkı": 27,
+   "giriş farkı + stop altı çıkış": 12,
+   "stop altı çıkış": 4
+  },
+  "kaybi_asan_bilesen_toplam_tl": {
+   "L": 46827.88,
+   "B": 41528.35,
+   "P": 40978.99,
+   "E": 3864.11,
+   "G": 1973.43,
+   "C": 11.59,
+   "K": -0.25
+  },
+  "kaybi_asan_en_buyuk": [
+   [
+    2.313,
+    "GOLTS",
+    "2026-02-20",
+    "stop altı çıkış"
+   ],
+   [
+    1.334,
+    "GSDDE",
+    "2026-09-16",
+    "giriş farkı + stop altı çıkış"
+   ],
+   [
+    1.265,
+    "GESAN",
+    "2026-07-27",
+    "giriş farkı"
+   ],
+   [
+    1.203,
+    "FMIZP",
+    "2026-01-23",
+    "giriş farkı"
+   ],
+   [
+    1.184,
+    "EDIP",
+    "2026-04-24",
+    "giriş farkı + stop altı çıkış"
+   ]
+  ],
+  "acilis_sl_alti_giris": 6,
+  "acilis_sl_alti_kapanan_sonuc": {
+   "SL": 6
+  },
+  "acilis_sl_alti_alis_gunu_stoptan_satis_kari_tl": 3738.71,
+  "acilis_sl_alti_ornek": [
+   [
+    "TEHOL",
+    "2025-12-31",
+    31.5,
+    32.57716401573672,
+    [
+     [
+      "SL (alış günü)",
+      32.5772
+     ]
+    ],
+    394.06
+   ],
+   [
+    "ARASE",
+    "2026-03-02",
+    75.52727965077524,
+    80.87170314715534,
+    [
+     [
+      "SL (alış günü)",
+      80.8717
+     ]
+    ],
+    2118.79
+   ],
+   [
+    "AKSGY",
+    "2026-05-22",
+    8.600000381469727,
+    8.66982799260043,
+    [
+     [
+      "SL (alış günü)",
+      8.6698
+     ]
+    ],
+    183.7
+   ],
+   [
+    "PEKGY",
+    "2026-09-01",
+    14.180000305175781,
+    14.622423983564167,
+    [
+     [
+      "SL (alış günü)",
+      14.6224
+     ]
+    ],
+    316.29
+   ],
+   [
+    "GESAN",
+    "2026-09-02",
+    74.6500015258789,
+    76.87684001162107,
+    [
+     [
+      "SL (alış günü)",
+      76.8768
+     ]
+    ],
+    292.42
+   ]
+  ],
+  "donem": [
+   "2025-11-14",
+   "2026-11-13"
+  ]
+ },
+ "canli_ortak/son_12_ay/alternatif": {
+  "metrik": {
+   "bitis_ozsermaye": 80252.39,
+   "toplam_getiri_%": -19.75,
+   "azami_dusus_%": -30.3,
+   "sortino_yillik": -1.507,
+   "kar_faktoru": 0.714,
+   "ort_R": -0.192,
+   "kapanan_islem": 136,
+   "kazanma_orani_%": 27.9,
+   "nakitle_kucultulen": 0,
+   "sonda_acik_pozisyon": 5,
+   "sonda_gerceklesmemis_tl": 2209.17,
+   "atlanan": {
+    "açılış azami girişin üstünde": 1112,
+    "pozisyon sınırı": 6454,
+    "zaten açık pozisyon": 271,
+    "sektör sınırı": 54
+   }
+  },
+  "acilan": 141,
+  "baslangic_riski_butceyi_asan": 0,
+  "baslangic_riski_en_yuksek_butce_kati": 0.9967,
+  "baslangic_riski_ornek": [],
+  "giris_ani_portfoy_riski_gercek_en_yuksek_%": 4.395,
+  "gunu": "2026-07-14",
+  "giris_ani_portfoy_riski_%6_asan_gun": 0,
+  "gun_sonu_acik_risk_en_yuksek_%": 4.356,
+  "kaybi_butceyi_asan_kapanan": 1,
+  "kapanan": 136,
+  "kaybi_asan_nedenleri": {
+   "stop altı çıkış": 1
+  },
+  "kaybi_asan_bilesen_toplam_tl": {
+   "L": 2388.62,
+   "B": 1040.11,
+   "P": 820.89,
+   "E": -0.0,
+   "G": 1567.73,
+   "C": -0.0,
+   "K": -0.0
+  },
+  "kaybi_asan_en_buyuk": [
+   [
+    2.297,
+    "GOLTS",
+    "2026-02-20",
+    "stop altı çıkış"
+   ]
+  ],
+  "acilis_sl_alti_giris": 6,
+  "acilis_sl_alti_kapanan_sonuc": {
+   "SL": 6
+  },
+  "acilis_sl_alti_alis_gunu_stoptan_satis_kari_tl": 2965.73,
+  "acilis_sl_alti_ornek": [
+   [
+    "TEHOL",
+    "2025-12-31",
+    31.5,
+    32.57716401573672,
+    [
+     [
+      "SL (alış günü)",
+      32.5772
+     ]
+    ],
+    320.36
+   ],
+   [
+    "ARASE",
+    "2026-03-02",
+    75.52727965077524,
+    80.87170314715534,
+    [
+     [
+      "SL (alış günü)",
+      80.8717
+     ]
+    ],
+    1647.94
+   ],
+   [
+    "AKSGY",
+    "2026-05-22",
+    8.600000381469727,
+    8.66982799260043,
+    [
+     [
+      "SL (alış günü)",
+      8.6698
+     ]
+    ],
+    141.46
+   ],
+   [
+    "PEKGY",
+    "2026-09-01",
+    14.180000305175781,
+    14.622423983564167,
+    [
+     [
+      "SL (alış günü)",
+      14.6224
+     ]
+    ],
+    269.51
+   ],
+   [
+    "GESAN",
+    "2026-09-02",
+    74.6500015258789,
+    76.87684001162107,
+    [
+     [
+      "SL (alış günü)",
+      76.8768
+     ]
+    ],
+    248.35
+   ]
+  ],
+  "donem": [
+   "2025-11-14",
+   "2026-11-13"
+  ]
+ },
+ "canli_ortak/son_12_ay/kisitsiz_sl_alti": {
+  "girilen": 2639,
+  "acilis_sl_alti": 32,
+  "sonuclar": {
+   "SL": 32
+  },
+  "alis_gunu_stoptan_satis": 32,
+  "bu_islemlerin_net_toplami_tl": 760549.54
+ },
+ "canli_ortak/2024/mevcut": {
+  "metrik": {
+   "bitis_ozsermaye": 135872.68,
+   "toplam_getiri_%": 35.87,
+   "azami_dusus_%": -15.15,
+   "sortino_yillik": 2.19,
+   "kar_faktoru": 1.344,
+   "ort_R": 0.263,
+   "kapanan_islem": 105,
+   "kazanma_orani_%": 39.0,
+   "nakitle_kucultulen": 7,
+   "sonda_acik_pozisyon": 5,
+   "sonda_gerceklesmemis_tl": 7643.41,
+   "atlanan": {
+    "açılış azami girişin üstünde": 1167,
+    "pozisyon sınırı": 6956,
+    "zaten açık pozisyon": 225,
+    "sektör sınırı": 41,
+    "giriş günü fiyat yok": 21
+   }
+  },
+  "acilan": 110,
+  "baslangic_riski_butceyi_asan": 48,
+  "baslangic_riski_en_yuksek_butce_kati": 1.3677,
+  "baslangic_riski_ornek": [
+   [
+    1.368,
+    "DESPC",
+    "2024-08-06"
+   ],
+   [
+    1.305,
+    "YKBNK",
+    "2024-01-02"
+   ],
+   [
+    1.264,
+    "AKYHO",
+    "2024-07-22"
+   ]
+  ],
+  "giris_ani_portfoy_riski_gercek_en_yuksek_%": 5.599,
+  "gunu": "2024-08-15",
+  "giris_ani_portfoy_riski_%6_asan_gun": 0,
+  "gun_sonu_acik_risk_en_yuksek_%": 5.549,
+  "kaybi_butceyi_asan_kapanan": 31,
+  "kapanan": 105,
+  "kaybi_asan_nedenleri": {
+   "giriş farkı": 16,
+   "giriş farkı + stop altı çıkış": 10,
+   "stop altı çıkış": 5
+  },
+  "kaybi_asan_bilesen_toplam_tl": {
+   "L": 46876.54,
+   "B": 38821.66,
+   "P": 38798.75,
+   "E": 3551.79,
+   "G": 4515.91,
+   "C": 10.66,
+   "K": -0.56
+  },
+  "kaybi_asan_en_buyuk": [
+   [
+    2.436,
+    "TEZOL",
+    "2024-05-09",
+    "giriş farkı + stop altı çıkış"
+   ],
+   [
+    2.054,
+    "TSGYO",
+    "2024-07-30",
+    "stop altı çıkış"
+   ],
+   [
+    1.571,
+    "GLYHO",
+    "2024-07-24",
+    "stop altı çıkış"
+   ],
+   [
+    1.368,
+    "DESPC",
+    "2024-08-06",
+    "giriş farkı"
+   ],
+   [
+    1.366,
+    "ESCOM",
+    "2024-04-30",
+    "giriş farkı + stop altı çıkış"
+   ]
+  ],
+  "acilis_sl_alti_giris": 1,
+  "acilis_sl_alti_kapanan_sonuc": {
+   "SL": 1
+  },
+  "acilis_sl_alti_alis_gunu_stoptan_satis_kari_tl": 248.89,
+  "acilis_sl_alti_ornek": [
+   [
+    "KTSKR",
+    "2024-08-05",
+    66.10919910878857,
+    66.78368175186809,
+    [
+     [
+      "SL (alış günü)",
+      66.7837
+     ]
+    ],
+    175.71
+   ]
+  ],
+  "donem": [
+   "2024-01-01",
+   "2024-12-31"
+  ]
+ },
+ "canli_ortak/2024/alternatif": {
+  "metrik": {
+   "bitis_ozsermaye": 128914.19,
+   "toplam_getiri_%": 28.91,
+   "azami_dusus_%": -12.3,
+   "sortino_yillik": 2.178,
+   "kar_faktoru": 1.35,
+   "ort_R": 0.263,
+   "kapanan_islem": 105,
+   "kazanma_orani_%": 39.0,
+   "nakitle_kucultulen": 0,
+   "sonda_acik_pozisyon": 5,
+   "sonda_gerceklesmemis_tl": 6435.31,
+   "atlanan": {
+    "açılış azami girişin üstünde": 1167,
+    "pozisyon sınırı": 6956,
+    "zaten açık pozisyon": 225,
+    "sektör sınırı": 41,
+    "giriş günü fiyat yok": 21
+   }
+  },
+  "acilan": 110,
+  "baslangic_riski_butceyi_asan": 0,
+  "baslangic_riski_en_yuksek_butce_kati": 0.9935,
+  "baslangic_riski_ornek": [],
+  "giris_ani_portfoy_riski_gercek_en_yuksek_%": 4.497,
+  "gunu": "2024-08-19",
+  "giris_ani_portfoy_riski_%6_asan_gun": 0,
+  "gun_sonu_acik_risk_en_yuksek_%": 4.437,
+  "kaybi_butceyi_asan_kapanan": 4,
+  "kapanan": 105,
+  "kaybi_asan_nedenleri": {
+   "giriş farkı + stop altı çıkış": 2,
+   "stop altı çıkış": 2
+  },
+  "kaybi_asan_bilesen_toplam_tl": {
+   "L": 7385.5,
+   "B": 4945.49,
+   "P": 3981.46,
+   "E": 132.27,
+   "G": 3271.38,
+   "C": 0.4,
+   "K": -0.0
+  },
+  "kaybi_asan_en_buyuk": [
+   [
+    1.935,
+    "TEZOL",
+    "2024-05-09",
+    "giriş farkı + stop altı çıkış"
+   ],
+   [
+    1.61,
+    "TSGYO",
+    "2024-07-30",
+    "stop altı çıkış"
+   ],
+   [
+    1.323,
+    "GLYHO",
+    "2024-07-24",
+    "stop altı çıkış"
+   ],
+   [
+    1.092,
+    "ESCOM",
+    "2024-04-30",
+    "giriş farkı + stop altı çıkış"
+   ]
+  ],
+  "acilis_sl_alti_giris": 1,
+  "acilis_sl_alti_kapanan_sonuc": {
+   "SL": 1
+  },
+  "acilis_sl_alti_alis_gunu_stoptan_satis_kari_tl": 196.95,
+  "acilis_sl_alti_ornek": [
+   [
+    "KTSKR",
+    "2024-08-05",
+    66.10919910878857,
+    66.78368175186809,
+    [
+     [
+      "SL (alış günü)",
+      66.7837
+     ]
+    ],
+    139.04
+   ]
+  ],
+  "donem": [
+   "2024-01-01",
+   "2024-12-31"
+  ]
+ },
+ "canli_ortak/2024/kisitsiz_sl_alti": {
+  "girilen": 2752,
+  "acilis_sl_alti": 22,
+  "sonuclar": {
+   "SL": 22
+  },
+  "alis_gunu_stoptan_satis": 22,
+  "bu_islemlerin_net_toplami_tl": 8262.33
+ },
+ "yalniz_teknik/son_12_ay/mevcut": {
+  "metrik": {
+   "bitis_ozsermaye": 75289.98,
+   "toplam_getiri_%": -24.71,
+   "azami_dusus_%": -39.33,
+   "sortino_yillik": -1.54,
+   "kar_faktoru": 0.761,
+   "ort_R": -0.189,
+   "kapanan_islem": 141,
+   "kazanma_orani_%": 26.2,
+   "nakitle_kucultulen": 12,
+   "sonda_acik_pozisyon": 2,
+   "sonda_gerceklesmemis_tl": 704.62,
+   "atlanan": {
+    "pozisyon sınırı": 3529,
+    "açılış azami girişin üstünde": 613,
+    "zaten açık pozisyon": 183,
+    "sektör sınırı": 43
+   }
+  },
+  "acilan": 143,
+  "baslangic_riski_butceyi_asan": 57,
+  "baslangic_riski_en_yuksek_butce_kati": 1.3337,
+  "baslangic_riski_ornek": [
+   [
+    1.334,
+    "GSDDE",
+    "2026-09-16"
+   ],
+   [
+    1.302,
+    "CIMSA",
+    "2026-05-13"
+   ],
+   [
+    1.263,
+    "GESAN",
+    "2026-07-27"
+   ]
+  ],
+  "giris_ani_portfoy_riski_gercek_en_yuksek_%": 5.414,
+  "gunu": "2026-10-15",
+  "giris_ani_portfoy_riski_%6_asan_gun": 0,
+  "gun_sonu_acik_risk_en_yuksek_%": 5.281,
+  "kaybi_butceyi_asan_kapanan": 49,
+  "kapanan": 141,
+  "kaybi_asan_nedenleri": {
+   "giriş farkı": 27,
+   "giriş farkı + stop altı çıkış": 15,
+   "stop altı çıkış": 7
+  },
+  "kaybi_asan_bilesen_toplam_tl": {
+   "L": 59110.96,
+   "B": 51327.44,
+   "P": 50958.1,
+   "E": 4615.38,
+   "G": 3523.89,
+   "C": 13.85,
+   "K": -0.25
+  },
+  "kaybi_asan_en_buyuk": [
+   [
+    2.49,
+    "LILAK",
+    "2026-02-26",
+    "stop altı çıkış"
+   ],
+   [
+    1.752,
+    "CATES",
+    "2026-04-30",
+    "stop altı çıkış"
+   ],
+   [
+    1.334,
+    "GSDDE",
+    "2026-09-16",
+    "giriş farkı + stop altı çıkış"
+   ],
+   [
+    1.302,
+    "CIMSA",
+    "2026-05-13",
+    "giriş farkı + stop altı çıkış"
+   ],
+   [
+    1.263,
+    "GESAN",
+    "2026-07-27",
+    "giriş farkı"
+   ]
+  ],
+  "acilis_sl_alti_giris": 5,
+  "acilis_sl_alti_kapanan_sonuc": {
+   "SL": 5
+  },
+  "acilis_sl_alti_alis_gunu_stoptan_satis_kari_tl": 5565.82,
+  "acilis_sl_alti_ornek": [
+   [
+    "TEHOL",
+    "2025-12-31",
+    31.5,
+    32.57716401573672,
+    [
+     [
+      "SL (alış günü)",
+      32.5772
+     ]
+    ],
+    393.08
+   ],
+   [
+    "ARASE",
+    "2026-03-02",
+    75.52727965077524,
+    80.87170314715534,
+    [
+     [
+      "SL (alış günü)",
+      80.8717
+     ]
+    ],
+    2343.97
+   ],
+   [
+    "YATAS",
+    "2026-05-11",
+    44.060001373291016,
+    46.27646740279468,
+    [
+     [
+      "SL (alış günü)",
+      46.2765
+     ]
+    ],
+    867.08
+   ],
+   [
+    "GESAN",
+    "2026-09-02",
+    74.6500015258789,
+    76.87684001162107,
+    [
+     [
+      "SL (alış günü)",
+      76.8768
+     ]
+    ],
+    326.46
+   ],
+   [
+    "IEYHO",
+    "2026-09-17",
+    186.3000030517578,
+    199.16388823351514,
+    [
+     [
+      "SL (alış günü)",
+      199.1639
+     ]
+    ],
+    1341.24
+   ]
+  ],
+  "donem": [
+   "2025-11-14",
+   "2026-11-13"
+  ]
+ },
+ "yalniz_teknik/son_12_ay/alternatif": {
+  "metrik": {
+   "bitis_ozsermaye": 80408.04,
+   "toplam_getiri_%": -19.59,
+   "azami_dusus_%": -33.26,
+   "sortino_yillik": -1.464,
+   "kar_faktoru": 0.767,
+   "ort_R": -0.189,
+   "kapanan_islem": 141,
+   "kazanma_orani_%": 26.2,
+   "nakitle_kucultulen": 0,
+   "sonda_acik_pozisyon": 2,
+   "sonda_gerceklesmemis_tl": 641.2,
+   "atlanan": {
+    "pozisyon sınırı": 3529,
+    "açılış azami girişin üstünde": 613,
+    "zaten açık pozisyon": 183,
+    "sektör sınırı": 43
+   }
+  },
+  "acilan": 143,
+  "baslangic_riski_butceyi_asan": 0,
+  "baslangic_riski_en_yuksek_butce_kati": 0.9966,
+  "baslangic_riski_ornek": [],
+  "giris_ani_portfoy_riski_gercek_en_yuksek_%": 4.529,
+  "gunu": "2026-10-15",
+  "giris_ani_portfoy_riski_%6_asan_gun": 0,
+  "gun_sonu_acik_risk_en_yuksek_%": 4.288,
+  "kaybi_butceyi_asan_kapanan": 3,
+  "kapanan": 141,
+  "kaybi_asan_nedenleri": {
+   "stop altı çıkış": 3
+  },
+  "kaybi_asan_bilesen_toplam_tl": {
+   "L": 4695.21,
+   "B": 3402.16,
+   "P": 2592.48,
+   "E": -0.0,
+   "G": 2102.73,
+   "C": -0.0,
+   "K": 0.01
+  },
+  "kaybi_asan_en_buyuk": [
+   [
+    1.801,
+    "LILAK",
+    "2026-02-26",
+    "stop altı çıkış"
+   ],
+   [
+    1.337,
+    "CATES",
+    "2026-04-30",
+    "stop altı çıkış"
+   ],
+   [
+    1.005,
+    "DESA",
+    "2026-05-07",
+    "stop altı çıkış"
+   ]
+  ],
+  "acilis_sl_alti_giris": 5,
+  "acilis_sl_alti_kapanan_sonuc": {
+   "SL": 5
+  },
+  "acilis_sl_alti_alis_gunu_stoptan_satis_kari_tl": 4489.9,
+  "acilis_sl_alti_ornek": [
+   [
+    "TEHOL",
+    "2025-12-31",
+    31.5,
+    32.57716401573672,
+    [
+     [
+      "SL (alış günü)",
+      32.5772
+     ]
+    ],
+    317.41
+   ],
+   [
+    "ARASE",
+    "2026-03-02",
+    75.52727965077524,
+    80.87170314715534,
+    [
+     [
+      "SL (alış günü)",
+      80.8717
+     ]
+    ],
+    1786.13
+   ],
+   [
+    "YATAS",
+    "2026-05-11",
+    44.060001373291016,
+    46.27646740279468,
+    [
+     [
+      "SL (alış günü)",
+      46.2765
+     ]
+    ],
+    714.92
+   ],
+   [
+    "GESAN",
+    "2026-09-02",
+    74.6500015258789,
+    76.87684001162107,
+    [
+     [
+      "SL (alış günü)",
+      76.8768
+     ]
+    ],
+    276.39
+   ],
+   [
+    "IEYHO",
+    "2026-09-17",
+    186.3000030517578,
+    199.16388823351514,
+    [
+     [
+      "SL (alış günü)",
+      199.1639
+     ]
+    ],
+    1156.67
+   ]
+  ],
+  "donem": [
+   "2025-11-14",
+   "2026-11-13"
+  ]
+ },
+ "yalniz_teknik/son_12_ay/kisitsiz_sl_alti": {
+  "girilen": 1691,
+  "acilis_sl_alti": 24,
+  "sonuclar": {
+   "SL": 24
+  },
+  "alis_gunu_stoptan_satis": 24,
+  "bu_islemlerin_net_toplami_tl": 4361.72
+ },
+ "yalniz_teknik/2024/mevcut": {
+  "metrik": {
+   "bitis_ozsermaye": 125910.93,
+   "toplam_getiri_%": 25.91,
+   "azami_dusus_%": -15.17,
+   "sortino_yillik": 1.792,
+   "kar_faktoru": 1.237,
+   "ort_R": 0.183,
+   "kapanan_islem": 110,
+   "kazanma_orani_%": 36.4,
+   "nakitle_kucultulen": 6,
+   "sonda_acik_pozisyon": 5,
+   "sonda_gerceklesmemis_tl": 5252.5,
+   "atlanan": {
+    "açılış azami girişin üstünde": 695,
+    "sektör sınırı": 33,
+    "pozisyon sınırı": 3810,
+    "zaten açık pozisyon": 165,
+    "giriş günü fiyat yok": 14
+   }
+  },
+  "acilan": 115,
+  "baslangic_riski_butceyi_asan": 50,
+  "baslangic_riski_en_yuksek_butce_kati": 1.3673,
+  "baslangic_riski_ornek": [
+   [
+    1.367,
+    "DESPC",
+    "2024-08-06"
+   ],
+   [
+    1.264,
+    "AKYHO",
+    "2024-07-22"
+   ],
+   [
+    1.224,
+    "CVKMD",
+    "2024-08-01"
+   ]
+  ],
+  "giris_ani_portfoy_riski_gercek_en_yuksek_%": 5.393,
+  "gunu": "2024-08-12",
+  "giris_ani_portfoy_riski_%6_asan_gun": 0,
+  "gun_sonu_acik_risk_en_yuksek_%": 5.367,
+  "kaybi_butceyi_asan_kapanan": 33,
+  "kapanan": 110,
+  "kaybi_asan_nedenleri": {
+   "giriş farkı": 22,
+   "giriş farkı + stop altı çıkış": 9,
+   "stop altı çıkış": 2
+  },
+  "kaybi_asan_bilesen_toplam_tl": {
+   "L": 46045.35,
+   "B": 41036.35,
+   "P": 40951.17,
+   "E": 3991.36,
+   "G": 1091.19,
+   "C": 11.97,
+   "K": -0.35
+  },
+  "kaybi_asan_en_buyuk": [
+   [
+    1.783,
+    "CVKMD",
+    "2024-08-01",
+    "giriş farkı + stop altı çıkış"
+   ],
+   [
+    1.367,
+    "DESPC",
+    "2024-08-06",
+    "giriş farkı"
+   ],
+   [
+    1.264,
+    "AKYHO",
+    "2024-07-22",
+    "giriş farkı"
+   ],
+   [
+    1.22,
+    "ISDMR",
+    "2024-07-18",
+    "giriş farkı"
+   ],
+   [
+    1.208,
+    "PGSUS",
+    "2024-03-13",
+    "giriş farkı"
+   ]
+  ],
+  "acilis_sl_alti_giris": 0,
+  "acilis_sl_alti_kapanan_sonuc": {},
+  "acilis_sl_alti_alis_gunu_stoptan_satis_kari_tl": 0,
+  "acilis_sl_alti_ornek": [],
+  "donem": [
+   "2024-01-01",
+   "2024-12-31"
+  ]
+ },
+ "yalniz_teknik/2024/alternatif": {
+  "metrik": {
+   "bitis_ozsermaye": 120186.99,
+   "toplam_getiri_%": 20.19,
+   "azami_dusus_%": -12.78,
+   "sortino_yillik": 1.711,
+   "kar_faktoru": 1.234,
+   "ort_R": 0.183,
+   "kapanan_islem": 110,
+   "kazanma_orani_%": 36.4,
+   "nakitle_kucultulen": 0,
+   "sonda_acik_pozisyon": 5,
+   "sonda_gerceklesmemis_tl": 4219.95,
+   "atlanan": {
+    "açılış azami girişin üstünde": 695,
+    "sektör sınırı": 33,
+    "pozisyon sınırı": 3810,
+    "zaten açık pozisyon": 165,
+    "giriş günü fiyat yok": 14
+   }
+  },
+  "acilan": 115,
+  "baslangic_riski_butceyi_asan": 0,
+  "baslangic_riski_en_yuksek_butce_kati": 0.992,
+  "baslangic_riski_ornek": [],
+  "giris_ani_portfoy_riski_gercek_en_yuksek_%": 4.336,
+  "gunu": "2024-01-04",
+  "giris_ani_portfoy_riski_%6_asan_gun": 0,
+  "gun_sonu_acik_risk_en_yuksek_%": 4.318,
+  "kaybi_butceyi_asan_kapanan": 1,
+  "kapanan": 110,
+  "kaybi_asan_nedenleri": {
+   "giriş farkı + stop altı çıkış": 1
+  },
+  "kaybi_asan_bilesen_toplam_tl": {
+   "L": 1739.96,
+   "B": 1244.93,
+   "P": 975.66,
+   "E": 218.13,
+   "G": 545.52,
+   "C": 0.65,
+   "K": -0.0
+  },
+  "kaybi_asan_en_buyuk": [
+   [
+    1.398,
+    "CVKMD",
+    "2024-08-01",
+    "giriş farkı + stop altı çıkış"
+   ]
+  ],
+  "acilis_sl_alti_giris": 0,
+  "acilis_sl_alti_kapanan_sonuc": {},
+  "acilis_sl_alti_alis_gunu_stoptan_satis_kari_tl": 0,
+  "acilis_sl_alti_ornek": [],
+  "donem": [
+   "2024-01-01",
+   "2024-12-31"
+  ]
+ },
+ "yalniz_teknik/2024/kisitsiz_sl_alti": {
+  "girilen": 1781,
+  "acilis_sl_alti": 20,
+  "sonuclar": {
+   "SL": 20
+  },
+  "alis_gunu_stoptan_satis": 20,
+  "bu_islemlerin_net_toplami_tl": 7996.15
+ }
+}

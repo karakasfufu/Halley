@@ -1915,3 +1915,10 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Yeni tespit (değiştirilmedi): adet planlanan girişle hesaplanıyor, alış açılıştan → SL'de kayıp %1'i aşabiliyor
   (ortak 12 ay 43/104, en çok %2,31). Ayrıca açılışta boşluk (GOLTS −3,15 R).
 - Dönem sonu pozisyonlar zorla kapatılmadı. Ayrıntı: HALLEY2_DENETIM_RAPORU Ek H2.
+
+## 2026-11-16 — FAZ 2 Ek H3: risk hesabı farkı (dal faz2-portfoy; araştırma, canlı kural değişmedi, geriye dönük doğrulama)
+- portfoy.py: adet_temeli seçeneği (varsayılan planlanan_giris = mevcut; orijinal metrikler 4/4 birebir) + gerçek dolumla başlangıç/giriş anı risk tanılaması.
+- Mevcut: başlangıç riski bütçeyi aşan ~%40 (ör. ortak 12 ay 57/141, en çok 1,37 kat); %1 üstü kayıp 43/136 (27 giriş farkı, 4 stop altı, 12 birleşim, maliyet 0). Portföy %6 gerçek dolumla da aşılmadı (en çok %5,60).
+- Alternatif (azami girişle önceden adet, açılış seansına azami limitli emir): başlangıç aşımı 0; kalan aşım yalnız stop boşluğu (1–4 işlem). Aynı işlemler, küçük pozisyon: ortak 12 ay −%22,7 → −%19,8; 2024 +%35,9 → +%28,9; Sortino/PF ~aynı. Otomatik seçilmedi.
+- Stop altı açılış: alt sınır yok; journal alış günü satışı SL fiyatından yazıyor → 'SL' ama kâr (iyimser; ortak 12 ay +3.739 TL). Ayrı düzeltme önerildi, uygulanmadı.
+- RiskTemeli 4 test; portföy 23/23. Ayrıntı: HALLEY2_DENETIM_RAPORU Ek H3.

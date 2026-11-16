@@ -310,6 +310,73 @@ class GelecegeBakmama(unittest.TestCase):
         self.assertLess(t["r"], -1.0)
 
 
+_spec2 = importlib.util.spec_from_file_location("risk_ayristirma", ROOT / "arastirma" / "asama6" / "risk_ayristirma.py")
+ra = importlib.util.module_from_spec(_spec2)
+_spec2.loader.exec_module(ra)
+
+
+class RiskTemeli(unittest.TestCase):
+    """Ek H3: başlangıç riski aşımı ile stop boşluğundan doğan gerçekleşen kayıp aşımı AYRI; stop altı açılış."""
+    AYAR = {"baslangic_sermaye": 10000, "risk_pct": 1.0}
+
+    def _r(self, acilis, ertesi, temel):
+        bars = {"AAA": [bar(D[0], 100, 100, 100, 100), bar(D[1], acilis, acilis + 0.5, acilis - 0.5, acilis), ertesi]}
+        return pf.simule([plan("AAA", D[0], azami=102.0)], bars, D[:3], D[1], D[2], dict(self.AYAR, adet_temeli=temel), SEK)
+
+    def test_default_is_current_behavior(self):
+        self.assertEqual(pf.VARSAYILAN["adet_temeli"], "planlanan_giris")
+        bars = {"AAA": [bar(D[0], 100, 100, 100, 100), bar(D[1], 102, 102.5, 101.5, 102), bar(D[2], 96, 97, 94, 95)]}
+        a = pf.simule([plan("AAA", D[0], azami=102.0)], bars, D[:3], D[1], D[2], self.AYAR, SEK)
+        b = pf.simule([plan("AAA", D[0], azami=102.0)], bars, D[:3], D[1], D[2],
+                      dict(self.AYAR, adet_temeli="planlanan_giris"), SEK)
+        self.assertEqual(a["islemler"], b["islemler"])
+        self.assertEqual(a["egri"], b["egri"])
+        with self.assertRaises(ValueError):
+            pf.simule([], bars, D[:3], D[1], D[2], dict(self.AYAR, adet_temeli="acilis"), SEK)
+
+    def test_initial_risk_exceeds_budget_only_in_current(self):
+        """Açılış 102 (azami), plan girişi 100, SL 95, bütçe 100 TL. Mevcut: 18 adet → gerçek başlangıç riski
+        18 × (7 + 102 × %0,3) = 131,5 > 100. Alternatif: adet azami girişle 13 → 94,98 ≤ 100. Stopta (boşluksuz)
+        gerçekleşen kayıp başlangıç riskine eşit."""
+        ertesi = bar(D[2], 96, 97, 94, 95)                        # boşluk yok: SL 95'ten
+        m = self._r(102, ertesi, "planlanan_giris")["islemler"][0]
+        a = self._r(102, ertesi, "azami_giris")["islemler"][0]
+        self.assertEqual((m["adet"], a["adet"]), (18, 13))
+        self.assertAlmostEqual(m["risk_bas_gercek_tl"], 18 * (7 + 102 * 0.003), places=4)
+        self.assertGreater(m["risk_bas_gercek_tl"], m["butce_tl"])
+        self.assertLessEqual(a["risk_bas_gercek_tl"], a["butce_tl"])
+        self.assertAlmostEqual(-m["net_tl"], m["risk_bas_gercek_tl"], places=1)
+        self.assertLessEqual(-a["net_tl"], a["butce_tl"])
+        k = ra.ayristir(m)
+        self.assertEqual(k["etiket"], "giriş farkı")
+        self.assertAlmostEqual(k["G"], 0.0)
+        self.assertAlmostEqual(k["K"], 0.0, places=1)              # tam SL: bileşenler kaybı açıklar
+
+    def test_gap_loss_exceeds_budget_even_in_alternative(self):
+        """Başlangıç riski bütçe içinde (alternatif), ama ertesi açılış SL'nin altında (85): gerçekleşen kayıp bütçeyi
+        aşar. Bu, başlangıç riski aşımından AYRI bir olgudur ve adet hesabıyla önlenemez."""
+        a = self._r(101, bar(D[2], 85, 86, 84, 85), "azami_giris")["islemler"][0]
+        self.assertLessEqual(a["risk_bas_gercek_tl"], a["butce_tl"])
+        self.assertGreater(-a["net_tl"], a["butce_tl"])
+        k = ra.ayristir(a)
+        self.assertIn("stop altı çıkış", k["etiket"])
+        self.assertAlmostEqual(k["G"], a["adet"] * (95 - 85), places=6)
+        self.assertLessEqual(k["P"] + k["E"] + k["C"], a["butce_tl"] + 1e-6)   # aşımın tamamı boşluktan
+
+    def test_open_below_stop_current_handling(self):
+        """MEVCUT davranışın belgelenmesi (değiştirilmedi): açılış SL'nin altında (94 < 95) olsa da alış yapılır
+        (ready.opening_check yalnız azami üstünü iptal eder). journal 'alış günü' kuralı satışı STOP fiyatından (95)
+        sayar; gerçekte satış açılış civarında olurdu. Sonuç 'SL' görünür ama net KÂR yazılır (iyimser)."""
+        for temel in ("planlanan_giris", "azami_giris"):
+            r = self._r(94, bar(D[2], 95, 96, 94, 95), temel)
+            t = r["islemler"][0]
+            self.assertTrue(t["acilis_sl_alti"])
+            self.assertEqual(t["sonuc"], "SL")
+            self.assertEqual(t["cikis_gunu"], D[1])
+            self.assertEqual([(b["neden"], b["fiyat"]) for b in t["bacaklar"]], [("SL (alış günü)", 95.0)])
+            self.assertGreater(t["net_tl"], 0)
+
+
 class Takvim(unittest.TestCase):
     def test_calendar_is_union_and_guard_catches_skipped_day(self):
         """XU100'de olmayan bir işlem günü (25 Aralık örneği) takvimden düşmemeli; düşerse sıra koruması hata verir."""
