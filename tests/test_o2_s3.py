@@ -121,7 +121,8 @@ class GercekAlis(Temel):
     def test_real_buy_labels_and_auto_versions(self):
         bar(self.conn, "GRC", GUN, 9.9, 10.2, 9.8, 10.0)
         bar(self.conn, "GRC", GUN2, 10.0, 12.5, 9.9, 12.2)
-        g = self.jr("gercek", fill=9.95, fill_day=GUN, durum="açık")
+        g = self.jr("gercek", fill=9.95, fill_day=GUN, durum="bekliyor")       # yeni kaydedilen gerçek alış
+        g_eski = self.jr("gercek", fill=9.95, fill_day=GUN, durum="açık", senaryo="kirilim")   # geçişten önce açık
         a_yeni = self.jr("otomatik", durum="bekliyor")
         a_eski = self.jr("otomatik", durum="açık", sonuc_json=json.dumps({"durum": "açık", "giris_fiyati": 9.9}),
                          senaryo="geri_cekilme")
@@ -144,6 +145,9 @@ class GercekAlis(Temel):
         self.assertEqual(res[a_yeni]["kural"], "s3")
         self.assertEqual(res[a_yeni]["gerceklesme"]["alis"], "kural_simulasyonu")
         self.assertNotIn("kural", res[a_eski])                    # önceden açık sanal pozisyon s2 ile sürdü
+        eski_g = json.loads(self.conn.execute("SELECT sonuc_json FROM trade_journal WHERE id=?", (g_eski,)).fetchone()[0])
+        self.assertNotIn("kural", eski_g)                         # önceden açık GERÇEK alış da s2 ile sürdü
+        self.assertEqual(eski_g["giris_fiyati"], 9.95)
 
     def test_record_real_still_rejects_below_stop(self):
         a = self.jr("otomatik")

@@ -55,9 +55,10 @@ GIRIS_KAYNAGI = {"azami_giris": "azami girişe göre ön hesap (en kötü giriş
 def kural_sec(rec: Dict, girilmis=GIRILMIS_STATES) -> str:
     """Bir kaydın hangi gerçekleşme kuralıyla değerlendirileceği (O2; sürüm sabitleme):
     - sonucunda saklı kural varsa o (bir kez s3 ile değerlendirilen kayıt s3 kalır);
-    - kullanıcının kaydettiği gerçek alış → s3 (alış korunur, çıkış 'varsayımsal' etiketlenir);
-    - s3'ten ÖNCE girilmiş (açık) sanal pozisyon → s2 ile sürer (önceden açık pozisyon; geçmişe dönük değişmez);
-    - henüz girilmemiş (bekliyor / aday) yeni öneri → s3."""
+    - s3'ten ÖNCE girilmiş (açık) pozisyon — sanal ya da kullanıcının gerçek alışı — s2 ile sürer (önceden açık
+      pozisyon; gerçekleşmiş işlemin kuralı geçmişe dönük değişmez);
+    - henüz değerlendirilmemiş yeni kayıt (bekliyor / aday; yeni kaydedilen gerçek alış da 'bekliyor' başlar) → s3
+      (gerçek alışta alış korunur, çıkış 'varsayımsal' etiketlenir)."""
     s = rec.get("sonuc_json")
     try:
         saklı = (json.loads(s) or {}).get("kural") if s else None
@@ -65,8 +66,6 @@ def kural_sec(rec: Dict, girilmis=GIRILMIS_STATES) -> str:
         saklı = None
     if saklı in ("s2", "s3"):
         return saklı
-    if rec.get("kaynak") == "gercek":
-        return yeni_kural()
     return "s2" if rec.get("durum") in girilmis else yeni_kural()
 
 
