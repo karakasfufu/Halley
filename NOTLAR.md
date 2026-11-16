@@ -1965,3 +1965,10 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Ön kayıt c1a4192 (sonuçlardan önce); rejim = canlı regime.py trend × oynaklık (karar anına kadarki veri; genişlik kullanılmadı); 30.470 tekil işlem (canli_ortak, s3 stop altı 217 çıkarıldı); gün kümesi bootstrap %95; n<30 / gün<20 YETERSİZ.
 - 23 ana grup, 15 yeterli; 8'inde R aralığı sıfırı dışlıyor ama aynı hisse 10 gün içinde tekrar %54–83 → bağımlı; anlamlılık iddiası yok. Kırılım tekil R +0,33 > geri çekilme +0,07; geri çekilme × yükseliş × yüksek oynaklık −0,35; dönemler arasında değişken; düşüş rejimi az.
 - Sonuç: uygulanabilir katkı yok; hipotez olarak kaydedildi. Portföy metriği çıkarılmadı. 629 test OK. Ayrıntı: Ek J.
+
+## 2026-11-16 18:25 — FAZ 1 canlı kanıtı: v2 sonrası İLK akşam analizi (salt-okunur bekçi raporu)
+- Akşam çalıştırması 18:21–18:23 (run 4); fiyatlar 16.11'e güncellendi; integrity ok.
+- YENİ s2 sözleşmeli tahminler: 3 (INVES, ENERY, METRO; kural s2, komisyon %0,2, kayma %0,1, protokol ayar_tahmin_ani_v1; giriş 17.11) → sözleşme alanları canlıda doğru dolduğu GÖZLENDİ.
+- BAHKM/ENERY (16.11 girişli): hazır fırsat durumu 'giris' (açılış ≤ azami), tahmin açık; nihai sonuç yok (beklenen: henüz TP/SL/30 gün yok). v1 sütun özeti d5d7973ca0bbe41e değişmedi.
+- Sonuç 0, ayrı değerlendirme 0, olay 0 (hata yok). Kapsam 5/5.
+- HENÜZ GÖZLENMEYEN: gerçek sonuçlandırma (TP/SL), yarın sabah kontrolü (17.11), s1→s2 yeniden değerlendirme yolu (s1 sonucu yok). FAZ 1 kabul edilmedi.
