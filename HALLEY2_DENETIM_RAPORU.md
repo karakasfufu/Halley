@@ -1884,3 +1884,71 @@ grubunda kalır. Tam bilgili yeni tahminlerle aynı performans grubunda birleşm
 uydurmaz; kullanılan maliyetin kaynağı sonuç satırına yazılır.
 
 Geçiş ayrıntıları ve kanıtları aşağıdaki bölümlerde.
+
+## G1. Canlıya geçiş (16.11.2026)
+
+| | |
+|---|---|
+| Canlıya alınan commit | `cb74a3b` (dal `faz1-dogrulama`; `a19593a` + hedef tanımı uyumsuzluğu notu) |
+| Önceki canlı sürüm | `main` `60ff0b2` (kod dosyaları canlıyla birebir; yalnız iki belge dosyası farklıydı) |
+| Fark kapsamı | `app.py`, `bist_haber/db.py`, `bist_haber/defter.py`, `bist_haber/journal.py` (yalnız `tp1_hedefi` alanı), `arastirma/asama6/etiketle.py`, testler, belgeler. **Değişmeyenler:** `ready.py`, `tradeplan.py`, `entries.py`, `signals.py`, `tp1_model.py`, `modeller/`, `analyzer.py`, `ai_service.py`, `watchdog.py`, `pipeline.py`. |
+| Testler (canlıya alınan kod) | `run_offline.py` → **559 test OK**, ağ 0 (`tum_testler_etiket_notu.log`). İlgili 37 test OK. Commit'e testten sonra eklenen yalnız rapor metnidir. |
+| Etkin model parmak izi | `tp1_v1.json` SHA-256 `09f8e5e0b279372663f43d293f6aedbce5a266b7578b6f01dd9954834806feb6`. Geçiş öncesi ve sonrası aynı. `aktif.txt` yok. |
+| Durdurma öncesi | Bugünün sabah kontrolü ve açılış kontrolü tamamdı (`hazir_durum.json`: sabah_gunu ve acilis_gunu 16.11). Analiz yoktu (`analiz_durumu.json` yok). `bist_haber.db-*` yazma günlüğü yoktu. |
+| Durdurma | 10:45:11 (Halley ve okuyucu). Durdurma sonrası da yazma günlüğü yok. |
+| Kod yedeği | `data/yedek/kod_60ff0b2_20261116_104552` (143 dosya; `.env` ve veri hariç). Ayrıca git `60ff0b2`. |
+| Veritabanı yedeği (elle) | `data/yedek/bist_haber_20261116_104552_faz1_v2_oncesi.db`: integrity **ok**, yedek = canlı |
+| Göç | 10:46:13–10:46:17, tek süreç, canlı klasördeki yeni kodla. Sonuç `guncellendi_v2`. Otomatik yedek `bist_haber_20261116_104613_tahmin_defteri_v2_oncesi.db` (integrity **ok**). |
+| Önce/sonra koruma | **22/22 tablo birebir aynı** (169.093 satır; tahmin ve tahmin_sonuc için v1 sütunları). BAHKM ve ENERY v1 sütun özeti `d5d7973ca0bbe41e`, önce = sonra. Eski tahminlerin yeni alanları boş: (1, BAHKM, None×4), (2, ENERY, None×4). |
+| Koruma tetikleyicileri | Canlıdan salt-okunur okundu: 8 tetikleyici (tahmin, tahmin_sonuc, tahmin_degerlendirme, defter_olay; güncelleme ve silme), hepsi `RAISE(ABORT`. Deneme canlının o anki **kopyasında** yapıldı: satır olan tablolarda 8/8 işlem reddedildi; kopya silindi. Canlıya yazılmadı. |
+| Yeniden başlatma | 10:47:03; sağlık OK; 2 okuyucu süreci. Göç tekrarlanmadı (v2 yedeği tek). Kesinti ~2 dk. |
+
+## G2. Geçiş sonrası kontroller (16.11 10:47–10:51)
+
+| Kontrol | Sonuç |
+|---|---|
+| Panel | Performans hatasız. "Hedef tanımı uyumsuzluğu" notu görünüyor. Sürüm grubu "tp1_v1 · özellik 97b3f4 · parametre 22b983 · kural eksik · maliyet eksik (2 tahmin)". Sayılar: Tahmin 2, Sonuçlanan 0, Açık 2, Veri eksik 0, Giriş olmadı 0, İptal/yerini aldı 0, Aynı mum 0. Güven "çok az örnek, karar verilmez". "Dönem dışı karşılaştırma: mevcut değil" notu görünüyor. |
+| Panel = veritabanı | Veritabanında tahmin 2, sonuç 0, değerlendirme 0, olay 0, açık 2. Panelle **eşleşiyor**. |
+| Eski tahminler | Değişmedi: v1 sütun özeti aynı. Sözleşmesiz oldukları için "kural eksik · maliyet eksik" grubunda; yeni tahminlerle birleşmez. |
+| Sayfa yenileme | 3 tam yenilemeden sonra sayılar ve özet aynı (2 / 0 / 0 / 0). |
+| Model, kurallar, eşikler | Model parmak izi aynı; kural ve seçim dosyaları farkta yok. |
+| Yeni tahminlerde sözleşme alanları | **Henüz canlıda gözlenmedi:** geçişten sonra yeni hazır fırsat yazılmadı. İlk yeni tahminler bu akşamki analizde oluşacak; kural s2, komisyon, kayma, protokol alanları dolu olmalı. Testte doğrulandı (`test_costs_frozen_at_prediction_time`). |
+| Kayıt hatası ve kapsam uyarısı | Canlıda hata yok; kapsam 2/2. Uyarının çalışması panel testinde doğrulandı (`test_faz1_ledger_failure_visible_in_panel`). Canlıda hata zorla üretilmedi. |
+| Açık / veri eksik / girişsiz / tamamlanmış | Şu an 2 açık. 16.11 fiyatı akşam analizinde inecek; ayrım o zaman gerçek veride görülecek. |
+| Eski sonuçların korunması, ayrı değerlendirme | Canlıda s1 sonucu yok, bu yüzden ayrı değerlendirme oluşmadı. Test: `test_s1_row_kept_and_s2_evaluation_added`. |
+
+## G3. Uyku olayı ve izleme
+
+- **Olay:** 16.11 01:15 uykusu boşta kalma süresinden değil, kullanıcının bilgisayarı kapatmasından oldu (kullanıcının
+  bildirimi).
+- **Windows kaydı:** Kernel-Power 187: "kullanıcı modu işlemi SetSuspendState çağırdı". Güç planı (salt-okunur): uykudan
+  önce bekleme prizde ve pilde 0 (hiçbir zaman). Güç ayarlarına dokunulmadı.
+- **İzleme:** Salt-okunur iki bekçi kuruldu:
+  - bu akşam (`dongu_aksam_20261116.txt`, en geç 23:30),
+  - yarın sabah (`dongu_sabah_20261117.txt`, en geç 10:30).
+
+  Bekçiler bu oturuma bağlıdır; bilgisayar kapanır ya da oturum biterse onlar da durur. Asıl kanıt Halley'in kendi
+  zaman damgalı kayıtlarıdır (`watch_runs`, `tahmin`, `tahmin_sonuc`, `tahmin_degerlendirme`, `defter_olay`); bekçi
+  durursa sonradan okunabilir. Bekçi betiği bugünkü sabah çalıştırmasıyla denendi ve hatasız rapor üretti.
+- **Döngünün gerçekleşme koşulu:** Bilgisayar açık ve Halley çalışıyor olmalı:
+  - akşam analizi kapanıştan sonra (~18:25),
+  - sabah kontrolü 08:30.
+
+## G4. Geri dönüş durumu
+
+| Seviye | Yöntem |
+|---|---|
+| 1 | Önceki kod (`kod_60ff0b2_…` ya da git `60ff0b2`) canlı klasöre konur. Eski kod v2 şemasıyla çalışır (kopyada sınandı). |
+| 2 | `DROP TABLE defter_olay; DROP TABLE tahmin_degerlendirme;` Eklenen boş sütunlar zararsız kalır (kopyada sınandı). |
+| 3 | Elle yedek geri konur. **Uyarı:** Geçişten sonra yeni kayıtlar oluştuysa (yeni haberler, tahminler, sonuçlar) doğrudan geri yükleme onları kaybettirir. Bu durumda önce 1. ve 2. seviye tercih edilir. |
+
+## G5. Kabul durumu
+
+**FAZ 1 henüz kabule hazır değil.** Gerekçe: geçiş ve geçiş sonrası kontroller başarılı, ama aşağıdakiler **canlıda
+henüz gözlenmedi**:
+
+- yeni (s2, sözleşmeli) tahmin kaydı,
+- gerçek sonuçlandırma (girişsiz, açık ya da tamamlandı),
+- akşam → sabah döngüsü.
+
+Bu kanıtlar akşam analizi ve yarın sabahki kontrolden sonra eklenecek.
