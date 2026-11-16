@@ -33,6 +33,16 @@ CREATE TABLE IF NOT EXISTS ai_calls (
 );
 CREATE INDEX IF NOT EXISTS ix_ai_calls_zaman ON ai_calls(zaman);
 """
+from .harcama import SCHEMA as _HARCAMA_SCHEMA   # O3 (16.11.2026): maliyet rezervasyon defteri (yalnız yeni tablo)
+SCHEMA = SCHEMA + _HARCAMA_SCHEMA
+# Gerçek istemcide parametre desteği süreç boyunca hatırlanır (her yeni LLM nesnesi aynı 400 hatasını yeniden üretmesin)
+_GERCEK_DESTEKSIZ, _GERCEK_DESTEKLI = set(), set()
+# gpt-5 ailesi (düşünen modeller) temperature kabul etmez: canlıda her sürecin ilk çağrısı bu yüzden 400 alıp parametresiz
+# yeniden deneniyordu. Sonuç aynıdır (parametre zaten çıkarılıyordu); yalnız boşa giden ve maliyeti belirsiz sayılan ilk
+# deneme önlenir. Başka parametre / model için öğrenme mekanizması aynen çalışır.
+for _m in {config.MODEL_ANALYSIS, config.MODEL_FILTER}:
+    if str(_m).startswith("gpt-5"):
+        _GERCEK_DESTEKSIZ.add((_m, "temperature"))
 MODULE_TR = {"haber_analizi": "Haber analizi", "derin_inceleme": "Derin yeniden inceleme", "ucuz_test": "Ucuz test",
              "rapor_yorumu": "Rapor yorumu", "kacirilan_aciklama": "Kaçırılan fırsat açıklaması",
              "pilot": "Geçmiş veri pilotu", "takip_haber": "Takip listesi haber analizi",
@@ -73,19 +83,34 @@ def record(modul: str, islem: Optional[str], ref: Optional[str], model: Optional
 class LLM:
     """OpenAI istemcisi (yapılandırılmış JSON). modul: hangi özelliğin çağırdığı (kullanım ekranında görünür)."""
 
-    def __init__(self, modul: str = "genel", client=None, db_path=None):
+    def __init__(self, modul: str = "genel", client=None, db_path=None, butce=None):
         if client is None:
             from openai import OpenAI
-            client = OpenAI()       # OPENAI_API_KEY ortam değişkeninden okunur
+            # O3 (16.11.2026): istemcinin İÇ yeniden denemesi KAPALI: her HTTP denemesi kendi rezervasyonunu ister
+            client = OpenAI(max_retries=0)       # OPENAI_API_KEY ortam değişkeninden okunur
         self.client = client
         self.modul = modul
         self.db_path = db_path
-        self._unsupported = set()   # (model, parametre) çiftleri
+        self.butce = butce          # harcama.Butce — GERÇEK istemcide zorunlu: yoksa ücretli çağrı yapılmaz
+        gercek = is_real(client)
+        self._unsupported = _GERCEK_DESTEKSIZ if gercek else set()   # (model, parametre) çiftleri
+        self._supported = _GERCEK_DESTEKLI if gercek else set()
+
+    def ek_deneme(self, model: str, reasoning_effort: Optional[str] = None) -> int:
+        """Desteği henüz bilinmeyen isteğe bağlı parametre sayısı = bu model için olası ek (400 sonrası) deneme."""
+        keys = ["temperature"] + (["reasoning_effort"] if reasoning_effort else [])
+        return sum(1 for k in keys if (model, k) not in self._unsupported and (model, k) not in getattr(self, "_supported", set()))
 
     def parse(self, model: str, system: str, user: str, schema, reasoning_effort: Optional[str] = None,
               islem: Optional[str] = None, ref: Optional[str] = None):
         from openai import BadRequestError
-        kwargs = dict(model=model, response_format=schema,
+        from . import harcama
+        butce = getattr(self, "butce", None)
+        harcama._YEREL.son_rid = None
+        if butce is None and is_real(self.client):
+            raise harcama.ButceKorumasiYok("ücretli çağrı bütçe koruması (rezervasyon) olmadan yapılamaz")
+        # O3: çıktı (düşünme dahil) API'de sınırlı → rezervasyonun çıktı kısmı kesin üst sınırdır (fiyat varsayımıyla)
+        kwargs = dict(model=model, response_format=schema, max_completion_tokens=harcama.MAX_CIKTI,
                       messages=[{"role": "system", "content": system}, {"role": "user", "content": user}])
         # temperature=0: tutarlılık. reasoning_effort: düşünme miktarı (token/maliyet). Model desteklemiyorsa
         # parametre çıkarılıp yeniden denenir (tekrar sayısı kaydedilir).
@@ -102,11 +127,25 @@ class LLM:
                 return None
         else:
             record = globals()["record"]
+        ust = harcama.cagri_ust_sinir(system, user, schema) if butce is not None else 0.0
+
+        def _kapat(fn, *a):
+            try:
+                fn(butce.db_path, *a)
+            except Exception:
+                pass    # yazılamazsa rezervasyon 'acik' kalır ve TAMAMI harcanmış sayılır (muhafazakâr)
         while True:
+            rid = None
+            if butce is not None:     # her HTTP denemesinden ÖNCE; yetmezse ButceYetersiz (çağrı yapılmaz)
+                rid = harcama.rezerve(butce, ust, modul, islem or "", "" if ref is None else str(ref),
+                                      zarf_id=harcama.aktif_zarf())
+                harcama._YEREL.son_rid = rid
             try:
                 resp = self.client.chat.completions.parse(**kwargs)
                 break
             except BadRequestError as e:
+                if rid is not None:
+                    _kapat(harcama.belirsiz, rid, str(e))      # faturalandı mı bilinmez → sıfır sayılmaz
                 bad = [k for k in optional if k in kwargs and k in str(e)]
                 if not bad:
                     record(modul, islem, ref, model, 0, 0, "hata", str(e), tries,
@@ -116,13 +155,24 @@ class LLM:
                 for k in bad:
                     self._unsupported.add((model, k))
                     kwargs.pop(k)
-            except Exception as e:
+            except BaseException as e:      # zaman aşımı, bağlantı, kesinti: maliyet BELİRSİZ (tamamı sayılır)
+                if rid is not None:
+                    _kapat(harcama.belirsiz, rid, str(e) or type(e).__name__)
                 record(modul, islem, ref, model, 0, 0, "hata", str(e), tries, int((time.time() - t0) * 1000),
                        db)
                 raise
+        sup = getattr(self, "_supported", None)
+        for k in optional:
+            if k in kwargs and sup is not None:
+                sup.add((model, k))
         msg = resp.choices[0].message
         u = resp.usage
         tin, tout = (u.prompt_tokens if u else 0), (u.completion_tokens if u else 0)
+        if rid is not None:
+            if u is None:
+                _kapat(harcama.belirsiz, rid, "kullanım bilgisi dönmedi")
+            else:
+                _kapat(harcama.tamamla, rid, usd(tin, tout))
         ms = int((time.time() - t0) * 1000)
         if msg.refusal:
             record(modul, islem, ref, model, tin, tout, "hata", f"model reddetti: {msg.refusal}", tries, ms,

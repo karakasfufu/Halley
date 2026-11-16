@@ -5187,3 +5187,204 @@ testle doğrulandı: iki aynı haber → tek çağrı.
 - Canlıda ilk analiz kullanıcının düğmesiyle, günlük sınır içinde yapılır.
 
 **Onay beklenen:** O3'ün canlıya geçişi. Diğer entegrasyonlar uygulanmadı.
+
+---
+
+# EK O-3b (16.11.2026) — O3 son düzeltmeleri: kesin bütçe rezervasyonu ve güncellik/kapsam ayrımı (dal `o3-haber`)
+
+**Konumu:**
+
+- Canlı kod ve canlı veritabanı **değişmedi**; müşteri sürümü yok.
+- **Ücretli API çağrısı yapılmadı.** Bütün testler OpenAI istemcisini taklit ediyor.
+- O3 canlıya alınmadı. Kontrollü geçiş onayı bekleniyor.
+- **Bu ek, Ek O-3'ün iki maddesinin yerine geçer:**
+  - "Bütçe verilmeyen yollarda davranış aynı kaldı" artık geçersiz.
+  - "İlk haberin tahmin hatası kadar aşım riski" artık geçersiz.
+
+## O3b.1 Bütçe koruması bütün üretim çağrılarını kapsıyor
+
+| Ücretli yol | Önce | Şimdi |
+|---|---|---|
+| "Haberleri güncelle" (`pipeline.update_all`) | aylık + günlük, tahmine dayalı | rezervasyon (aylık + günlük) |
+| Seçili haber analizi (panel) | aylık + günlük, tahmine dayalı | rezervasyon |
+| Sabah haber kontrolü / takip analizi (ikisi kapalı) | aylık + günlük, tahmine dayalı | rezervasyon |
+| Derin yeniden inceleme | yalnız aylık, tahmine dayalı | rezervasyon (aylık + günlük) |
+| Ucuz test | **bütçe yoktu; maliyeti hiçbir kayda yazılmıyordu** | rezervasyon; maliyet defterde sayılmaya devam eder |
+| Rapor yorumu / kaçırılan açıklaması | aylık `yz_butce_usd`, tahmine dayalı | rezervasyon (`yz_butce_usd`) |
+| Komut satırı (`python -m bist_haber analyze`) | **bütçe yoktu** | rezervasyon (üretim bütçesi) |
+
+**Kurallar:**
+
+- `analyze()` içinde aylık bütçe verilmemesi sınırsız harcama anlamına **gelmez**. Bu durumda Ayarlar'daki
+  `haber_butce_usd` ve `haber_gunluk_butce_usd` kullanılır.
+- Gerçek bir OpenAI istemcisi bütçesiz çağrı yapmaz; `ButceKorumasiYok` hatası verir ve çağrı hiç gönderilmez. Bu kural
+  `ai_service.LLM` katmanında olduğu için yeni eklenecek bir yol da korumanın dışında kalamaz.
+- **Açık istisnalar:**
+  - `butcesiz_izin=True`: yalnız testlerdeki sahte istemciler. Gerçek istemci bu bayrakla bile rezervasyonsuz çağrı yapmaz.
+  - Geçmiş veri pilotu (`backtest.PilotLLM`): kendi ayrı 1 $ defteri var; aynı muhafazakâr yöntemi zaten kullanıyordu.
+    Değişmedi.
+
+## O3b.2 Muhafazakâr rezervasyon (`bist_haber/harcama.py`)
+
+**Bir çağrının üst sınırı:**
+
+    (UTF-8 bayt[sistem + kullanıcı mesajı + JSON şeması] + 4096) × 0,25 $/1M  +  16.000 × 2,00 $/1M
+
+- **Girdi:** OpenAI'nin bayt tabanlı tokenlaştırmasında bir token en az bir bayttır. Bu yüzden token sayısı bayt
+  sayısını geçemez. 4096 bayt, mesaj biçimi için paydır.
+- **Çıktı:** Düşünme tokenları dahil, API'de `max_completion_tokens = 16.000` ile sınırlandı. Bu sınır her istekte
+  zorunlu olarak gönderilir. Canlıda gözlenen en büyük çıktı haber başına 14.334 token (iki çağrı toplamı).
+- **İstemcinin iç yeniden denemesi kapatıldı** (`OpenAI(max_retries=0)`). Koddaki her yeni deneme ayrı rezervasyon alır.
+
+**İş zarfı (kalite profilindeki ek çağrılar ve yeniden denemeler):**
+
+- Bir haber işinin toplam üst sınırı, iş **başlamadan önce** tek seferde ayrılır (`analyzer.is_ust_siniri`). Toplam
+  şunları kapsar:
+  - KAP dışı haberde ön eleme;
+  - tam analiz;
+  - profil ikinci görüş istiyorsa ikinci görüş;
+  - desteği henüz bilinmeyen parametreler yüzünden olabilecek ek denemeler.
+- KAP bildiriminde ya da adresi olmayan haberde metin önceden bellidir; mesaj birebir kurulur. İndirilecek tam metin
+  için okuma sınırı × 4 bayt ayrılır (UTF-8'de bir karakter en çok 4 bayttır).
+- Kalan günlük ya da aylık bütçe (hangisi daha kısıtlayıcıysa) zarfı karşılamıyorsa **iş başlatılmaz**. Haber hatalı
+  sayılmaz, sırada kalır; sıradaki işler de başlatılmaz.
+- İşin her çağrısı zarftan düşer. Zarfı aşacak bir çağrı yapılmaz.
+- İş bitince zarfın kullanılmayan kısmı serbest kalır.
+
+**Süreçler arası güvenlik:**
+
+- Rezervasyon SQLite `BEGIN IMMEDIATE` işlemiyle yazılır. Aynı veritabanını kullanan süreçler ve iş parçacıkları
+  aynı bütçeyi iki kez ayıramaz.
+- Bu koruma Ek O-3'teki analiz kilidinden ayrıdır ve onu tamamlar. Kilit yalnız haber analizini kapsar; rezervasyon
+  bütün ücretli yolları kapsar.
+
+**Hata, zaman aşımı ve süreç kapanması:**
+
+| Durum | Defterde | Bütçeden düşen |
+|---|---|---|
+| Başarılı çağrı | `tamam` + gerçek kullanım | gerçek maliyet; kalıcı kayda (analyses / ai_comments) geçince oradan sayılır, çift sayılmaz |
+| 400 sonrası yeniden deneme (ilk deneme) | `belirsiz` | rezervasyonun **tamamı** |
+| Zaman aşımı, bağlantı hatası, kesinti | `belirsiz` | rezervasyonun **tamamı** |
+| Yanıtta kullanım bilgisi yok | `belirsiz` | rezervasyonun **tamamı** |
+| Model reddi | `tamam` + bildirilen kullanım | gerçek maliyet |
+| Süreç çağrı sırasında kapandı | `acik` kalır | rezervasyonun **tamamı** |
+| Süreç iş sırasında kapandı | iş zarfı `zarf_acik` kalır | zarfın çağrıya dönüşmemiş kısmı dahil **tamamı** |
+
+Belirsiz maliyet hiçbir zaman sıfır sayılmaz. Kayda geçmemiş maliyetler (örneğin ucuz test) defterde sayılmaya devam
+eder.
+
+**Yan değişiklik (davranış sonucu aynı):**
+
+- gpt-5 ailesi `temperature` parametresini kabul etmiyor. Canlıda her sürecin ilk çağrısı bu yüzden 400 hatası alıp
+  parametresiz yeniden deneniyordu.
+- Artık bu parametre baştan gönderilmiyor. Sonuç aynıdır, çünkü parametre zaten çıkarılıyordu. Önlenen şey, maliyeti
+  belirsiz sayılacak boşa bir denemedir.
+- Model **gpt-5-mini olarak kaldı**.
+
+## O3b.3 Güncellik ile kapsam eksikliği ayrıldı (`haber_kapsam.guncellik`)
+
+Tam **"güncel"** denebilmesi için dört koşulun hepsi gerekir:
+
+1. Kapsamdaki her günün KAP listesi eksiksiz alınmış olmalı. Geçmiş günün listesi gün bittikten sonra alınmış olmalı
+   (`kap.coverage_gaps`).
+2. Analiz bekleyen güncel haber olmamalı.
+3. Metni alınamamış güncel haber olmamalı.
+4. Takvim bu günler için doğrulanmış olmalı.
+
+Herhangi biri eksikse durum uyarıdır ve her eksik ayrı yazılır:
+
+| Eksik | Panel metni |
+|---|---|
+| Toplama | "toplama eksik: KAP listesi şu günler için hiç alınmamış ya da gün bitmeden alınıp yenilenmemiş …" |
+| Analiz | "analiz bekliyor: N güncel haber henüz analiz edilmedi … İÇERMİYOR" |
+| Metin | "kapsam eksik: N güncel haberin metni alınamadı: analiz edilemedi … İÇERMİYOR" |
+| Takvim | "takvim doğrulanmadı: …" (2027 dini bayramları) |
+
+**Panelde bütçe yazısı:**
+
+- "harcanmış sayılan" ifadesi kullanılıyor: gerçekleşen tutar artı açık ya da maliyeti belirsiz rezervasyonlar.
+- Maliyeti belirsiz bir çağrı varsa sayısı gösteriliyor.
+- Panelde açıkça şu yazıyor: "kesin bütçe garantisi değildir; sınır OpenAI fiyatının değişmediği varsayımına dayanır;
+  faturayı OpenAI panelinden kontrol edin."
+
+## O3b.4 Kanıt
+
+**Testler (ağ engelli koşucu; ağ denemesi 0):**
+
+| Komut | Sonuç |
+|---|---|
+| `tests.test_o3_haber` | **31 test OK** (18 + 13 yeni) |
+| Haber, bütçe, yorum, panel ve hazır testleri (19 dosya, seçili) | **300 test OK** |
+| Tam takım (`run_offline.py`) | **Ran 687 tests … OK** (674 + 13), ağ denemesi 0 |
+
+**İstenen senaryolar:**
+
+| Senaryo | Test | Sonuç |
+|---|---|---|
+| Pahalı ilk çağrı: haber başına 15.000 çıktı tokenı ≈ 0,030 $, günlük 0,20 $ | `test_expensive_first_call_cannot_exceed_daily_cap` | Gerçek harcama ≤ 0,20 $. Eski yöntem bu durumda aşabiliyordu. Her istekte `max_completion_tokens` = 16.000. Çift sayım yok. |
+| İki çağrılı profil (yüksek doğruluk + ikinci görüş) | `test_two_call_profile_reserved_before_job_starts` | Bütçe bir çağrıya yetiyor, ikisine yetmiyor → **hiç çağrı yapılmadı**. Haber hatalı sayılmadı. |
+| Yeniden deneme (400 → parametresiz) | `test_retry_gets_own_reservation_and_uncertain_cost_is_not_zero` | İki ayrı rezervasyon. İlki `belirsiz` ve tamamı sayıldı; ikisi birlikte zarfın içinde. |
+| Zaman aşımı / kullanım bilgisi yok | `test_timeout_and_missing_usage_counted_in_full` | `belirsiz`; tamamı sayıldı. |
+| Süreç kapanması | `test_crashed_process_leftovers_are_counted` | Açık zarf ve açık çağrı tamamıyla sayıldı. Zarfı aşan çağrı reddedildi. |
+| Eşzamanlı iş parçacıkları | `test_concurrent_threads_cannot_double_spend` | 10 deneme, 0,10 $ bütçe → tam 3 × 0,03 $. |
+| Eşzamanlı **süreçler** | `test_concurrent_processes_cannot_double_spend` | 4 ayrı Python süreci × 4 deneme, 0,20 $ → tam 6 × 0,03 $ = 0,18 $. |
+| Aylık bütçe parametresi verilmedi | `test_missing_monthly_param_uses_production_budget` | Üretim bütçesi (0,15 $) uygulandı. İstemci `max_retries=0` ile kuruldu. İstisna yalnız açık bayrakla. |
+| Gerçek istemci bütçesiz | `test_real_client_without_budget_refuses` | Çağrı gönderilmedi (`ButceKorumasiYok`). Bellek içi veritabanında da rezervasyon yapılamaz. |
+| Ucuz test ve rapor yorumu | `test_cheap_test_and_comment_go_through_reservation` | İkisi de rezervasyondan geçti. Ucuz testin maliyeti defterde sayılmaya devam ediyor. |
+| Güncel ama metni eksik haber | `test_current_textless_news_is_coverage_gap_not_fresh` | "kapsam eksik"; güncel değil. |
+| Eksik ya da yarım KAP günü | `test_missing_or_partial_kap_day_blocks_fresh_claim` | "toplama eksik"; güncel değil. |
+| Doğrulanmamış takvim | `test_unverified_calendar_blocks_fresh_claim` | Güncel değil. |
+
+**Canlı veritabanı kopyası (salt-okunur alındı, 16.11 21:05):**
+
+- Canlı dosyanın boyutu ve değişiklik zamanı **aynı kaldı**.
+- Kopyada eklenen tek şey yeni `harcama_rezervasyon` tablosu. Silinen tablo yok; mevcut tabloların satır sayıları aynı.
+- Panelin göstereceği durum:
+  - "analiz bekliyor: 114 güncel haber henüz analiz edilmedi …";
+  - ek olarak "kapsam eksik: 9 güncel haberin metni alınamadı";
+  - KAP toplama boşluğu yok.
+- İş zarfı ile gerçek maliyet karşılaştırması (yüksek doğruluk profili, 114 bekleyen haber):
+
+| | Medyan | En büyük |
+|---|---|---|
+| İş zarfı, süreçteki ilk iş | 0,106 $ | 0,220 $ |
+| İş zarfı, sonraki işler | 0,071 $ (p90: 0,135 $) | 0,135 $ |
+| Gerçek haber maliyeti, Ekim–Kasım (148 haber) | 0,015 $ (ort. 0,0154 $) | 0,031 $ |
+
+- Rezervasyon gerçek maliyetin yaklaşık 5–9 katı ayırıyor, ama yalnız iş sürerken. İş bitince fark serbest kalır.
+- Günlük 0,50 $ ile tahmini haber sayısı: rezervasyonla **~28**, yalnız gerçek maliyetle ~32. Gün sonuna doğru zarf
+  kalanı aşınca iş başlatılmaz.
+
+## O3b.5 Kalan sınırlar (açıkça)
+
+- **Fiyat varsayımı:** Üst sınır `pipeline.INPUT/OUTPUT_USD_PER_TOKEN` (0,25 / 2,00 $ / 1M token) doğruysa geçerlidir.
+  OpenAI fiyatı değişirse ya da faturalama farklı olursa garanti **değildir**.
+  - Önbellekli girdi indirimi yalnız maliyeti düşürür.
+  - Fatura OpenAI panelinden ayrıca kontrol edilmelidir.
+  - Arayüz kesin garanti vermez.
+- **Bayt ≥ token varsayımı:** Bayt tabanlı BPE için doğrudur; OpenAI'nin iç biçimlendirme tokenları için 4096 bayt pay
+  ayrıldı. OpenAI tokenlaştırmayı değiştirirse varsayım yeniden doğrulanmalıdır.
+- **Çıktı sınırı API'ye bağlı:** `max_completion_tokens` OpenAI tarafında uygulanır. Uygulanmazsa ya da reddedilirse
+  üst sınır geçersiz olur. Model reddederse çağrı hata verir; parametre sessizce çıkarılmaz.
+- **Kalan süreç rezervasyonları:** Çöken süreçten kalan `acik` / `zarf_acik` kayıtlar o gün ve o ay için harcanmış
+  sayılmaya devam eder. Bu muhafazakârdır; ancak elle temizleme aracı yok. Ay değişince aylık sayımdan çıkar.
+- **Verim:** İş zarfı gerçek maliyetin ~5–9 katı. Günlük sınırda analiz edilebilecek haber ~%12 azalır (~32 → ~28).
+- **Pilot:** Ayrı defterle kalıyor; üretim bütçesine dahil değil.
+- **Yapay zekâ yorumu** (`yz_yorum`) haber bütçesinden ayrı. Kendi aylık bütçesiyle aynı rezervasyon yöntemini
+  kullanıyor; günlük sınırı yok.
+- **Test sınırı:** Gerçek OpenAI uç noktası denenmedi. Yanıt biçimi, `max_completion_tokens` kabulü ve 400 metinleri
+  taklitle test edildi. Kontrollü canlı geçişte ilk gerçek çağrıda doğrulanmalı:
+  - ai_calls ve defter satırları;
+  - `tamam` + gerçek kullanım;
+  - 400 olmaması.
+- **Şema:** Canlıda ilk ücretli çağrıda ya da ilk açılışta yeni `harcama_rezervasyon` tablosu eklenecek. Yalnız
+  ekleme yapılır; mevcut tablolar değişmez.
+  - Geri dönüş: önceki kod. Tablo zararsız kalır; istenirse yedekten dönülür.
+  - Ek O ortak koşulları (yedek, kopyada prova, aktif iş yokken geçiş) geçerli.
+
+**Onay beklenen:** O3'ün kontrollü canlıya geçişi.
+
+- Önerilen sıra: yedek → kod geçişi → panelde güncellik ve bütçe yazısı kontrolü → kullanıcının düğmesiyle **tek** haber
+  analizi.
+- Ardından defter, ai_calls ve OpenAI panelinden maliyet doğrulaması yapılır; sonra normal kullanım.
+- Bu ekte hiçbiri yapılmadı.

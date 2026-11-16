@@ -82,6 +82,14 @@ def month_spend(conn, now: Optional[datetime] = None) -> float:
     return float(r[0] or 0)
 
 
+def _kayda_gecti(conn, rid) -> None:
+    try:
+        from . import harcama
+        harcama.kayda_gecti(conn, rid=rid)
+    except Exception:
+        pass
+
+
 def budget(settings: Dict) -> float:
     try:
         b = float(settings.get("yz_butce_usd", DEFAULT_BUDGET_USD))
@@ -154,15 +162,19 @@ def comment_report(conn, kind: str, ref: str, report_md: str, settings: Dict, ll
                                      f"bu çağrı en fazla {est['high']:.3f} $). Bütçe Ayarlar'dan değiştirilebilir."}
     try:
         from .analyzer import LLM
-        llm = llm or LLM("rapor_yorumu")
+        from . import harcama
+        if llm is None:     # O3: rezervasyon zorunlu (yz_butce_usd)
+            llm = LLM("rapor_yorumu", butce=harcama.uretim_butcesi(conn, "yz_yorum", cap))
         out, tin, tout = llm.parse(config.MODEL_ANALYSIS, REPORT_PROMPT, report_md[:MAX_INPUT_CHARS], ReportComment,
                                    reasoning_effort=REASONING)
+        rid = harcama.son_rezervasyon() if getattr(llm, "butce", None) is not None else None
     except Exception as e:  # rapor yine de arşivlenir
         return {"ok": False, "hata": f"Yapay zekâ yorumu alınamadı: {e}"}
     res = out.model_dump() if hasattr(out, "model_dump") else dict(out)
     text = " ".join([res["ozet"], *res["dikkat"], *res["riskler"]])
     bad = unverified_numbers(text, report_md)
     usd = _record(conn, kind, ref, tin, tout, res, bad)
+    _kayda_gecti(conn, rid)
     return {"ok": True, "yorum": res, "dogrulanamayan": bad, "usd": usd, "input_tokens": tin, "output_tokens": tout}
 
 
@@ -254,9 +266,12 @@ def explain_missed(conn, items: List[Dict], settings: Dict, llm=None, limit: int
             break
         try:
             from .analyzer import LLM
-            llm = llm or LLM("kacirilan_aciklama")
+            from . import harcama
+            if llm is None:
+                llm = LLM("kacirilan_aciklama", butce=harcama.uretim_butcesi(conn, "yz_yorum", cap))
             res_, tin, tout = llm.parse(config.MODEL_ANALYSIS, MISSED_PROMPT, msg, MissedExplain,
                                         reasoning_effort=REASONING)
+            rid = harcama.son_rezervasyon() if getattr(llm, "butce", None) is not None else None
         except Exception as e:
             out.append({"ok": False, "hisse": item["hisse"], "ref": ref, "hata": f"Açıklama alınamadı: {e}"})
             paid += 1
@@ -264,6 +279,7 @@ def explain_missed(conn, items: List[Dict], settings: Dict, llm=None, limit: int
         res = res_.model_dump() if hasattr(res_, "model_dump") else dict(res_)
         bad = unverified_numbers(" ".join([res["aciklama"], res["oneri"]]), msg)
         usd = _record(conn, "kacirilan", ref, tin, tout, res, bad)
+        _kayda_gecti(conn, rid)
         paid += 1
         out.append({"ok": True, "hisse": item["hisse"], "ref": ref, "yorum": res, "dogrulanamayan": bad, "usd": usd,
                     "input_tokens": tin, "output_tokens": tout})

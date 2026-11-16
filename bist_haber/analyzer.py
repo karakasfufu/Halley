@@ -149,6 +149,7 @@ GÜVEN (guven, 0-1): Metin ne kadar net ve yoruma ne kadar az açık? Belirsiz/s
 
 # 2026-11-14 Aşama 2: istemci merkezi YZ servisine taşındı; bütün çağrılar orada kaydedilir.
 from .ai_service import LLM  # noqa: E402,F401  (eski ad: analyzer.LLM)
+from .harcama import ButceYetersiz  # noqa: E402
 
 
 def _fmt_tl(v: Optional[float]) -> str:
@@ -421,6 +422,43 @@ def _work(llm: LLM, row, universe: Dict[str, str], stats: Dict[str, dict], quali
     return res
 
 
+def is_ust_siniri(llm, row, universe: Dict[str, str], stats: Optional[Dict[str, dict]], q: dict) -> float:
+    """O3: bir haber işinin (_work) TOPLAM muhafazakâr üst sınırı: KAP dışı haberde ön eleme + tam analiz + profil
+    ikinci görüş istiyorsa ikinci görüş + desteği bilinmeyen parametreler yüzünden olası ek denemeler. Henüz indirilmemiş
+    tam metin, okuma sınırı (karakter) × 4 bayt ile ayrılır (UTF-8'de bir karakter en çok 4 bayt). KAP bildiriminde
+    ya da adresi olmayan haberde metin önceden bellidir: mesaj birebir kurulup bayt sayısı kullanılır."""
+    from . import harcama
+    toplam, enbuyuk = 0.0, {}
+
+    def ekle(model, effort, system, user, schema, ek_bayt=0):
+        nonlocal toplam
+        u = harcama.cagri_ust_sinir(system, user, schema, ek_bayt)
+        toplam += u
+        enbuyuk[(model, effort)] = max(enbuyuk.get((model, effort), 0.0), u)
+    if row["source"] != "kap":
+        ekle(config.MODEL_FILTER, config.FILTER_REASONING_EFFORT, FILTER_PROMPT,
+             _user_message(row, universe, config.FILTER_BODY_CHARS, stats), FilterResult)
+    body_chars = int(config.reading_limits(row["subject"] or "")["body_chars"] * q["body_factor"])
+    url = row["url"] if "url" in row.keys() else None
+    if row["source"] == "kap" or not url:          # _work tam metin indirmez: mesaj birebir bu
+        msg, ek_bayt = _user_message(row, universe, body_chars, stats, row["body"] or ""), 0
+    else:                                          # indirilecek metin bilinmiyor: okuma sınırı × 4 bayt
+        msg, ek_bayt = _user_message(row, universe, body_chars, stats, ""), 4 * body_chars
+    for _ in range(2 if q["second_opinion"] else 1):
+        ekle(config.MODEL_ANALYSIS, q["reasoning"], ANALYSIS_PROMPT, msg, FullAnalysis, ek_bayt)
+    ek = getattr(llm, "ek_deneme", None)
+    for (model, effort), u in enbuyuk.items():
+        toplam += (ek(model, effort) if ek else 0) * u
+    return toplam
+
+
+def _zarfli_work(zarf_id, db_path, llm, row, universe, stats, q):
+    """İş parçacığında: çağrılar bu işin zarfından düşer; iş bitince zarfın kullanılmayan kısmı serbest kalır."""
+    from . import harcama
+    with harcama.zarf_icinde(zarf_id, db_path):
+        return _work(llm, row, universe, stats, q)
+
+
 def _store(conn, row, universe, res, stats) -> None:
     nid = row["id"]
     f, a = res["filter"], res["analysis"]
@@ -544,7 +582,11 @@ def reanalyze(conn, universe: Dict[str, str], news_ids, llm: Optional[LLM] = Non
     q = quality_profile("yuksek")
     q.update(second_opinion=True, second_min_impact=0, body_factor=q["body_factor"] * DEEP_BODY_FACTOR)
     out = {"istenen": len(news_ids), "incelenen": 0, "hata": 0, "butce_disi": 0, "degisen": 0, "sonuclar": []}
-    if budget_usd is not None:
+    from . import harcama
+    if llm is None:     # O3: üretim yolu her zaman bütçe korumalı (parametre verilmezse Ayarlar'daki bütçe)
+        llm = LLM("derin_inceleme", butce=harcama.uretim_butcesi(conn, "haber", budget_usd))
+    butce = getattr(llm, "butce", None)
+    if budget_usd is not None and butce is None:     # eski tahmin süzgeci (yalnız sahte istemci / test)
         left = budget_usd - month_spend(conn)
         avg, hi_out = _avg_out(conn), _high_out(conn)
         keep = []
@@ -558,7 +600,6 @@ def reanalyze(conn, universe: Dict[str, str], news_ids, llm: Optional[LLM] = Non
         rows = keep
     if not rows:
         return out
-    llm = llm or LLM("derin_inceleme")
     spend0 = month_spend(conn)
     st_ = {"_izle": track, "tur": "derin inceleme", "durum": "çalışıyor", "toplam": len(rows), "biten": 0,
            "basladi": datetime.now(config.TR_TZ).isoformat(timespec="seconds")}
@@ -569,7 +610,8 @@ def reanalyze(conn, universe: Dict[str, str], news_ids, llm: Optional[LLM] = Non
     except Exception:
         cstats = {}
     for i, row in enumerate(rows):
-        if budget_usd is not None and month_spend(conn) + row_cost(row, _avg_out(conn), "yuksek", _high_out(conn))[1] \
+        if budget_usd is not None and butce is None and month_spend(conn) + row_cost(row, _avg_out(conn), "yuksek",
+                                                                                     _high_out(conn))[1] \
                 * DEEP_COST_FACTOR > budget_usd:     # gerçek harcamayla her haberden önce yeniden kontrol
             out["butce_disi"] += len(rows) - i
             break
@@ -582,14 +624,19 @@ def reanalyze(conn, universe: Dict[str, str], news_ids, llm: Optional[LLM] = Non
         work_row = {k: row[k] for k in row.keys()}
         if "[TAM METİN]" in (work_row.get("body") or ""):
             work_row["url"] = None          # tam metin zaten eklenmiş: yeniden indirilip iki kez eklenmesin
+        zid = None
         try:
-            res = _work(llm, work_row, universe, cstats, q)
+            if butce is not None:
+                zid = harcama.zarf_ac(butce, is_ust_siniri(llm, work_row, universe, cstats, q), "derin_inceleme",
+                                      "is_zarfi", str(row["id"]))
+            res = _zarfli_work(zid, butce.db_path if butce else None, llm, work_row, universe, cstats, q)
             if res["analysis"] is None:            # KAP dışı haberde ön eleme "önemsiz" dedi: eski sonuç korunur
                 raise RuntimeError("ön eleme bu haberi önemsiz buldu; önceki sonuç korundu")
             stats = {"analyzed": 0, "filtered_out": 0, "errors": 0, "impacts": 0, "dropped_tickers": 0, "flagged": 0,
                      "input_tokens": 0, "output_tokens": 0}
             res["article"] = None if work_row["url"] is None else res["article"]
             _store(conn, work_row, universe, res, stats)
+            harcama.kayda_gecti(conn, zarf_id=zid)        # maliyet artık analyses'te: çift sayılmaz
             new = _impacts_snapshot(conn, row["id"])
             conn.execute("INSERT INTO reanalysis_log(news_id, eski_json, yeni_json, input_tokens, output_tokens, durum, "
                          "created_at, eski_input_tokens, eski_output_tokens, eski_ay) VALUES(?,?,?,?,?,'tamam',?,?,?,?)",
@@ -605,6 +652,11 @@ def reanalyze(conn, universe: Dict[str, str], news_ids, llm: Optional[LLM] = Non
             out["incelenen"] += 1
             out["sonuclar"].append({"news_id": row["id"], "baslik": row["title"], "eski": old, "yeni": new,
                                     "degisti": bool(changed or gone)})
+        except ButceYetersiz as e:      # muhafazakâr üst sınır karşılanmadı: iş BAŞLATILMADI, kalanlar da
+            conn.rollback()
+            out["butce_disi"] += len(rows) - i
+            out["butce_durdu"] = str(e)[:200]
+            break
         except Exception as e:
             conn.rollback()
             conn.execute("INSERT INTO reanalysis_log(news_id, eski_json, yeni_json, durum, created_at) "
@@ -632,8 +684,13 @@ def test_one(conn, universe: Dict[str, str], llm: Optional[LLM] = None) -> Optio
     if not rows:
         return None
     row = rows[0]
-    llm = llm or LLM("ucuz_test")
-    res = _work(llm, row, universe, {}, quality_profile(config.TEST_QUALITY))
+    from . import harcama
+    if llm is None:     # O3: ucuz test de bütçe korumalı; maliyeti başka kayda yazılmaz → defterde sayılmaya devam eder
+        llm = LLM("ucuz_test", butce=harcama.uretim_butcesi(conn, "haber"))
+    butce, q = getattr(llm, "butce", None), quality_profile(config.TEST_QUALITY)
+    zid = harcama.zarf_ac(butce, is_ust_siniri(llm, row, universe, {}, q), "ucuz_test", "is_zarfi",
+                          str(row["id"])) if butce is not None else None
+    res = _zarfli_work(zid, butce.db_path if butce else None, llm, row, universe, {}, q)
     tin, tout = res["tokens"]
     from .pipeline import INPUT_USD_PER_TOKEN, OUTPUT_USD_PER_TOKEN
     return {"row": dict(row), "filter": res["filter"], "analysis": res["analysis"], "input_tokens": tin,
@@ -644,7 +701,8 @@ def analyze(conn, universe: Dict[str, str], limit: Optional[int] = None, llm: Op
             progress: Optional[Callable[[int, int], None]] = None, quality: Optional[str] = None,
             rows=None, budget_usd: Optional[float] = None, max_age_days: Optional[int] = None,
             track: bool = False, modul: str = "haber_analizi", on_eleme: bool = True,
-            gunluk_butce_usd: Optional[float] = None, kilit: bool = True) -> Dict[str, int]:
+            gunluk_butce_usd: Optional[float] = None, kilit: bool = True,
+            butcesiz_izin: bool = False) -> Dict[str, int]:
     """Bekleyen haberleri analiz eder. LLM çağrıları paralel, veritabanı yazımı ana iş parçacığında.
 
     quality: "yuksek" | "dengeli" | "ekonomik" (panel ayarı). Boşsa yüksek doğruluk.
@@ -656,8 +714,15 @@ def analyze(conn, universe: Dict[str, str], limit: Optional[int] = None, llm: Op
     uygulanır, kısıtlayıcı olan geçerli. Aynı anda tek analiz (haber_kapsam.analiz_kilidi): kilit alınamazsa HİÇ çağrı
     yapılmaz. Kapsam (son iki işlem günü) dışındaki haber analiz edilirse etkileri 'sonradan_analiz' işaretlenir.
     Dönüşte tahmini (üst sınır) ve gerçekleşen maliyet ayrı.
+    O3 düzeltmesi: aylık bütçe verilmemesi SINIRSIZ demek değildir → Ayarlar'daki üretim bütçesi kullanılır. Tek açık
+    istisna butcesiz_izin=True (yalnız testlerdeki sahte istemciler; gerçek istemci rezervasyonsuz hiç çağrı yapmaz).
+    Her haber işi başlamadan toplam muhafazakâr üst sınırı (is_ust_siniri) iş zarfı olarak ayrılır; yetmezse iş ve
+    sıradakiler başlatılmaz.
     """
     from . import haber_kapsam
+    if budget_usd is None and not butcesiz_izin:
+        from .pipeline import news_budget
+        budget_usd = news_budget()
     if not kilit:
         return _analyze(conn, universe, limit, llm, progress, quality, rows, budget_usd, max_age_days, track, modul,
                         on_eleme, gunluk_butce_usd)
@@ -703,7 +768,10 @@ def _analyze(conn, universe, limit, llm, progress, quality, rows, budget_usd, ma
         return stats
     kapsam_bas = haber_kapsam.kapsam_baslangici()["baslangic_iso"]
     stats["tahmini_ust_usd"] = 0.0
-    llm = llm or LLM(modul)
+    from . import harcama
+    if llm is None:
+        llm = LLM(modul, butce=harcama.uretim_butcesi(conn, "haber", budget_usd, gunluk_butce_usd))
+    butce = getattr(llm, "butce", None)
     spend0 = month_spend(conn)
     st_ = {"_izle": track, "tur": "haber analizi", "durum": "çalışıyor", "toplam": len(rows), "biten": 0,
            "basladi": datetime.now(config.TR_TZ).isoformat(timespec="seconds")}
@@ -727,11 +795,25 @@ def _analyze(conn, universe, limit, llm, progress, quality, rows, budget_usd, ma
     gozlenen = [0.0]
     ust = lambda r: max(hi_of[r["id"]], gozlenen[0])
     with ThreadPoolExecutor(max_workers=config.ANALYSIS_WORKERS) as ex:
-        futures = {}
+        futures, zarf_of = {}, {}
 
         def fill():
             while queue and len(futures) < config.ANALYSIS_WORKERS:
-                if budget_usd is not None:
+                if butce is not None:     # KESİN koruma: işin toplam üst sınırı atomik ayrılır (süreçler arası)
+                    try:
+                        zu = is_ust_siniri(llm, queue[0], universe, cstats, q)
+                        zid = harcama.zarf_ac(butce, zu, modul, "is_zarfi", str(queue[0]["id"]))
+                    except ButceYetersiz as e:
+                        stats["butce_disi"] = stats.get("butce_disi", 0) + len(queue)
+                        stats["butce_durdu"] = str(e)[:200]
+                        queue.clear()
+                        return
+                    r = queue.pop(0)
+                    stats["tahmini_ust_usd"] += zu
+                    f = ex.submit(_zarfli_work, zid, butce.db_path, llm, r, universe, cstats, q)
+                    futures[f], zarf_of[f] = r, zid
+                    continue
+                if budget_usd is not None:    # sahte istemci (test): eski tahmin süzgeci
                     if futures and not gozlenen[0]:
                         break                                   # ilk gerçek maliyet bekleniyor
                     running = sum(ust(futures[f]) for f in futures)
@@ -750,6 +832,7 @@ def _analyze(conn, universe, limit, llm, progress, quality, rows, budget_usd, ma
         while futures:
             fut = next(as_completed(list(futures)))
             row = futures.pop(fut)
+            zid = zarf_of.pop(fut, None)
             done += 1
             if progress:
                 progress(done, len(rows))
@@ -757,12 +840,20 @@ def _analyze(conn, universe, limit, llm, progress, quality, rows, budget_usd, ma
                 _res = fut.result()
                 gozlenen[0] = max(gozlenen[0], _res["tokens"][0] * _IN + _res["tokens"][1] * _OUT)
                 _store(conn, row, universe, _res, stats)
+                harcama.kayda_gecti(conn, zarf_id=zid)        # maliyet artık analyses'te: çift sayılmaz
                 if (row["published_at"] or "") < kapsam_bas:      # geçmişe dönük analiz: geçmişte BİLİNMİYORDU
                     conn.execute("UPDATE impacts SET flag=CASE WHEN flag IS NULL OR flag='' THEN 'sonradan_analiz' "
                                  "ELSE flag || ',sonradan_analiz' END WHERE news_id=?", (row["id"],))
                     conn.commit()
                     stats["sonradan_analiz"] = stats.get("sonradan_analiz", 0) + 1
                 st_["son"] = ([_result_label(conn, row)] + st_.get("son", []))[:8]
+            except ButceYetersiz as e:
+                # Çağrı zarfa / bütçeye sığmadı: o çağrı YAPILMADI. Haber hatalı sayılmaz (sırada kalır); yapılmış
+                # önceki çağrıların maliyeti defterde sayılmaya devam eder. Sıradakiler başlatılmaz.
+                conn.rollback()
+                stats["butce_disi"] = stats.get("butce_disi", 0) + 1 + len(queue)
+                stats["butce_durdu"] = str(e)[:200]
+                queue.clear()
             except (AuthenticationError, PermissionDeniedError, RateLimitError) as e:
                 # Hesap/kota sorunu: haberleri hatalı işaretleme, kalanları iptal et.
                 conn.rollback()

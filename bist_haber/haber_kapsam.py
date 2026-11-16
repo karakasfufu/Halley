@@ -79,15 +79,18 @@ def gunluk_butce() -> float:
 def butce_durumu(conn, aylik_usd: Optional[float], gunluk_usd: Optional[float] = None,
                  simdi: Optional[datetime] = None) -> Dict:
     """Kalan bütçe: aylık ve günlük kalanın KÜÇÜĞÜ. aylik_usd None ise sınırsız (test / pilot yolu)."""
-    from .analyzer import month_spend
+    from . import harcama
     if aylik_usd is None:
         return {"kalan": None, "sinirlayan": None}
     gunluk = gunluk_butce() if gunluk_usd is None else gunluk_usd
-    ay, gun = month_spend(conn, simdi), gun_harcamasi(conn, simdi)
+    h = harcama.harcanan(conn, "haber", simdi)      # kayıtlı + kayda geçmemiş + açık / belirsiz rezervasyonlar
+    ay, gun = h["ay"]["toplam"], h["gun"]["toplam"]
     ak, gk = aylik_usd - ay, gunluk - gun
     return {"aylik_butce": aylik_usd, "gunluk_butce": gunluk, "ay_gerceklesen": round(ay, 4), "gun_gerceklesen": round(gun, 4),
             "aylik_kalan": round(ak, 4), "gunluk_kalan": round(gk, 4), "kalan": min(ak, gk),
-            "sinirlayan": "günlük" if gk <= ak else "aylık"}
+            "sinirlayan": "günlük" if gk <= ak else "aylık",
+            "rezerve_gun": round(h["gun"]["rezerve"], 4), "belirsiz_adet": h["ay"]["belirsiz_adet"],
+            "acik_adet": h["ay"]["acik_adet"]}
 
 
 # ---------------------------------------------------------------- kilit
@@ -150,15 +153,38 @@ def guncellik(conn, simdi: Optional[datetime] = None) -> Dict:
                                 "AND published_at<?", (bas,)),
            "son_haberli_liste": one("SELECT MAX(olusturuldu) FROM hazir_firsat WHERE kaynak='haber'"),
            "analiz_suruyor": kilitli_mi()}
-    if not son_toplama or son_toplama < bas:
-        out["durum"], out["seviye"] = ("toplama eski: kapsamdaki günlerin haberleri toplanmamış olabilir "
-                                       "(\"Haberleri güncelle\" ile toplanır; toplama ücretsizdir)"), "uyari"
-    elif out["bekleyen_kapsamda"]:
-        out["durum"], out["seviye"] = (f"{out['bekleyen_kapsamda']} güncel haber analiz bekliyor: haberli fırsat listesi "
-                                       "ve haber puanı bu haberleri İÇERMİYOR"), "uyari"
-    else:
-        out["durum"], out["seviye"] = ("güncel: kapsamdaki (son iki işlem günü) haberlerin analizi tamam; analiz "
-                                       "gerektiren güncel haber yok"), "tamam"
+    # O3 düzeltmesi (16.11.2026): güncellik ile kapsam eksikliği AYRI. Tam "güncel" ancak (1) kapsamdaki her günün KAP
+    # listesi eksiksiz alınmış, (2) analiz bekleyen güncel haber yok, (3) metni alınamamış güncel haber yok ve
+    # (4) takvim bu günler için doğrulanmışsa denir. Aksi halde her eksik ayrı yazılır.
+    from .kap import coverage_gaps
+    bugun = simdi.date()
+    try:
+        bosluk = [g.isoformat() for g in coverage_gaps(conn, k["baslangic"].date(), bugun, bugun)]
+    except Exception:
+        bosluk = ["(okunamadı)"]
+    out["toplama_bosluk_gunleri"] = bosluk
+    eksikler = []
+    if bosluk or not son_toplama:
+        eksikler.append(("toplama eksik", "KAP listesi şu günler için hiç alınmamış ya da gün bitmeden alınıp "
+                         f"yenilenmemiş: {', '.join(bosluk) or 'tüm kapsam'} — bu günlerin haberleri eksik olabilir "
+                         "(\"Haberleri güncelle\" ile toplanır; toplama ücretsizdir)"))
+    if out["bekleyen_kapsamda"]:
+        eksikler.append(("analiz bekliyor", f"{out['bekleyen_kapsamda']} güncel haber henüz analiz edilmedi: haberli fırsat "
+                         "listesi ve haber puanı bu haberleri İÇERMİYOR"))
     if out["metinsiz_kapsamda"]:
-        out["not"] = f"{out['metinsiz_kapsamda']} güncel haberin metni henüz alınamadı (arka plan okuyucu yeniden dener)."
+        eksikler.append(("kapsam eksik", f"{out['metinsiz_kapsamda']} güncel haberin metni alınamadı: analiz edilemedi, "
+                         "haberli fırsat listesi ve haber puanı bu haberleri İÇERMİYOR (arka plan okuyucu yeniden dener)"))
+    if k.get("uyari"):
+        eksikler.append(("takvim doğrulanmadı", k["uyari"]))
+    out["eksikler"] = [ad for ad, _ in eksikler]
+    out["tam_guncel"] = not eksikler
+    if eksikler:
+        out["durum"] = eksikler[0][0] + ": " + eksikler[0][1]
+        out["seviye"] = "uyari"
+        if len(eksikler) > 1:
+            out["not"] = " · ".join(f"{ad}: {ac}" for ad, ac in eksikler[1:])
+    else:
+        out["durum"], out["seviye"] = (f"güncel: kapsamdaki (son iki işlem günü) KAP listeleri eksiksiz (son alım "
+                                       f"{(son_toplama or '')[11:16]}), analiz bekleyen ya da metni eksik güncel haber "
+                                       "yok"), "tamam"
     return out

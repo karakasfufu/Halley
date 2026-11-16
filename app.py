@@ -335,8 +335,14 @@ def haber_guncellik_satiri() -> None:
             st.caption(g["not"])
         if b.get("kalan") is not None:
             st.caption(f"Bütçe: bugün {b['gun_gerceklesen']:.2f} / {b['gunluk_butce']:.2f} \\$ · bu ay "
-                       f"{b['ay_gerceklesen']:.2f} / {b['aylik_butce']:.2f} \\$ (gerçekleşen) · geçerli sınır: "
-                       f"{b['sinirlayan']} ({max(b['kalan'], 0):.2f} \\$ kaldı).")
+                       f"{b['ay_gerceklesen']:.2f} / {b['aylik_butce']:.2f} \\$ (harcanmış sayılan: gerçekleşen + açık ya "
+                       f"da maliyeti belirsiz rezervasyonlar) · geçerli sınır: {b['sinirlayan']} "
+                       f"({max(b['kalan'], 0):.2f} \\$ kaldı)."
+                       + (f" · ⚠️ {b['belirsiz_adet']} çağrının maliyeti belirsiz; tamamı harcanmış sayıldı."
+                          if b.get("belirsiz_adet") else ""))
+            st.caption("Her haber işi başlamadan muhafazakâr bir üst sınır ayrılır; yetmezse iş başlatılmaz. Bu sınır "
+                       "OpenAI fiyatının (0,25 / 2,00 \\$ / 1M token) değişmediği varsayımına dayanır: kesin bütçe "
+                       "garantisi değildir, faturayı OpenAI panelinden kontrol edin.")
         k = g["kapsam"]
         st.caption(f"Kapsam: {k['is_gunleri'][0]} ve {k['is_gunleri'][1]} işlem günleri (başlangıç "
                    f"{zaman(k['baslangic_iso'])})" + (" · yarım gün dahil" if k["yarim_gun"] else "")

@@ -47,7 +47,8 @@ def cmd_analyze(conn, args):
     if args.dry_run or not rows:
         return
     try:
-        llm = analyzer.LLM()
+        from bist_haber import harcama
+        llm = analyzer.LLM("komut_satiri", butce=harcama.uretim_butcesi(conn, "haber"))
     except Exception as e:
         sys.exit(f"OpenAI istemcisi kurulamadı: {e}\n.env dosyasına OPENAI_API_KEY ekleyin (bkz. .env.example).")
     print(analyzer.analyze(conn, uni, args.limit, llm))
