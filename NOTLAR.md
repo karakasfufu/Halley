@@ -1922,3 +1922,9 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Alternatif (azami girişle önceden adet, açılış seansına azami limitli emir): başlangıç aşımı 0; kalan aşım yalnız stop boşluğu (1–4 işlem). Aynı işlemler, küçük pozisyon: ortak 12 ay −%22,7 → −%19,8; 2024 +%35,9 → +%28,9; Sortino/PF ~aynı. Otomatik seçilmedi.
 - Stop altı açılış: alt sınır yok; journal alış günü satışı SL fiyatından yazıyor → 'SL' ama kâr (iyimser; ortak 12 ay +3.739 TL). Ayrı düzeltme önerildi, uygulanmadı.
 - RiskTemeli 4 test; portföy 23/23. Ayrıntı: HALLEY2_DENETIM_RAPORU Ek H3.
+
+## 2026-11-16 — FAZ 2 Ek H4: stop altı açılışta yapay kâr giderildi (kural s3; dal faz2-portfoy; araştırma, canlı kural değişmedi)
+- journal.giris_kosulu (yeni öneri: açılış ≤ SL girişsiz) + evaluate(kural='s3'): alış ≤ SL ise alış günü satışı alış fiyatından (gerçek alış korunur). Varsayılan s2 birebir; canlı çağrılar değişmedi.
+- Etki: canlıda etkilenen kayıt 0 (salt-okunur); eğitim planlarının 293/39.112'si (hepsi y=0, etiket değişmez). Defter için s3 ayrı kural sürümü tasarlandı, uygulanmadı.
+- Düzeltilmiş bağımsız koşular (ortak 12 ay): mevcut_s3 −%14,4 (yol bağımlılığı: 27 işlem değişti), alternatif_s3 −%22,1 (saf düzeltme etkisi −2,4 puan); başlangıç riski aşımı 56 vs 0. Önceki raporlara 'hatalı gerçekleşme varsayımı' notu.
+- test_kural_s3 (14); 596 test OK. Ayrıntı: HALLEY2_DENETIM_RAPORU Ek H4.

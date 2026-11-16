@@ -88,9 +88,27 @@ def record_real(conn, auto_id: int, fill_day: str, fill_price: float) -> int:
 
 
 # ---------------------------------------------------------------- değerlendirme
+def giris_kosulu(acilis: Optional[float], azami: float, sl: float) -> Optional[str]:
+    """Ek H4 (araştırma, kural s3): HENÜZ ALINMAMIŞ yeni önerinin açılışta giriş koşulu. None = geçerli; aksi halde
+    girişsiz nedeni. Açılış SL'ye eşit ya da altındaysa plan geçersizdir (alış yapılmaz, getiri yazılmaz).
+    Canlı kodda henüz KULLANILMIYOR; canlı kural ayrı onayla değişir."""
+    if not acilis:
+        return "açılış fiyatı yok"
+    if acilis > azami + 1e-9:
+        return "açılış azami girişin üstünde"
+    if acilis <= sl + 1e-9:
+        return "açılış stopun altında veya eşit"
+    return None
+
+
 def evaluate(rec: Dict, bars: List[Dict], commission_pct: float = DEFAULT_COMMISSION_PCT,
-             slippage_pct: float = DEFAULT_SLIPPAGE_PCT) -> Dict:
-    """rec: günlük satırı; bars: signal_day SONRASI günlük barlar (tarih sıralı). Durum ve sonucu döndürür."""
+             slippage_pct: float = DEFAULT_SLIPPAGE_PCT, kural: str = "s2") -> Dict:
+    """rec: günlük satırı; bars: signal_day SONRASI günlük barlar (tarih sıralı). Durum ve sonucu döndürür.
+    kural: "s2" (varsayılan, canlıdaki mevcut davranış) | "s3" (Ek H4, araştırma): alış fiyatı SL'ye eşit ya da altındaysa
+    (gerçekleşmiş alış ya da açılışta dolan limit emir) alış günü satışı STOP fiyatından değil ALIŞ fiyatından yazılır —
+    stop alışla birlikte tetiklenmiş sayılır; ek kayma, genel kayma varsayımı içindedir. Yapay kâr oluşmaz."""
+    if kural not in ("s2", "s3"):
+        raise ValueError("kural: s2 | s3")
     sl, tp1, tp2, kind = rec["sl"], rec["tp1"], rec["tp2"], rec["senaryo"]
     bars = [b for b in bars if b["date"] > rec["signal_day"] and b.get("close")]
     hl = lambda b: (b.get("high") or b["close"], b.get("low") or b["close"], b.get("open") or b["close"])
@@ -131,6 +149,9 @@ def evaluate(rec: Dict, bars: List[Dict], commission_pct: float = DEFAULT_COMMIS
         exit_idx = j
         h, l, o = hl(b)
         if j == 0 and limit_day:
+            if kural == "s3" and fill <= stop + 1e-12:
+                legs.append((1.0, fill, "SL (alış stopun altında)"))
+                break
             if l <= stop:
                 legs.append((1.0, stop, "SL (alış günü)"))
                 break

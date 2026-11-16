@@ -2102,6 +2102,8 @@ gibi kapanmış işlem metriklerine **girmez**; özsermaye eğrisine gerçekleş
 
 ## H5. Sonuçlar
 
+> **Düzeltme notu (16.11, Ek H4):** Bu bölümün rakamları **hatalı bir gerçekleşme varsayımı içerir**: stopun altında açılan alışlarda alış günü satışı stop fiyatından yazılmış, yapay kâr oluşmuştu. Rakamlar kayıt için olduğu gibi korunmuştur; düzeltilmiş sonuçlar Ek H4'tedir.
+
 Rakamlar geçmiş veri simülasyonudur, gelecek garantisi değildir; **haber şartı yoktur**.
 
 | | canli_ortak · son 12 ay | canli_ortak · 2024 | yalniz_teknik · son 12 ay | yalniz_teknik · 2024 |
@@ -2398,6 +2400,8 @@ yalniz_teknik için aynı liste `sonuclar_faz2/yalniz_teknik/*_acik_son.csv` iç
 
 ## H2.8 İki dönemin özeti (istenen bütün kalemler)
 
+> **Düzeltme notu (16.11, Ek H4):** Bu bölümün rakamları **hatalı bir gerçekleşme varsayımı içerir**: stopun altında açılan alışlarda alış günü satışı stop fiyatından yazılmış, yapay kâr oluşmuştu. Rakamlar kayıt için olduğu gibi korunmuştur; düzeltilmiş sonuçlar Ek H4'tedir.
+
 | | canli_ortak · son 12 ay | canli_ortak · 2024 | yalniz_teknik · son 12 ay | yalniz_teknik · 2024 |
 |---|---|---|---|---|
 | Dönem | 2025-11-14 … 2026-11-13 | 2024-01-02 … 2024-12-31 | aynı | aynı |
@@ -2526,6 +2530,8 @@ dışı başarı kanıtı sayılmaz**.
 
 ## H3.4 İki senaryo (aynı dönem, aynı diğer ayarlar)
 
+> **Düzeltme notu (16.11, Ek H4):** Bu bölümün rakamları **hatalı bir gerçekleşme varsayımı içerir**: stopun altında açılan alışlarda alış günü satışı stop fiyatından yazılmış, yapay kâr oluşmuştu. Rakamlar kayıt için olduğu gibi korunmuştur; düzeltilmiş sonuçlar Ek H4'tedir.
+
 **Mevcut:** Adet, planlanan girişe göre hesaplanır. Nakit kontrolü açılış fiyatıyla yapılır. Canlı paneldeki adet
 hesabı budur.
 
@@ -2647,3 +2653,235 @@ Hiçbiri uygulanmadı. FAZ 2 kabulü ve olası canlı değişiklik için kullan�
 - `arastirma/asama6/risk_ayristirma.py` (yeni): ayrıştırma ve iki senaryo. Çıktısı `sonuclar_faz2/risk_h3.json`.
 - `tests/test_portfoy.py`: `RiskTemeli` (4 test).
 - Bu ek ve `NOTLAR.md`.
+
+
+---
+
+# Ek H4 — Stop altı açılışta yapay kârın giderilmesi: gerçekleşme kuralı s3 (16.11.2026, dal `faz2-portfoy`, yalnız araştırma)
+
+**Konumu:** Bu ek **geriye dönük doğrulamadır**. Dönem dışı başarı kanıtı değildir. Parametre optimizasyonu yapılmadı
+ve senaryo otomatik seçilmedi.
+
+- **Canlı kural değişmedi:** `journal.evaluate` varsayılanı hâlâ `s2`. Yeni `giris_kosulu` hiçbir canlı yoldan
+  çağrılmıyor. Canlı veritabanı yalnız okundu.
+- **Önceki raporlar korundu:** Ek H5, H2.8 ve H3.4'e "hatalı gerçekleşme varsayımı içerir" notu eklendi; rakamları
+  değişmedi.
+- **Değiştirilemez kayıtlar** güncellenmedi ve silinmedi. Model eğitilmedi; etkin model değişmedi.
+
+## H4.1 Üç işlem türü ve kural s3
+
+| Tür | Durum | s2 (mevcut) | s3 (araştırma) |
+|---|---|---|---|
+| **A. Yeni öneri, henüz alınmamış** | Açılış ≤ SL | Alış yapılmış sayılır. Alış günü satış SL fiyatından yazılır, sonuç "SL" ama net **kâr** (yapay). | `journal.giris_kosulu` → **girişsiz** ("açılış stopun altında veya eşit"). Alış ya da satış getirisi yazılmaz. |
+| **B. Önceden açık pozisyon** | Ertesi gün açılış ≤ stop | Açılıştan çıkar ("SL (açılışta boşluk)" ya da TP1 sonrası "başabaş stop (açılış)"). Toplam %0,2 + %0,1 maliyet ve kayma. | **Aynı** (zaten gerçekçiydi). Boşluk + genel kayma varsayımı belgelendi; stop fiyatı gösterilmez. |
+| **C. Kullanıcının kaydettiği gerçek alış** | Alış fiyatı ≤ SL | Tür A ile aynı yapay kâr. | Kayıt **korunur**: silinmez, girişsiz sayılmaz; gerçek alış günü ve fiyatı aynen kalır. Stop alışla birlikte tetiklenmiş sayılır ve satış **alış fiyatından** yazılır ("SL (alış stopun altında)"). Zarar = maliyet. |
+| Limit emirli plan (otomatik/takip) | Açılış SL'nin altında, limit dolar | Yapay kâr. | Tür C gibi: satış dolum fiyatından. |
+
+- **Stopa eşit açılış:** A'da girişsiz. B'de açılıştan, yani stop fiyatından çıkış. C'de satış alış fiyatından (stopa
+  eşit), zarar = maliyet.
+- **Stop üstü açılış:** s2 ile s3 **birebir aynı**. 300 rastgele senaryoda doğrulandı.
+
+**Günlük veriyle modellenen giriş koşulunun sınırları:**
+
+- **"Açılış ≤ SL ise girişsiz" kuralı açılış fiyatını görmeyi gerektirir.** Bu ancak kullanıcı açılıştan sonra fiyata
+  bakıp elle aldığında uygulanabilir. Halley'in açılış kontrolü 15 dk gecikmeli fiyatla çalışır.
+  - Simülasyon böyle bir alışı **açılış fiyatından** yapar. Gerçekte alış birkaç dakika sonra ve farklı bir fiyattan
+    olur. Bu iyimser bir yaklaşımdır; mevcut Halley sonuç kuralıyla (`ready.evaluate_all`) aynı varsayımdır.
+- **Açılış seansına önceden verilen azami limitli emir yalnız üst sınırı uygular.** Açılış SL'nin altındaysa emir yine
+  dolar. Bu yüzden alternatif senaryoda stop altı açılışlar **alınmış** sayıldı: s3 ile hemen stop olur, zarar =
+  maliyet. Üst limitin SL altı alışı engellediği **varsayılmadı**.
+- Midas'ta alt sınırı da uygulayan koşullu ya da şartlı bir emir türü olup olmadığı **doğrulanmadı**.
+
+## H4.2 Etki analizi: hangi yollar etkileniyor?
+
+| Yol | Tür | s3 etkisi | Şu anki canlı veri (salt-okunur, 16.11 12:13) |
+|---|---|---|---|
+| `journal.evaluate` (gerçek kayıt alış günü, limit dolumu) | C, limit | Yalnız alış ≤ SL durumunda satış fiyatı | — |
+| `journal.update_all` → `trade_journal` | C ve otomatik | Yalnız **açık/bekleyen** kayıtları yeniden yazar; kapanmışlara dokunmaz | 30 kayıt (3 kapanmış). Alış ≤ SL **0**. Tek "SL (alış günü)" kaydında alış (48,44) stopun (46,57) üstünde, etkilenmez. |
+| `ready.opening_check` / `evaluate_all` → `hazir_firsat` | A | Alt sınır eklenmeli (girişsiz) | 2 kayıt (onaylandı), açılış ≤ SL **0** |
+| `tracker` (takip senaryoları) | limit | `journal.evaluate` üzerinden aynı | Ölçülmedi (olay günlüğü değişir, sonuç alanı yok) |
+| `defter._degerlendir` → tahmin defteri | A | s2 sözleşmesi donmuş. s3 ayrı kural sürümü gerekir (H4.6). | 2 tahmin, 0 sonuç, 0 değerlendirme |
+| `arastirma/asama6/etiketle.py` (eğitim etiketleri) | A | Bu planlar girişsize dönerdi | 39.112 girilen planın **293**'ünde (%0,75) açılış ≤ SL (yaklaşık, plan dosyasındaki açılış boşluğundan). Hepsi zaten y = 0 (SL); **TP1 etiketi değişmez**, yalnız örnek eğitimden çıkardı. Yeniden etiketleme ve eğitim yapılmadı. |
+| `arastirma/asama6/portfoy.py` | A ve C | `kural` + `stop_alti_girissiz` seçenekleri (varsayılan = eski) | Bu ek |
+
+## H4.3 Regresyon testleri (`tests/test_kural_s3.py`, 14 test)
+
+| Test | Kanıtladığı |
+|---|---|
+| `test_entry_condition_for_new_suggestion` | Tür A koşulu: azami üstü, stopa eşit, stop altı, fiyat yok, hemen stop üstü. |
+| `test_s2_default_unchanged_shows_artificial_profit` | Varsayılan s2 değişmedi; eski yapay kâr belgelendi (94'ten alış, 95'ten satış). |
+| `test_s3_below_stop_no_artificial_profit` | Tür C: kayıt korunur (gün, fiyat), satış 94'ten, net = −%0,3. |
+| `test_s3_fill_equal_to_stop` | Stopa eşit alış: zarar = maliyet. |
+| `test_s3_fill_above_stop_identical_to_s2` + `test_random_fills_above_stop_never_differ` | Stop üstünde s2 = s3 (300 rastgele yol); stop altında s3'te hiç kâr yok. |
+| `test_gap_below_stop_exits_at_open` | Tür B: açılış 85 → satış 85'ten, R < −1. |
+| `test_open_equal_to_stop_exits_at_stop` | Açık pozisyonda açılış = stop. |
+| `test_gap_below_breakeven_after_tp1` | TP1 sonrası boşluk: satış açılıştan (97), girişten değil. |
+| `test_limit_fill_below_stop` | Limit emir SL altında dolar; s2 kâr, s3 yalnız maliyet. |
+| `test_unknown_rule_rejected` | Bilinmeyen kural hata verir. |
+| `PortfoyS3` (3 test) | Açılışı görerek alımda stop altı → girişsiz, nakit değişmez. Önceden verilen emirde dolar ve zarar = maliyet. Stop üstünde sonuç değişmez. |
+
+**Gerçek veride yapay kâr kontrolü:** Bütün s3 koşularında stop altı açılan ve kârlı yazılan işlem sayısı **0**. s2'de
+bu sayı 6 / 1 / 5 / 0'dı.
+
+## H4.4 Düzeltilmiş karşılaştırma
+
+**Koşular.** Her koşu kendi nakit ve risk durumuyla **bağımsız** yürür; aynı işlemleri seçmeye zorlanmaz. Diğer bütün
+ayarlar aynı.
+
+- **mevcut_s3:** planlanan girişe göre adet; açılışı görüp elle alım (açılış ≤ SL girişsiz).
+- **alternatif_s3:** azami girişe göre önceden adet; açılış seansına azami limitli emir; stop altında da dolar.
+- `_s2` sütunları eski, hatalı varsayımlı koşulardır (karşılaştırma için).
+
+**canli_ortak · son 12 ay (2025-11-14 … 2026-11-13)**
+
+| | mevcut_s2 | **mevcut_s3** | alternatif_s2 | **alternatif_s3** |
+|---|---|---|---|---|
+| Bitiş özsermayesi (TL) | 77.270 | **85.564** | 80.252 | **77.877** |
+| Net getiri | −%22,7 | **−%14,4** | −%19,8 | **−%22,1** |
+| Azami düşüş | −%34,1 | −%30,7 | −%30,3 | −%32,2 |
+| Sortino / kâr faktörü | −1,45 / 0,72 | −0,81 / 0,82 | −1,51 / 0,71 | −1,68 / 0,68 |
+| Ortalama R | −0,19 | −0,08 | −0,19 | −0,22 |
+| Açılan / kapanan | 141 / 136 | 134 / 129 | 141 / 136 | 141 / 136 |
+| Toplam maliyet (TL) | 7.092 | 6.951 | 6.059 | 5.963 |
+| Başlangıç riski %1'i aşan | 57 | 56 | 0 | **0** |
+| Kaybı %1'i aşan | 43 | 43 | 1 | **1** (stop boşluğu) |
+| Giriş anı portföy riski en yüksek | %5,56 | %5,54 | %4,40 | %4,40 |
+| Stop altı açılış: alınan / kârlı yazılan / net (TL) | 6 / 6 / +3.396 | 0 / 0 / 0 (70 aday girişsiz) | 6 / 6 / +2.695 | 6 / **0** / −266 |
+| s2 koşusuyla ortak işlem | — | 114 (27 çıktı, 20 girdi) | — | 141 (aynı) |
+
+**canli_ortak · 2024**
+
+| | mevcut_s2 | **mevcut_s3** | alternatif_s2 | **alternatif_s3** |
+|---|---|---|---|---|
+| Bitiş / net getiri | 135.873 / +%35,9 | **135.071 / +%35,1** | 128.914 / +%28,9 | **128.719 / +%28,7** |
+| Azami düşüş | −%15,2 | −%15,7 | −%12,3 | −%12,4 |
+| Sortino / kâr faktörü | 2,19 / 1,34 | 2,12 / 1,33 | 2,18 / 1,35 | 2,16 / 1,35 |
+| Açılan / kapanan | 110 / 105 | 110 / 105 | 110 / 105 | 110 / 105 |
+| Toplam maliyet (TL) | 6.697 | 6.696 | 5.260 | 5.257 |
+| Başlangıç riski aşan / kaybı aşan | 48 / 31 | 48 / 31 | 0 / 4 | 0 / 4 |
+| Stop altı: alınan / kârlı / net (TL) | 1 / 1 / +176 | 0 (49 aday girişsiz) | 1 / 1 / +139 | 1 / 0 / −58 |
+
+**yalniz_teknik**
+
+| | mevcut_s2 | mevcut_s3 | alternatif_s2 | alternatif_s3 |
+|---|---|---|---|---|
+| 12 ay getiri / düşüş | −%24,7 / −%39,3 | −%24,6 / −%41,0 | −%19,6 / −%33,3 | −%22,8 / −%35,7 |
+| 12 ay kâr faktörü | 0,76 | 0,75 | 0,77 | 0,72 |
+| 12 ay başlangıç aşan / kayıp aşan | 57 / 49 | 54 / 46 | 0 / 3 | 0 / 3 |
+| 2024 getiri / düşüş | +%25,9 / −%15,2 | aynı | +%20,2 / −%12,8 | aynı |
+
+2024'te seçilen yolda stop altı açılış yok; s2 = s3.
+
+**Düzeltmenin saf etkisi** (aynı işlemler, yalnız yapay kâr kalktı: alternatif_s2 → s3):
+
+| | Getiri etkisi | TL |
+|---|---|---|
+| ortak · 12 ay | **−2,4 puan** | −2.375 |
+| ortak · 2024 | −0,2 puan | — |
+| teknik · 12 ay | −3,2 puan | — |
+
+**Mevcut senaryoda tablo yanıltıcı olabilir.** mevcut_s2 → s3'te getirinin artması (ortak 12 ay +8,3 puan) düzeltmenin
+kendisinden **değil**, **yol bağımlılığından** geliyor. Girişsiz sayılan aday, o gün yerini sıradaki adaya bıraktı ve
+27 işlem değişti. Yapay kârın kalkması tek başına sonucu düşürür.
+
+**Ayrıştırma koşuları** (öneri değil; adet etkisini "açılışı görerek SL süzgeci" etkisinden ayırmak için çapraz
+koşular, s3):
+
+| ortak · 12 ay | Açılışı görüp alım (SL süzgeci var) | Önceden emir (SL süzgeci yok) |
+|---|---|---|
+| Planlanan girişe göre adet | −%14,4 (düşüş −%30,7) = mevcut_s3 | −%25,5 (−%36,2) |
+| Azami girişe göre adet | −%9,9 (−%26,1) | −%22,1 (−%32,2) = alternatif_s3 |
+
+| ortak · 2024 | Açılışı görüp | Önceden emir |
+|---|---|---|
+| Planlanan girişe göre adet | +%35,1 | +%35,6 |
+| Azami girişe göre adet | +%28,3 | +%28,7 |
+
+teknik · 12 ay: planlanan + önceden emir −%28,7; azami + açılışı görüp −%19,5.
+
+**Okuma:**
+
+- **Adet etkisi** (aynı giriş türünde azami ile planlanan): 12 ayda +3 – +5 puan, 2024'te −7 puan. İşareti döneme
+  göre değişiyor; bu orantılı küçülmedir.
+- **SL süzgecinin görünen etkisi** (12 ayda +11 – +12 puan) neredeyse tümüyle yol bağımlılığı. Stop altı alınan
+  işlemlerin doğrudan zararı yalnız maliyet kadar: alternatif_s3'te 6 işlemde −266 TL. 2024'te etki yok denecek
+  kadar küçük.
+- Bu büyüklükte bir fark sağlam bir avantaj olarak **okunmamalıdır**. Üstelik süzgeç açılışı görmeye dayanır
+  (H4.1 sınırı).
+
+## H4.5 Azami girişe göre adet önerisinin yeniden değerlendirilmesi
+
+1. **Risk tanımı açısından öneri geçerli.** Bütün s3 koşularında azami girişe göre adetle başlangıç riski aşımı
+   **0**; %1'i aşan kayıp yalnız stop boşluğundan geliyor (1–4 işlem). Planlanan girişe göre adette 48–57 aşım sürüyor.
+2. **Performans gerekçesi yok.** Getiri farkı dönem ve giriş türüyle işaret değiştiriyor. Seçim performansa göre
+   yapılmamalı.
+3. **Uygulanabilirlik koşullu.** Midas'ta açılış seansına limit emir verilebildiği doğrulanmadı.
+   - Doğrulanırsa: emir azami limitle önceden verilir. Stop altı açılışta emir dolar ve hemen stop olur (maliyet
+     kadar zarar); bunu ancak koşullu bir emir önler, o da doğrulanmadı.
+   - Doğrulanmazsa ya da kullanıcı açılışı görüp elle almaya devam ederse, **daha uygun canlı seçenek** şudur: panel
+     adedi alış anında kullanıcının gireceği **gerçek fiyatla** yeniden hesaplar ve plan açılışı görüldüğünde stop
+     altıysa girişsiz sayılır. Bu, günlük veriyle test edilemez; azami girişe göre adet, onun en kötü durum
+     (muhafazakâr) üst sınırıdır.
+4. **Öneri:**
+   - **(a) s3 gerçekleşme düzeltmesi + A türü alt sınır:** doğruluk düzeltmesi olarak önerilir.
+   - **(b) Adet hesabı:** "azami girişe göre" (en kötü durum) ya da "alış anında gerçek fiyatla yeniden hesap". Hangisi
+     olacağı Midas doğrulamasına bağlı.
+
+   İkisi de ayrı canlı onay ister.
+
+## H4.6 Canlı değişiklik kapsamı (uygulanmadı; onay sonrası plan)
+
+**Dosyalar:**
+
+- `bist_haber/journal.py`: s3'ü varsayılan yapmak ve sonuç kaydına `kural` alanı eklemek.
+- `bist_haber/ready.py`: `opening_check` ve `evaluate_all` alt sınırı (A türü girişsiz, açıklamalı neden).
+- `bist_haber/defter.py`: `KURAL_SURUM = "s3"`, girişsiz nedeni, s2 sonuçlarına ayrı s3 değerlendirmesi.
+- `app.py`: adet ve "SL'de en fazla kayıp" metni, girişsiz nedeni gösterimi.
+- `bist_haber/tracker.py`: yalnız çağrı yolu.
+- Testler.
+
+**Şema:**
+
+- Yeni tablo ya da sütun **gerekmiyor**.
+- `tahmin_degerlendirme` zaten `kural_surum` taşıyor; s3 satırları eklenir, s2 satırları değişmez.
+- `hazir_firsat` için mevcut `durum='girissiz'` + `iptal_nedeni` yeterli.
+- `trade_journal.sonuc_json` serbest JSON'dur; `kural` alanı eklenir.
+
+**Sürümleme:**
+
+- Tahmin defteri: s2 değişmez, s3 ayrı değerlendirme satırı olur (s1 → s2 mekanizmasıyla aynı). Panel sürüm grupları
+  kural sürümünü zaten ayırıyor.
+- `trade_journal`: `update_all` yalnız açık ve bekleyen kayıtları yeniden yazar. Kapanmış kayıtlar eski kuralla kalır;
+  `kural` alanı olmayan kayıt s2 kabul edilir.
+- Etiketler ve model: değişmez. Yeniden eğitim ayrı karar.
+
+**Yedekleme ve geri dönüş:** FAZ 1 v2 geçişiyle aynı yol.
+
+1. Halley durdurulur (aktif iş yokken).
+2. Kod yedeği ve DB yedeği alınır (`integrity_check`).
+3. Kod değiştirilir (şema göçü yok).
+4. Başlatılır ve sağlık kontrolü yapılır.
+
+- **Geri dönüş:** Önceki commit'in koduna dönülür. s3 değerlendirme satırları eklemedir ve s2'yi bozmaz; eski kod
+  onları yok sayar.
+- **Yeni veri kaybı yok:** Yedek doğrudan geri yüklenmez.
+
+## H4.7 FAZ 1 canlı kabul durumu (ayrı)
+
+- **16.11 12:13 itibarıyla:** 2 tahmin, 0 sonuç, 0 değerlendirme, 0 olay. Geçişten sonra yeni akşam ya da sabah
+  çalıştırması gözlenmedi.
+- Bu akşamki analiz ve yarın sabahki kontrol için bekçiler çalışıyor (oturuma bağlı).
+- **FAZ 1 kabul edilmedi; gözlenmeyen durum doğrulanmış sayılmadı.**
+
+## H4.8 Değişen dosyalar (dal `faz2-portfoy`)
+
+- `bist_haber/journal.py`: `giris_kosulu()` yeni; `evaluate(..., kural="s2")` seçeneği. Varsayılan davranış birebir
+  aynı. Canlı çağrılar parametre geçmiyor.
+- `arastirma/asama6/portfoy.py`: `kural` ve `stop_alti_girissiz` seçenekleri (varsayılan eski).
+- `arastirma/asama6/kural_s3_karsilastirma.py` (yeni). Çıktısı `sonuclar_faz2/kural_s3.json`.
+- `tests/test_kural_s3.py` (yeni, 14 test).
+- Bu ek; Ek H5, H2.8, H3.4 düzeltme notları; `NOTLAR.md`.
+
+**Testler:** `tests.test_kural_s3` 14 / 14 OK; tam takım (ağ engelli) **596 test OK**, ağ denemesi 0. Varsayılan kuralla orijinal (Ek H5) ve Ek H3 metrikleri birebir yeniden üretildi.
+
+**Onay beklenen:** canlı değişiklik (H4.6) ve FAZ 2 nihai kabulü. FAZ 3 yok.

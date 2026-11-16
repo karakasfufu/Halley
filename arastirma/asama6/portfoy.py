@@ -51,7 +51,12 @@ from typing import Dict, List, Optional
 
 VARSAYILAN = {"baslangic_sermaye": 100000.0, "risk_pct": 1.0, "azami_pozisyon": 5, "azami_toplam_risk_pct": 6.0,
               "azami_sektor": 2, "komisyon_pct": 0.20, "kayma_pct": 0.10, "sabit_adet": None, "sinirsiz": False,
-              "adet_temeli": "planlanan_giris"}
+              "adet_temeli": "planlanan_giris", "kural": "s2", "stop_alti_girissiz": False}
+# kural / stop_alti_girissiz (Ek H4, gerçekleşme düzeltmesi; varsayılanlar = önceki sonuçlar):
+#   kural="s3": journal.evaluate s3 — alış fiyatı SL'ye eşit/altındaysa alış günü satışı alış fiyatından (yapay kâr yok).
+#   stop_alti_girissiz=True: açılışı GÖRÜP elle alım (mevcut akış): açılış ≤ SL ise yeni öneri girişsiz (journal.giris_kosulu).
+#   Açılış seansına önceden verilen limit emirde (azami_giris senaryosu) bu süzgeç UYGULANAMAZ: emir SL altında da dolar,
+#   s3 ile hemen stop olur (zarar = maliyet).
 # adet_temeli (Ek H3, araştırma senaryosu): "planlanan_giris" = MEVCUT davranış (canlı panel gibi plan girişiyle adet;
 # nakit kontrolü açılış fiyatıyla). "azami_giris" = ALTERNATİF: adet, nakit ayırma ve aday riski açılıştan ÖNCE bilinen
 # azami girişle hesaplanır; emir açılış seansına azami giriş limitli verilir, açılış fiyatından (≤ azami) dolar. Açılış
@@ -129,6 +134,8 @@ def simule(planlar: List[Dict], bars: Dict[str, List[Dict]], takvim: List[str], 
                 neden = "giriş günü fiyat yok"
             if not neden and (bar.get("open") or bar["close"]) > p["azami"] + 1e-9:
                 neden = "açılış azami girişin üstünde"
+            if not neden and a["stop_alti_girissiz"] and                     journal.giris_kosulu(bar.get("open") or bar["close"], p["azami"], p["sl"]):
+                neden = "açılış stopun altında veya eşit (girişsiz)"
             if not neden and not a["sinirsiz"] and len(acik) + len(bugun) >= a["azami_pozisyon"]:
                 neden = "pozisyon sınırı"
             sek = sektor_fn(tk)
@@ -195,7 +202,7 @@ def simule(planlar: List[Dict], bars: Dict[str, List[Dict]], takvim: List[str], 
             rec = {"kaynak": "gercek", "gercek_giris_gunu": x["giris_gunu"], "gercek_giris_fiyati": x["fill"],
                    "signal_day": p["tarih"], "senaryo": p["tur"], "sl": p["sl"], "tp1": p["tp1"], "tp2": p["tp2"],
                    "giris": p["giris"], "alarm": None, "gecerlilik": 1}
-            res = journal.evaluate(rec, upto, kom, kay)
+            res = journal.evaluate(rec, upto, kom, kay, kural=a["kural"])
             if res.get("durum") == "kapandı":
                 legs = res.get("bacaklar") or []
                 if x["tp1_satildi"]:
