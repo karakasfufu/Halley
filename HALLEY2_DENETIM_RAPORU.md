@@ -1589,3 +1589,37 @@ Prova canlı veritabanını değiştirmedi: canlıda 0 tahmin kaldı ve hazır f
    - Yeni akşam tahminleri eklendi mi?
    - Önceki tahminler değişmedi mi?
 3. İki rapor da beklenen sonucu verirse FAZ 1 kabulü önerilecek. Karar kullanıcıda.
+
+## E4. Canlı sabah kontrolü (16.11, gerçek veri) — sonuçlar
+
+**Olay:** Bilgisayar 01:15'te uykuya geçti ve 09:10'da uyandı. Kanıt: Windows Power-Troubleshooter olayı,
+"Uykuya Geçiş 2026-11-15T22:15:34Z, Uyanma 2026-11-16T06:10:57Z". Uyanınca Halley süreçleri çalışmıyordu; iki
+salt-okunur bekçi de çıktı vermeden sonlanmıştı (çıkış kodu 4). Bu yüzden 08:30 sabah kontrolü yapılmadı. **Bu bir
+kod hatası değil, ortam olayı.** Halley 09:37'de yeniden başlatıldı; kod ve kurallar değişmedi.
+
+**Sabah kontrolü:** 09:38'de çalıştı. Bekçi kaydı: `watch_runs` run_id 3, sabah, 2026-11-16, başlangıç kaydı 09:42:26.
+
+| Kontrol | Canlı sonuç | Kanıt |
+|---|---|---|
+| BAHKM ve ENERY tahminleri | ✅ #1 BAHKM, #2 ENERY; hazır fırsatlar "onaylandı" | `tahmin`, `hazir_firsat` |
+| Zaman damgası ve giriş günü | ✅ tahmin_zamani 2026-11-16T09:38:05+03:00, giriş günü 16.11, sinyal günü 13.11. Açılış sınırından (09:55) önce, yani **ölçüme girecek**. | `tahmin` |
+| Olasılık | ✅ BAHKM 0,32647 (orta), ENERY 0,37279 (yüksek). Hazır fırsat gösterimiyle ve sabah provasıyla birebir aynı. | `tahmin` ↔ `hazir_firsat.model_json` |
+| Teknik göstergeler | ✅ Gün 13.11. BAHKM: RSI 59,96, ATR 11,82, skor 7. ENERY: RSI 62,18, ATR 0,541, skor 8. Provayla aynı. | `teknik_json` |
+| Sürümler | ✅ tp1_v1 / 97b3f45b5a82 / 22b983b5a3ec; kod sürümü "gelistirme" (geliştirme klasörü, beklenen) | `tahmin` |
+| İşlem seviyeleri | ✅ BAHKM: giriş 163,50, azami 167,05, SL 150,88, TP1 202,00, TP2 214,62. ENERY: giriş 14,60, azami 14,72, SL 13,99, TP1 15,82, TP2 16,43. Hazır fırsatla aynı. | `tahmin` ↔ `hazir_firsat` |
+| Rejim ve veri | ✅ Rejim: düşüş, yüksek oynaklık, genişlik %12,1. Veri: uyarı yok, kritik değil, 250 gün. | `rejim_json`, `veri_json` |
+| Mükerrer kayıt | ✅ Canlıda tek sabah çalıştırması oldu; 2 tahmin. Aynı analizin tekrarı canlı kopyada sınandı (Ek E1: tekrar → 0 yeni satır). | `watch_runs`, `tahmin` |
+| Sayfa yenileme / rerun | ✅ Panel ziyaretleri ve 3 tam sayfa yenilemeden sonra: 2 tahmin, 0 sonuç, satır özeti `aeed9616f1d40205` (değişmedi) | salt-okunur sorgu |
+| Açık / girişsiz / sonuçlanmış | ✅ 16.11 fiyatı henüz yok, ikisi de **açık**. Girişsiz ya da sonuçlanmış ayrımı akşam analizinde görülecek. | `tahmin_sonuc` boş |
+| Panel = veritabanı | ✅ Panel: Tahmin 2, Sonuçlanan 0, Açık 2, Giriş olmadı 0, İptal/yerini aldı 0, Aynı mumda 0. Model seçici "tp1_v1 (2 tahmin)". Veritabanı: 2 / 0. | canlı panel metni |
+| Veritabanı sağlamlığı | ✅ integrity_check ok | salt-okunur sorgu |
+
+**Kalan:** Akşam analizi sonrası kontrol. Bekleneceklerler:
+
+- 16.11 açılışına göre sonuç: açılış azami girişin üstündeyse "girişsiz", değilse açık pozisyon.
+- Yeni akşam tahminleri.
+- Sabahki iki satırın özetinin değişmemesi.
+
+Akşam bekçisi sonucu `aksam_raporu_20261116.txt` dosyasına da yazacak.
+
+**FAZ 1 hâlâ kabul edilmedi;** akşam adımı bekleniyor.
