@@ -4034,3 +4034,31 @@ seçim ya da kâr açısından değeri gösterilemedi. Dönemler önceden incele
 - Akşam kaydı doğrulandı (Ek J2). **Gözlenmeyen:** 17.11 sabah kontrolü ve gerçek sonuçlandırma. FAZ 1 kabul edilmedi.
 
 **Onay beklenen:** FAZ 5 kabul kararı. FAZ 6'ya geçilmedi.
+
+---
+
+# EK K2 (16.11.2026) — FAZ 5 KABUL KAYDI
+
+**Kabul:** Kullanıcı FAZ 5'i commit `6c7e7a2` kapsamında **araştırma teslimi** olarak kabul etti (etiket `faz5-kabul`). Aday modellerin yatırım açısından faydalı bulunduğu ya da canlıya alınması **onaylanmadı**. Etkin model (`tp1_v1`), seçim kuralları ve eşikler değişmez.
+
+**Korunan ayrımlar:**
+- TP1 olay hedefleri (5 ve 10 gün) ön kayıtlı ölçütü **geçti**.
+- Hedef uzaklığına dayalı mekanik referans **sonradan** incelendi. Modelin bunun üzerindeki ek katkısı ve ekonomik faydası **kanıtlanmadı**.
+- Getiri hedeflerinde katkı **gösterilemedi**.
+- İncelenen dönemler (2024, son 12 ay) bağımsız yeni doğrulama **değildir**.
+
+**Metrik açıklaması:** Ek K tablosundaki "+%3,7" gibi değerler **Brier becerisidir**: 1 − Brier(M1) / Brier(R1).
+- Bu, türe göre orana (R1) göre Brier skorundaki **göreli (oransal) azalma yüzdesidir; yüzde puan değildir**.
+- Örnek (H5_tp1, ana sınama): R1 Brier 0,0737, M1 Brier 0,0710 → 1 − 0,0710 / 0,0737 ≈ %3,7 göreli iyileşme. Mutlak fark 0,0027 Brier birimidir.
+- AUC değerleri mutlak AUC'dir (0–1).
+
+**Sabitlenenler** (`arastirma/faz5/kabul_kaydi.json`):
+- Kod ve deney tanımının SHA-256 değerleri.
+- Veri parmak izleri: plan dosyası `2413d1df…`, araştırma veritabanı `d563b954…`, hedef dosyası `233a6a83…` (Git dışı arşiv: `data/backtest/arsiv/faz5_kabul_20261116/`), sonuç dosyası `c2af4cdd…`.
+- Rastgelelik tohumları: blok bootstrap tohum 1 (300 tekrar), gün kümesi bootstrap tohum 20261116 (1.000 tekrar).
+- Seçilen λ ve iç doğrulama sınırları.
+- Ortam: Python 3.9.13, numpy 2.0.2, pandas 2.3.3, Windows 10.
+
+**Tekrar üretim:** Aynı kod ve veriyle hedef dosyası ve sonuçlar yeniden üretildi; SHA-256 değerleri **birebir aynı** çıktı.
+
+**Aday modeller:** Dosyaya yazılmadı, etkinleştirilmedi.

@@ -1985,3 +1985,7 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Ön kayıt 6430231 (sonuçlardan önce), kod 5dd858f. Hedefler ayrı: zaman çıkışı getirisi (H5/H10_pozitif, net %, R_plan) ve TP1 olayı (H5/H10_tp1, journal.evaluate ilk N mum). Ortak örneklem 30.404, ambargo 45 gün, ön işleme/λ yalnız eğitimden.
 - Ön kayıtlı karar: TP1 olay hedeflerinde ölçüt geçti (AUC 0,67–0,73), getiri hedeflerinde katkı yok. Sonradan tanı: yalnız TP1 uzaklığı AUC 0,69 → büyük kısmı mekanik; üst %20 son 12 ayda yine eksi. Uygulanabilir katkı yok; aday model etkinleştirilmedi, dosyaya yazılmadı.
 - 639 test OK. Ayrıntı: Ek K.
+
+## 2026-11-16 — FAZ 5 KABUL EDİLDİ (araştırma teslimi; commit 6c7e7a2, etiket faz5-kabul)
+- Ayrımlar: TP1 olay hedefleri ön kayıtlı ölçütü geçti; mekanik uzaklık referansı sonradan incelendi, ek katkı/ekonomik fayda kanıtlanmadı; getiri hedeflerinde katkı yok; dönemler bağımsız değil.
+- '+%3,7' = Brier becerisi (R1'e göre GÖRELİ azalma), yüzde puan değil. Kabul kaydı arastirma/faz5/kabul_kaydi.json; yeniden üretim SHA-256 birebir aynı. Etkin model/kurallar değişmedi.

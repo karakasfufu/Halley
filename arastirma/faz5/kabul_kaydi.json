@@ -1,0 +1,127 @@
+{
+ "ad": "FAZ 5 KABUL KAYDI — 5/10 günlük hedefler (araştırma teslimi)",
+ "kabul": "Kullanıcı 16.11.2026: commit 6c7e7a2 kapsamında ARAŞTIRMA TESLİMİ. Aday modellerin yatırım açısından faydalı bulunduğu ya da canlıya alınması onaylanmadı. Etkin model (tp1_v1), seçim kuralları ve eşikler değişmez.",
+ "ayrimlar": [
+  "TP1 olay hedefleri (H5_tp1, H10_tp1) ön kayıtlı ölçütü geçti.",
+  "Hedef uzaklığına dayalı mekanik referans SONRADAN incelendi (sonradan_tani.json); modelin bunun üzerindeki ek katkısı ve ekonomik faydası KANITLANMADI.",
+  "Getiri hedeflerinde (H5_pozitif, H10_pozitif) katkı gösterilemedi.",
+  "İncelenen dönemler (2024, son 12 ay) bağımsız yeni doğrulama değildir."
+ ],
+ "metrik_aciklamasi": "Ek K tablosundaki '+%3,7' gibi değerler BRIER BECERİSİDİR: 1 − Brier(M1) / Brier(R1), yani R1'e (türe göre oran) göre Brier skorundaki GÖRELİ (oransal) azalma yüzdesi; yüzde PUAN değildir. Örnek: H5_tp1 ana sınamada R1 Brier 0,0737, M1 0,0710 → 1 − 0,0710/0,0737 ≈ %3,7 göreli iyileşme (mutlak fark 0,0027 Brier birimi). AUC değerleri mutlak AUC'dir (0–1).",
+ "kod": {
+  "kabul_commit": "6c7e7a2",
+  "etiket": "faz5-kabul",
+  "on_kayit_commit": "6430231",
+  "kod_commit": "5dd858f",
+  "sha256": {
+   "deney_tanimi.json": "8c233ee250fe8248724abe3d34b0e458a89e3bddbac456bf9fc9e1e924c7aca1",
+   "hedefler.py": "c5db603765a4e128833d0a34efadf9bb3e493606596a5e3e8f4f0924da15baab",
+   "deney.py": "6610b4fbcf3358b9d3cbbb3a38929fca6fc5f3972119a0aeaf3f9e606138e629",
+   "asama6/model.py": "036df8d3c9f50f0bfbbb14b6bf7f8df496d128f25580bba06bf7102a9e30f40a",
+   "faz4/rejim_analiz.py": "0d03492d129f974f79631319c65f2d214b41aa4694eb0d4f72fec153b5138cbd",
+   "bist_haber/journal.py": "5c4609dbb84c17bfa628867df72605698ec84f011229d46c626fabedc2579624"
+  }
+ },
+ "veri": {
+  "planlar_seviyeli.csv": {
+   "sha256": "2413d1dfecca4994202797e0a156096953010a7e689ab237070a7b5aaa5a12de",
+   "satir": 45737
+  },
+  "arastirma_5y.db": {
+   "parmak_izi_sha256": "d563b954e872834be802e294160266619780096a8ff6007cdcb7650e6441f468",
+   "not": "fiyat_izi.veri_ozeti (FAZ 3); 16.11 14:40 alındı"
+  },
+  "hedefler.csv": {
+   "sha256": "233a6a836d5340f640193468abd5c56d8df666d3d64881ab675df3e4d37843c0",
+   "satir": 30472,
+   "arsiv": "data/backtest/arsiv/faz5_kabul_20261116/hedefler.csv (Git dışı)"
+  },
+  "deney_sonuclari.json": {
+   "sha256": "c2af4cdd38b34612ff7005956e4e2db28b70b39fcf217dc1edd76659dacadc98"
+  }
+ },
+ "rastgelelik": {
+  "model.block_ci": {
+   "yontem": "aylık blok bootstrap, numpy.random.default_rng",
+   "tohum": 1,
+   "tekrar": 300,
+   "aralik": "%90 (5.–95. yüzdelik)"
+  },
+  "rejim_analiz.kume_bootstrap (betimleme)": {
+   "yontem": "gün kümesi bootstrap, random.Random",
+   "tohum": 20261116,
+   "tekrar": 1000,
+   "aralik": "%95"
+  },
+  "model_uydurma": "deterministik (Newton–Raphson, sıfır başlangıç, 50 yineleme, durma 1e-8)"
+ },
+ "model_ayarlari": {
+  "M1": "L2 lojistik (model.logit_fit), girdiler model.NUM + CAT, ön işleme model.design (medyan, %1–99 kırpma, standartlaştırma; yalnız eğitimden)",
+  "lambda_adaylari": [
+   1,
+   10,
+   100,
+   1000
+  ],
+  "secilen_lambda": {
+   "ana_sinama/H5_tp1": 1,
+   "ana_sinama/H10_tp1": 10,
+   "ana_sinama/H5_pozitif": 1000,
+   "ana_sinama/H10_pozitif": 1000,
+   "ek_sinama/H5_tp1": 100,
+   "ek_sinama/H10_tp1": 100,
+   "ek_sinama/H5_pozitif": 100,
+   "ek_sinama/H10_pozitif": 100
+  },
+  "ic_dogrulama_sinirlari_[fit_son, val_bas]": {
+   "ana_sinama/H5_tp1": [
+    "2025-02-21",
+    "2025-03-13"
+   ],
+   "ana_sinama/H10_tp1": [
+    "2025-02-21",
+    "2025-03-13"
+   ],
+   "ana_sinama/H5_pozitif": [
+    "2025-02-21",
+    "2025-03-13"
+   ],
+   "ana_sinama/H10_pozitif": [
+    "2025-02-21",
+    "2025-03-13"
+   ],
+   "ek_sinama/H5_tp1": [
+    "2023-09-01",
+    "2023-09-21"
+   ],
+   "ek_sinama/H10_tp1": [
+    "2023-09-01",
+    "2023-09-21"
+   ],
+   "ek_sinama/H5_pozitif": [
+    "2023-09-01",
+    "2023-09-21"
+   ],
+   "ek_sinama/H10_pozitif": [
+    "2023-09-01",
+    "2023-09-21"
+   ]
+  },
+  "ambargo_takvim_gunu": 45,
+  "ic_ambargo_takvim_gunu": 20,
+  "aday_model_kaydi": "YOK — ağırlıklar dosyaya yazılmadı, etkinleştirilmedi"
+ },
+ "ortam": {
+  "python": "3.9.13",
+  "platform": "Windows-10-10.0.19045-SP0",
+  "islemci": "Intel64 Family 6 Model 142 Stepping 9, GenuineIntel",
+  "numpy": "2.0.2",
+  "pandas": "2.3.3",
+  "venv": "%USERPROFILE%/.venvs/bist-haber"
+ },
+ "tekrar_uretim_kaniti": "16.11.2026: aynı kod ve veriyle hedefler.csv ve deney_sonuclari.json yeniden üretildi; SHA-256 ikisi de BİREBİR aynı (233a6a83…, c2af4cdd…).",
+ "komutlar": [
+  "python arastirma/faz5/hedefler.py <repo> <arastirma_5y.db> <planlar_seviyeli.csv> <hedefler.csv>",
+  "python arastirma/faz5/deney.py <repo> <hedefler.csv> <deney_sonuclari.json>"
+ ]
+}
