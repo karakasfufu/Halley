@@ -1,0 +1,36 @@
+{
+ "ad": "FAZ 4 ön kayıt — strateji türü × piyasa rejimi (tekil işlem araştırması)",
+ "kayit_zamani": "2026-11-16, sonuçlar hesaplanmadan ÖNCE (bu dosyanın commit'i analiz çıktılarından önce gelir)",
+ "not_onceden_gorulen": "Kullanılan plan ve sonuç verisi (planlar_seviyeli.csv) FAZ 2'de, tp1_v1 eğitiminde ve Aşama 6'da incelenmişti. Strateji türü düzeyindeki toplu sonuçlar ve 2024 / son 12 ay dönemleri daha önce görüldü. Bu çalışma YENİ ve BAĞIMSIZ doğrulama değildir.",
+ "rejim": {
+  "kaynak": "bist_haber.regime.regime (canlı kod; değiştirilmedi). Yalnız trend ve oynaklık sınıfı kullanılır; canlı tahmin defterinin rejim anahtarıyla aynı ('trend / oynaklık').",
+  "trend": "BIST 100 kapanışı > EMA50 > EMA200 → yükseliş; kapanış < EMA50 < EMA200 → düşüş; diğer → kararsız (o güne kadarki en çok 520 mum)",
+  "oynaklik": "BIST 100 20 günlük ATR% değerinin, o güne kadarki son 252 gözlem içindeki yüzdeliği: < 30 düşük, > 70 yüksek, arası normal (eşikler canlı koddaki LOW_PCT=30, HIGH_PCT=70; tüm dönemden hesaplanmaz)",
+  "genislik": "KULLANILMAZ: canlı kodda sınıf eşiği yok; yeni eşik tanımlamak yeni bir kural olurdu.",
+  "karar_ani": "Rejim, planın sinyal günü (kapanıştan sonra karar) için regime(conn, sinyal_gunu) ile hesaplanır; yalnız o güne kadarki BIST 100 mumları. XU100'de o gün yoksa (25 Aralık) son mevcut gün kullanılır (canlı kodla aynı).",
+  "hesaplama": "regime() yalnız XU100 satırlarını içeren bellek içi veritabanıyla çağrılır (genişlik döngüsü boş kalır; trend/oynaklık kodu aynı)."
+ },
+ "evren": "canli_ortak (risk ≠ yüksek, teknik skor ≥ 5) — FAZ 2'deki tanım; haber şartı YOK (canlı haberli hazır fırsat listesi değildir)",
+ "strateji_turleri": ["kirilim_teyitli", "geri_cekilme", "destek_teyitli", "mevcut_fiyat (varsa)"],
+ "ornek": {
+  "kaynak": "planlar_seviyeli.csv (etiketle.py, 16.11.2026; y = tp1_hedefi; r/net journal.evaluate, giriş ertesi açılış, azami üstü girişsiz, komisyon %0,2 + kayma %0,1)",
+  "dahil": "sonuç kapanmış (SL, TP2, başabaş (TP1 sonrası), süre doldu)",
+  "haric": ["girissiz (açılış azami üstü)", "acik (sonuç belli değil)", "s3 tür A: açılış ≤ SL → girişsiz (yapay kâr içeren s2 sonuçları çıkarılır; açılış = kapanış × (1 + açılış boşluğu %))"],
+  "tekil_islem": "Her plan bağımsız tekil işlemdir; portföy getirisi veya portföy düşüşü HESAPLANMAZ."
+ },
+ "donemler": {"2022_son": ["2022-11-01", "2022-12-31"], "2023": ["2023-01-01", "2023-12-31"], "2024": ["2024-01-01", "2024-12-31"], "2025_ilk": ["2025-01-01", "2025-11-13"], "son_12_ay": ["2025-11-14", "2026-11-13"], "tumu": ["2022-11-01", "2026-11-13"]},
+ "olcutler": {
+  "n": "örnek sayısı", "gun": "farklı sinyal günü sayısı", "hisse": "farklı hisse",
+  "tp1_%": "y ortalaması", "kazanma_%": "net > 0 (maliyet sonrası)", "ort_net_%": "net ortalaması", "ort_R": "r ortalaması",
+  "guven_araligi": "%95, sinyal gününe göre KÜME bootstrap (gün yeniden örneklenir; 2000 tekrar, tohum 20261116); aynı günün gözlemleri birlikte örneklenir",
+  "ayni_hisse_tekrar": "aynı hissenin önceki sinyalinden 10 işlem günü içinde gelen sinyal payı (aynı hisseden ilişkili gözlem uyarısı; aralıklar bunu düzeltmez)",
+  "yeterlilik": "bist_haber.defter.guven(n, gun): n < 30 → 'çok az örnek, karar verilmez'; gün < 20 → 'az bağımsız gün'; n < 100 ya da gün < 60 → 'düşük güven'; aksi 'orta güven'",
+  "veri_kalitesi": "grup içinde gösterge penceresinde (sinyal gününe kadarki 250 mum) > %10,5 tek gün sıçrama olan plan payı; tutma süresinde (giriş … giriş + gun mum) sıçrama olan plan payı (FAZ 3 tanımı)"
+ },
+ "gruplar": {
+  "ana": "strateji türü × trend × oynaklık (dönem: tümü ve her dönem)",
+  "marjinal": "strateji türü × trend; strateji türü × oynaklık; yalnız rejim (tür birleşik)"
+ },
+ "coklu_karsilastirma": "Grup sayısı raporlanır. %95 aralığı 0'ı dışlayan grupların sayısı, rastlantıyla beklenen sayıyla (grup × 0,05) birlikte verilir. Düzeltme sonrası anlamlılık iddia edilmez.",
+ "yasaklar": ["sonuçlara bakarak eşik/sınıf değiştirmek", "otomatik strateji seçimi", "portföy metriği çıkarmak", "canlı kural/model değişikliği"]
+}
