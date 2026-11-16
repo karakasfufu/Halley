@@ -2540,6 +2540,7 @@ def model_live_panel() -> None:
                         "TP1 %": (o_["metrik"] or {}).get("tp1_%"), "Brier": (o_["metrik"] or {}).get("brier"),
                         "Güven": o_["guven"]})
         st.dataframe(pd.DataFrame(tbl).astype(str), hide_index=True, width="stretch")
+    st.caption("ℹ️ Hedef tanımı uyumsuzluğu: " + defter.ETIKET_UYUMSUZLUGU)
     f1, f2, f3, f4, f6, f5 = st.columns([1.8, 1.0, 1.2, 1.1, 1.0, 1.2])
     gi = f1.selectbox("Sürüm grubu", list(range(len(gs))), key="ml_grup",
                       format_func=lambda i: f"{defter.grup_etiketi(gs[i]['grup'])} ({gs[i]['n']} tahmin)",

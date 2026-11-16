@@ -1862,3 +1862,25 @@ Faz sırası korunuyor:
 5. 5/10 günlük hedefler
 6. Bozulma uyarıları ve hız
 7. Vadeler
+
+---
+
+# EK G (16.11.2026) — FAZ 1 canlıya geçiş: ön kontrol notu (hedef tanımı uyumsuzluğu)
+
+**Hedef tanımı uyumsuzluğu (panel ve rapor):**
+
+- **Eski tanım:** Etkin model `tp1_v1`, eski etiketle eğitildi. Bu etikette doğrudan TP2 açılışı y=0 sayılıyordu.
+  Eğitim planlarının %0,26'sı (34.665 planda 91) bu durumda.
+- **Yeni tanım:** Canlı ölçüm (kural s2) doğrudan TP2 açılışını TP1'e ulaşmış sayar.
+- **Sonuç:** Canlı sonuçlar, modelin tarihsel ölçüleriyle (isabet 0,605 / 0,612; en yüksek %20 için +0,17 R) doğrudan
+  eşdeğer değildir.
+- **Nerede açıklanıyor:** Panelde her zaman görünen not: `defter.ETIKET_UYUMSUZLUGU`, Performans → Model canlı
+  performansı. Test: `test_faz1_ledger_panel_and_reruns_do_not_duplicate`.
+- **Model:** Yeniden eğitilmedi; etkin model değişmedi.
+
+**Eksik sözleşmeli sonuçlar:** Maliyet ya da kural sözleşmesi olmayan eski tahminler, "kural eksik · maliyet eksik"
+grubunda kalır. Tam bilgili yeni tahminlerle aynı performans grubunda birleşmez (Ek F-C; test
+`test_missing_contract_is_shown_not_guessed`; canlı kopyada BAHKM ve ENERY bu grupta). Yeni değerlendirme bu bilgiyi
+uydurmaz; kullanılan maliyetin kaynağı sonuç satırına yazılır.
+
+Geçiş ayrıntıları ve kanıtları aşağıdaki bölümlerde.

@@ -41,6 +41,11 @@ TEKNIK_ALANLAR = ("tarih", "son_fiyat", "trend", "rsi14", "macd_hist", "adx", "a
 TABLO_ANAHTAR = ("tur", "trend", "atr_%", "rsi")   # benzer durumlar tablosunun grup anahtarı (tp1_model._table_key)
 GRUP_ALANLARI = ("model_surum", "ozellik_surum", "parametre_surum", "kural_surum", "maliyet_protokol", "komisyon_pct",
                  "kayma_pct")
+ETIKET_UYUMSUZLUGU = ("Etkin model (tp1_v1) ESKİ hedef tanımıyla eğitildi: o etikette fiyatın doğrudan TP2 üstünde "
+                      "açıldığı durumlar 'TP1'e ulaşmadı' sayılmıştı (eğitim planlarının %0,26'sı; 34.665 planda 91). "
+                      "Canlı ölçüm YENİ tanımı kullanır (doğrudan TP2 açılışı da TP1'e ulaşmış sayılır). Bu yüzden canlı "
+                      "sonuçlar, modelin tarihsel ölçüleriyle (isabet 0,605 / 0,612, en yüksek %20 için +0,17 R) doğrudan "
+                      "eşdeğer değildir. Model yeniden eğitilmedi.")
 DONEM_DISI_GEREKCE = ("Uygun dönem dışı geçmiş sınama referansı yok: 5 yıllık araştırma evreni haber şartı içermeyen "
                       "teknik plan evrenidir; canlı hazır fırsatlar ise haber skoru, en fazla 5 seçim, sabah kontrolü "
                       "gibi farklı koşullarla seçilir. Modeldeki 'benzer durumlar oranı' eğitim tablosundandır, dönem "

@@ -299,6 +299,9 @@ class PanelFlowTests(unittest.TestCase):
         self.assertIn("Model canlı performansı", md_)
         self.assertEqual(at.selectbox(key="ml_grup").value, 0)        # Ek F-C: sürüm grubu seçimi (model × özellik × …)
         self.assertIn("mevcut değil", " ".join(c_.value for c_ in at.caption))   # Ek F-F: dönem dışı referans yok
+        caps_ = " ".join(c_.value for c_ in at.caption)                     # Ek G: eski etiket ↔ yeni hedef uyumsuzluğu
+        self.assertIn("ESKİ hedef tanımıyla eğitildi", caps_)
+        self.assertIn("doğrudan eşdeğer değildir", caps_)
         # 16.11: "Planı üreten analiz" etiketi ve ayrı "Kayıt zamanı" filtresi (Sabah / Akşam / Tümü)
         self.assertEqual(at.selectbox(key="ml_ana").label, "Planı üreten analiz")
         self.assertEqual((at.selectbox(key="ml_kayit").label, at.selectbox(key="ml_kayit").options),
