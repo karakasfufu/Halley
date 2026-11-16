@@ -5497,3 +5497,70 @@ Canlı veritabanı salt-okur açıldı; yeni kod ile eski hesap karşılaştır�
 - OpenAI kullanım panelinde aynı tutar görülmeli.
 
 İlk deneme doğrulanmadan kuyruk topluca işlenmez.
+
+
+---
+
+# EK O-3d (16.11.2026) — O3 tek haberlik ücretli doğrulama sonucu ve kabul önerisi
+
+**Başlatan:** kullanıcı, paneldeki 🔬 Haber analizi düğmesiyle (21:47:21). Asistan çağrı başlatmadı; denemeyi
+salt-okur bir bekçiyle izledi.
+
+## O3d.1 Sonuç
+
+| Kontrol | Kayıt | Sonuç |
+|---|---|---|
+| Yalnız seçilen haber | Defterde, `ai_calls`'ta ve yeni analyses satırında yalnız `kap:1698251` (ARDYZ "Yeni İş İlişkisi") var. Haberin durumu `analyzed`; 1 etki (ARDYZ +1, güven 0,9). | ✅ |
+| Çağrı ve yeniden deneme sayısı | 1 iş zarfı + 1 çağrı rezervasyonu (`tam_analiz`). `ai_calls`'ta 1 satır: `ok`, `deneme=0`, 28,3 sn. 400 hatası yok. | ✅ eşleşiyor |
+| İkinci görüş | Yapılmadı. Bulunan etki 1; profilin ikinci görüş eşiği 3. Bu, mevcut kuralın olağan davranışı. Zarf ikinci çağrıyı da kapsıyordu. | beklenen |
+| Kullanım ve maliyet | Girdi 2.737, çıktı 2.857 token. Maliyet 0,006398 $; defter (`gercek_usd`), `ai_calls.usd` ve analyses tokenlarından hesaplanan tutar **birebir aynı**. | ✅ |
+| Rezervasyonun serbest kalması | Zarf 0,1058 $ → `zarf_kapali` (21:47:49). Çağrı rezervasyonu 0,0353 $ → `tamam`. Açık kayıt 0, belirsiz kayıt 0. Harcanmış sayılan yalnız gerçek tutar. | ✅ |
+| Çift sayım yok | Ay: 2,285221 + 0,006398 = **2,291619** ≈ defterin 2,29162'si (yuvarlama). Eski hesap (`month_spend`) da aynı. Çağrı satırında `kayda_gecti=1`: tutar analyses'ten bir kez sayılıyor. Gün: 0,006398. | ✅ |
+| Panel | "bugün 0.01 / 0.50 $ · bu ay 2.29 / 10.00 $ · günlük (0.49 $ kaldı)". "113 güncel haber henüz analiz edilmedi" (önce 114). "kapsam eksik: 9". Hata yok. Kayıtlarla tutarlı (iki ondalığa yuvarlanmış). | ✅ |
+| Geçmiş tahminler | Geçiş öncesi yedekle satır satır karşılaştırıldı. `tahmin` (5), `tahmin_sonuc`, `tahmin_degerlendirme`, `defter_olay`, `hazir_firsat` (5): eksilen 0, eklenen 0. Eski analyses ve impacts satırları değişmedi. | ✅ |
+
+**Diğer yazımlar (yedekle karşılaştırıldı; hepsi mevcut davranış, O3 değiştirmedi):**
+
+- `news`:
+  - 148 bekleyen haberde yalnız `content_hash` dolduruldu. Bu, tekrar elemesinin özet alanı; durum ve metin değişmedi.
+  - Seçilen haberde `status` ve `note` değişti.
+- `company_stats`: ARDYZ için günün piyasa değeri ve fiyatı eklendi (analiz bağlamı; ücretsiz fiyat verisi).
+- `trade_journal`: 20 satırda yalnız `guncellendi` zamanı değişti (panelin yeniden çizilmesi).
+
+## O3d.2 OpenAI kullanım ekranıyla karşılaştırma (açık)
+
+- Kayıtlara göre beklenen tutar: 1 istek, 2.737 girdi + 2.857 çıktı token, **≈ 0,0064 $** (16.11 21:47 TR = 18:47 UTC).
+- OpenAI kullanım ve fatura ekranı **gecikmeli** güncellenebilir (dakikalar ile saatler arası). Bu yüzden henüz
+  karşılaştırılmadı. Kullanıcının hesabıyla bakılması gerekir.
+- Kurulum öncesi yapılan **kayıtsız "ucuz test" çağrılarının tutarı bilinmiyor; sıfır kabul edilmedi.**
+  - Halley'in kayıtlarında görünmüyorlar.
+  - OpenAI ekranındaki Kasım toplamı, Halley'in 2,29 $'ından büyükse fark bu çağrılar ve öncesindeki kayıtsız
+    kullanımlar olabilir.
+  - Gerekirse aylık bütçe bu farka göre elle düşürülmeli; kod bu farkı bilemez.
+
+## O3d.3 Canlıda gösterilemeyenler (taklitle test edildi)
+
+- İkinci görüş çağrısı, 400 sonrası yeniden deneme, zaman aşımı ve kullanım bilgisi yokluğu canlıda oluşmadı. Bunlar
+  testlerde doğrulandı (Ek O-3b).
+- `reasoning_effort` desteği bu panel sürecinde artık biliniyor. Sonraki işlerin zarfı daha küçük olur (~0,071 $
+  medyan); süreç yeniden başlayınca ilk iş yine payla başlar.
+
+## O3d.4 Kabul önerisi
+
+**Öneri: O3'ü canlıda KABUL et.** Kapsam: haber güncellik göstergesi, işlem günü kapsamı, günlük + aylık bütçe,
+süreçler arası rezervasyon, tek analiz kilidi, sonradan analiz işareti.
+
+**Kabulle birlikte açık kalanlar:**
+
+1. OpenAI kullanım ekranı karşılaştırması (gecikme nedeniyle sonra; kullanıcının hesabıyla).
+2. Kayıtsız eski "ucuz test" harcaması bilinmiyor; OpenAI ekranındaki Kasım toplamıyla kıyaslanmalı.
+3. gpt-5-mini OpenAI'de "deprecated" olarak işaretli. Model değiştirilmedi; kapanış tarihi izlenmeli ve model
+   değişikliği ayrı onay gerektirir.
+4. 9 güncel haberin metni alınamadı ("kapsam eksik"). Okuyucu yeniden deniyor.
+5. 113 güncel haber analiz bekliyor. **Kuyruk topluca işlenmedi.**
+   - Önerilen normal kullanım: "Haberleri güncelle" (en fazla 10 haber) ya da küçük seçimler.
+   - Günlük 0,50 $ sınırıyla günde yaklaşık 28 haber işlenebilir.
+   - Kuyruğun tamamı birkaç günde biter; eski haber geçmişe taşınmaz.
+6. Çöken süreçten kalan açık rezervasyonlar için temizleme aracı yok (muhafazakâr; ay sonunda düşer).
+
+**Kapsam dışı (başlatılmadı):** O2, O4–O6, müşteri yayını, FAZ 8.

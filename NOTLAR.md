@@ -2030,3 +2030,9 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Durdurma 21:23:50; yedek data/yedek/kod_main_6a95652_20261116_212401 + bist_haber_20261116_212401_o3_oncesi.db (integrity ok, yedek = canlı); kopyada yedek→uygula→geri dönüş sınandı; göç yalnız harcama_rezervasyon; 24/24 tablo (170.636 satır) ve 22 tetikleyici aynı; yeniden başlatma 21:25:01 (~1 dk).
 - Panel: "analiz bekliyor" (114) + "kapsam eksik" (9), bütçe 0,00/0,50 · 2,29/10,00 $, garanti değildir notu. Bekçi ai=False. Geri dönüş aracı araclar/o3_gecis.py.
 - Bekleyen: tek haberlik ücretli deneme (öneri kap:1698251 ARDYZ; azami ayrılacak 0,1058 $; "Yalnız işaretlediklerim" + tek haber) — kullanıcının düğmesi. Ek O-3c.
+
+## 2026-11-16 21:47 — O3 tek haberlik ücretli doğrulama (kullanıcı düğmesi) → KABUL ÖNERİSİ
+- Yalnız kap:1698251 (ARDYZ) işlendi: 1 zarf (0,1058 $ → zarf_kapali) + 1 çağrı (tamam, kayda_gecti=1); ai_calls 1 satır ok, deneme 0; ikinci görüş eşik altında (etki 1 < 3).
+- Maliyet 0,006398 $ (2.737 / 2.857 token): defter = ai_calls = analyses. Ay 2,285221 → 2,291619 (çift sayım yok); belirsiz/açık 0. Panel 0,01/0,50 · 2,29/10 $, bekleyen 114 → 113.
+- Geçmiş tahminler/hazır fırsatlar yedekle satır satır aynı; diğer yazımlar mevcut davranış (148 haberde content_hash, ARDYZ company_stats, journal guncellendi).
+- Açık: OpenAI kullanım ekranı karşılaştırması (gecikmeli), kayıtsız eski ucuz test harcaması bilinmiyor (sıfır sayılmadı), gpt-5-mini deprecated, 9 metinsiz haber, 113 bekleyen (topluca işlenmedi). Ek O-3d.
