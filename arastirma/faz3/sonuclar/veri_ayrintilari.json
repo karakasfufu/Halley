@@ -1,0 +1,161 @@
+{
+ "not": "Neden kesinleştirilmedi; örüntü ve yakınlık yalnız UYUM gösterir. KAP listesi 2022-10-17 öncesini kapsamaz.",
+ "eksik_gun_turleri": {
+  "piyasa_geneli_dusuk_kapsama": 329,
+  "olasi_veri_eksikligi": 19
+ },
+ "eksik_gun_ornekleri": {
+  "piyasa_geneli_dusuk_kapsama": [
+   [
+    "ACSEL",
+    "2024-04-09",
+    1
+   ],
+   [
+    "ADGYO",
+    "2024-04-09",
+    1
+   ],
+   [
+    "AFYON",
+    "2024-04-09",
+    1
+   ],
+   [
+    "AGESA",
+    "2024-04-09",
+    1
+   ],
+   [
+    "AGYO",
+    "2024-04-09",
+    1
+   ],
+   [
+    "AHGAZ",
+    "2024-04-09",
+    1
+   ]
+  ],
+  "olasi_veri_eksikligi": [
+   [
+    "ARZUM",
+    "2024-03-15",
+    1
+   ],
+   [
+    "CASA",
+    "2023-04-06",
+    1
+   ],
+   [
+    "DNISI",
+    "2024-03-15",
+    1
+   ],
+   [
+    "GENIL",
+    "2023-04-06",
+    1
+   ],
+   [
+    "GWIND",
+    "2022-04-12",
+    1
+   ],
+   [
+    "ISGSY",
+    "2023-02-08",
+    1
+   ]
+  ]
+ },
+ "piyasa_geneli_dusuk_kapsamali_gunler": [
+  [
+   "2024-04-09",
+   218
+  ]
+ ],
+ "veritabani_baslangicindan_sonra_baslayan_hisse": 191,
+ "veritabani_ilk_gun": "2021-11-15",
+ "iki_veritabani_farki": {
+  "ETILR": {
+   "farkli_gun": 232,
+   "ilk": "2025-11-10",
+   "son": "2026-10-12",
+   "oran_min_%": -0.288,
+   "oran_max_%": -0.288,
+   "ornek": "belli günden önce sabit oran (geriye dönük düzeltmeyle UYUMLU)",
+   "son_farktan_sonraki_10_gunde_kap_kar_sermaye": []
+  },
+  "FLAP": {
+   "farkli_gun": 232,
+   "ilk": "2025-11-10",
+   "son": "2026-10-12",
+   "oran_min_%": -1.067,
+   "oran_max_%": -1.067,
+   "ornek": "belli günden önce sabit oran (geriye dönük düzeltmeyle UYUMLU)",
+   "son_farktan_sonraki_10_gunde_kap_kar_sermaye": []
+  },
+  "KBORU": {
+   "farkli_gun": 231,
+   "ilk": "2025-11-10",
+   "son": "2026-10-09",
+   "oran_min_%": -0.191,
+   "oran_max_%": -0.191,
+   "ornek": "belli günden önce sabit oran (geriye dönük düzeltmeyle UYUMLU)",
+   "son_farktan_sonraki_10_gunde_kap_kar_sermaye": []
+  },
+  "MGROS": {
+   "farkli_gun": 232,
+   "ilk": "2025-11-10",
+   "son": "2026-10-12",
+   "oran_min_%": -1.322,
+   "oran_max_%": -1.322,
+   "ornek": "belli günden önce sabit oran (geriye dönük düzeltmeyle UYUMLU)",
+   "son_farktan_sonraki_10_gunde_kap_kar_sermaye": []
+  }
+ },
+ "faz2_kabul_kurumsal_olay_maruziyeti": {
+  "o_12a_azami_islemler.csv": {
+   "islem": 130,
+   "tutma_suresinde_kap_kar_sermaye": 14,
+   "gosterge_penceresinde": 130
+  },
+  "o_12a_plan_islemler.csv": {
+   "islem": 130,
+   "tutma_suresinde_kap_kar_sermaye": 14,
+   "gosterge_penceresinde": 130
+  },
+  "o_2024_azami_islemler.csv": {
+   "islem": 123,
+   "tutma_suresinde_kap_kar_sermaye": 14,
+   "gosterge_penceresinde": 114
+  },
+  "o_2024_plan_islemler.csv": {
+   "islem": 123,
+   "tutma_suresinde_kap_kar_sermaye": 14,
+   "gosterge_penceresinde": 114
+  },
+  "t_12a_azami_islemler.csv": {
+   "islem": 144,
+   "tutma_suresinde_kap_kar_sermaye": 13,
+   "gosterge_penceresinde": 142
+  },
+  "t_12a_plan_islemler.csv": {
+   "islem": 144,
+   "tutma_suresinde_kap_kar_sermaye": 13,
+   "gosterge_penceresinde": 142
+  },
+  "t_2024_azami_islemler.csv": {
+   "islem": 115,
+   "tutma_suresinde_kap_kar_sermaye": 15,
+   "gosterge_penceresinde": 107
+  },
+  "t_2024_plan_islemler.csv": {
+   "islem": 115,
+   "tutma_suresinde_kap_kar_sermaye": 15,
+   "gosterge_penceresinde": 107
+  }
+ }
+}
