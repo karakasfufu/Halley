@@ -317,6 +317,13 @@ def bar_oku(dbp: str, tickers: List[str]) -> Dict[str, List[Dict]]:
     return out
 
 
+def takvim_olustur(bars: Dict[str, List[Dict]]) -> List[str]:
+    """İşlem günleri = herhangi bir hissenin mumu olan günlerin birleşimi. (16.11.2026: Yahoo'nun XU100 verisinde
+    2023/2024/2025 25 Aralık günleri YOK ama BIST açıktı, 512–593 hisse işlem gördü; takvim yalnız XU100'den alınırsa
+    o günler atlanır ve olaylar yanlış güne kayardı.)"""
+    return sorted({b["date"] for bs in bars.values() for b in bs})
+
+
 def _sha_dosya(p: str) -> str:
     h = hashlib.sha256()
     with open(p, "rb") as f:
@@ -334,7 +341,9 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     planlar = plan_oku(plan_csv, evren)
     bars = bar_oku(dbp, [p["ticker"] for p in planlar] + ["XU100"])
-    takvim = [b["date"] for b in bars["XU100"]]
+    takvim = takvim_olustur(bars)
+    xu = {b["date"] for b in bars.get("XU100", [])}
+    xu_eksik = [d for d in takvim if d not in xu]
     son_gun = takvim[-1]
     from datetime import date as _d, timedelta
     bas12 = (_d.fromisoformat(son_gun) - timedelta(days=365)).isoformat()
@@ -352,6 +361,7 @@ def main():
                       "plan_tarih_araligi": [min(p["tarih"] for p in planlar), max(p["tarih"] for p in planlar)],
                       "arastirma_db": dbp, "db_boyut": Path(dbp).stat().st_size, "fiyat_son_gun": son_gun,
                       "hisse_sayisi": len({p["ticker"] for p in planlar}),
+                      "takvim": "hisse mumlarının birleşimi", "xu100de_olmayan_gunler": xu_eksik,
                       "sektoru_bilinmeyen_hisse": sorted({p["ticker"] for p in planlar if _sektor(p["ticker"]) == "bilinmiyor"})}}
     ozet = {}
     for ad, (b, s) in donemler.items():

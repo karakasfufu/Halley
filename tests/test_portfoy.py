@@ -216,6 +216,21 @@ class Rapor(unittest.TestCase):
         self.assertEqual(m["toplam_getiri_%"], 8.0)
 
 
+class Takvim(unittest.TestCase):
+    def test_calendar_is_union_and_guard_catches_skipped_day(self):
+        """XU100'de olmayan bir işlem günü (25 Aralık örneği) takvimden düşmemeli; düşerse sıra koruması hata verir."""
+        bars = {"XU100": [bar(d, 1, 1, 1, 1) for d in D[:5] if d != D[2]],
+                "AAA": [bar(D[0], 100, 100, 100, 100), bar(D[1], 100, 101, 99, 100), bar(D[2], 100, 111, 100, 110),
+                        bar(D[3], 110, 112, 108, 111), bar(D[4], 111, 113, 109, 112)]}
+        tk = pf.takvim_olustur(bars)
+        self.assertEqual(tk, D[:5])                               # D2 (XU100'de yok) takvimde
+        r = pf.simule([plan("AAA", D[0], tp2=130)], bars, tk, D[1], D[4], {"baslangic_sermaye": 10000}, SEK)
+        self.assertEqual(r["acik_son"][0]["tp1_satildi"], True)  # TP1 D2'de işlendi
+        xu_takvim = [b["date"] for b in bars["XU100"]]
+        with self.assertRaises(AssertionError):                   # yalnız XU100 takvimi: TP1 günü atlanır → koruma
+            pf.simule([plan("AAA", D[0], tp2=130)], bars, xu_takvim, D[1], D[4], {"baslangic_sermaye": 10000}, SEK)
+
+
 class CanliSiralama(unittest.TestCase):
     def test_same_order_as_ready_select(self):
         ps = [plan("AAA", D[0], skor=6, rr1=3.0, risk="orta"), plan("BBB", D[0], skor=9, rr1=2.0, risk="orta"),
