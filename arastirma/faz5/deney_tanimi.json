@@ -1,0 +1,33 @@
+{
+ "ad": "FAZ 5 ön kayıt — 5 ve 10 işlem günlük hedefler (araştırma; canlıya bağlı değil)",
+ "kayit": "2026-11-16; sonuçlar hesaplanmadan ÖNCE commit'lendi. Deneme listesi sonuçlara bakılarak GENİŞLETİLMEZ.",
+ "onceden_gorulen": "Planlar ve dönemler (2024, son 12 ay) FAZ 2/4 ve tp1_v1 eğitiminde incelendi. Sonuçlar YENİ ve BAĞIMSIZ başarı kanıtı değildir.",
+ "evren": "canli_ortak (risk ≠ yüksek, teknik skor ≥ 5) planlar_seviyeli.csv (SHA-256 2413d1df…); haber şartı YOK (canlı haberli fırsat listesi değildir)",
+ "giris": "sinyal gününden sonraki işlem gününün AÇILIŞI (dolum). Açılış > azami giriş → girişsiz; açılış ≤ SL → girişsiz (s3 tür A). Girişsizler hedef örneğine girmez.",
+ "hedefler": {
+  "H5_getiri / H10_getiri (ZAMAN ÇIKIŞI)": "Giriş günü 1. gün sayılır; çıkış N. işlem gününün KAPANIŞI (N = 5 / 10). Stop ve hedef UYGULANMAZ. net_% = (çıkış / dolum − 1) × 100 − 0,30 (komisyon %0,2 + kayma %0,1, gidiş-dönüş). R_plan = (çıkış − dolum) / (plan girişi − SL) − 0,003 × dolum / (plan girişi − SL) (journal ile aynı payda ve maliyet). İkili hedef: H*_pozitif = net_% > 0.",
+  "H5_tp1 / H10_tp1 (OLAY)": "İlk N işlem günü içinde TP1 hedefine SL'den ÖNCE ulaşılması: journal.evaluate (gerçek giriş, açılış dolumu) mumları girişten itibaren ilk N mumla sınırlayarak çalıştırılır; etiket = tp1_hedefi. Aynı mumda TP1 ve SL → journal kuralı (SL önce). N gün içinde ikisi de yoksa 0.",
+  "not": "Getiri hedefi ile TP1 olay hedefi AYRI hedeflerdir; karıştırılmaz. tp1_v1 (30 günlük TP1 etiketiyle eğitilmiş) bu hedeflerin tahmincisi olarak DEĞERLENDİRİLMEZ."
+ },
+ "eksik_veri": "Hissenin kendi mumları sayılır. Girişten sonra N mum yoksa (veri sonu) örnek dışı ('sonuc_yok'). Pencerede piyasa takviminde olup hissede olmayan gün varsa örnek tutulur, 'takvim_boslugu' bayrağıyla sayılır (silinmez, düzeltilmez). FAZ 3 sıçrama bayrağı (gösterge penceresi) raporlanır.",
+ "girdiler": "arastirma/asama6/model.py NUM + CAT (karar anı: sinyal günü kapanışına kadarki 250 mum + BIST 100 penceresi; etiketle.py). Ertesi gün bilgisi (acilis_bosluk_%, ertesi_kilitli) ve sonuç sütunları KULLANILMAZ.",
+ "bolumler": {
+  "ana_sinama": {"test": ["2025-11-14", "veri sonu (sonucu olan son plan)"], "egitim": "test başlangıcından 45 takvim günü öncesine kadar (ambargo)"},
+  "ek_sinama": {"test": ["2024-01-01", "2024-12-31"], "egitim": "2023-11-17 öncesi (45 gün ambargo)"},
+  "ic_dogrulama": "λ seçimi yalnız EĞİTİM içinde: son %20'lik zaman dilimi doğrulama; aralarında 20 takvim günü ambargo; λ ∈ {1, 10, 100, 1000}, ölçüt Brier",
+  "on_isleme": "medyan doldurma, %1–%99 kırpma, standartlaştırma YALNIZ eğitimden (model.design)"
+ },
+ "modeller": {
+  "R0": "sabit oran (eğitim ortalaması)",
+  "R1": "strateji türüne göre oran (eğitim)",
+  "M1": "L2 cezalı lojistik regresyon (model.logit_fit, yerel CPU), aynı girdiler",
+  "baska_model": "YOK (liste genişletilmez)"
+ },
+ "olcutler": {
+  "olasilik": "Brier, Log Loss, AUC, 5 dilimli kalibrasyon, Brier becerisi (R1'e göre); %90 aralık: aylık blok bootstrap (model.block_ci, 300 tekrar)",
+  "islem": "net_% ve R_plan ortalamaları; M1'in üst %20'si ile kalanın farkı (tekil işlem; portföy DEĞİL)",
+  "betimleme": "her hedef × strateji türü: n, farklı sinyal günü, aynı hisse 10 gün içinde tekrar %, oran/ortalama ve %95 gün kümesi bootstrap (FAZ 4 kodu)"
+ },
+ "basari_olcutu": "Bir hedefte M1 'katkı' sayılır ANCAK İKİ sınamada da (ana ve ek): AUC %90 alt sınırı > 0,50 VE R1'e göre Brier becerisi > 0 ve %90 alt sınırı > 0. Aksi halde 'katkı yok'. Ekonomik fark tek başına katkı sayılmaz.",
+ "yasaklar": ["sonuçlara göre hedef/eşik/model eklemek", "aday modeli etkinleştirmek ya da canlı model dosyasına yazmak", "canlı kod/veritabanı/eşik değişikliği", "ücretli YZ çağrısı", "portföy metriği çıkarmak", "canlı müşteri verisi kullanmak"]
+}
