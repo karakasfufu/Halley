@@ -1980,3 +1980,8 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - İçerik sınıfı: işlem raporu (hisse kodları, tarih, fiyat, model olasılığı, çalıştırma zamanı). Kimlik bilgisi/API anahtarı/kişisel veri YOK (desen taraması 0).
 - Geçmiş temizliği zorla gönderme gerektiriyor; izin denetimi engelledi, aşılmadı. Temiz dal: faz4-rejim-temiz (2538d28 üstüne, dosyasız). Eski dalın silinmesi kullanıcı adımı.
 - .gitignore: dongu_*.txt, faz1_aksam/sabah_*.txt, *canli_rapor*, *bekci_rapor* — yalnız GELECEKTEKİ eklemeleri önler, geçmişi temizlemez.
+
+## 2026-11-16 — FAZ 5: 5/10 günlük hedefler (dal faz5-hedef; araştırma; canlı/model değişmedi; KABUL BEKLİYOR)
+- Ön kayıt 6430231 (sonuçlardan önce), kod 5dd858f. Hedefler ayrı: zaman çıkışı getirisi (H5/H10_pozitif, net %, R_plan) ve TP1 olayı (H5/H10_tp1, journal.evaluate ilk N mum). Ortak örneklem 30.404, ambargo 45 gün, ön işleme/λ yalnız eğitimden.
+- Ön kayıtlı karar: TP1 olay hedeflerinde ölçüt geçti (AUC 0,67–0,73), getiri hedeflerinde katkı yok. Sonradan tanı: yalnız TP1 uzaklığı AUC 0,69 → büyük kısmı mekanik; üst %20 son 12 ayda yine eksi. Uygulanabilir katkı yok; aday model etkinleştirilmedi, dosyaya yazılmadı.
+- 639 test OK. Ayrıntı: Ek K.

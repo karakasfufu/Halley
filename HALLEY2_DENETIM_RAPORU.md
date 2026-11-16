@@ -3855,3 +3855,182 @@ içinde.
 - **Kabul:** Kullanıcı FAZ 4'ü commit `2538d28` kapsamındaki **betimleyici araştırma** olarak kabul etti (etiket `faz4-kabul`). Strateji veya rejim filtresinin canlıya alınması **onaylanmadı**. Sonradan eklenen rapor dosyası (31dbcf7) kabulün parçası değildir.
 - **Olay:** Canlı bekçi raporu `faz4-rejim` dalına gönderildi (31dbcf7) ve kaldırıldı (63f88a5). Depo herkese açık. İçerik işlem raporudur; kimlik bilgisi, API anahtarı veya kişisel veri içermez. Geçmiş temizliği kullanıcı adımıdır; temiz dal `faz4-rejim-temiz` hazırlandı.
 - **Önleme:** `.gitignore` kuralları eklendi; geçmişteki dosyayı temizlemez.
+
+
+---
+
+# EK K (16.11.2026) — FAZ 5: 5 ve 10 işlem günlük hedefler (araştırma; dal `faz5-hedef`)
+
+**Konumu:**
+
+- Canlı kod, veritabanı, seçim eşikleri ve etkin model **değişmedi**. Etkin model `tp1_v1` (SHA-256 `09f8e5e0…`);
+  `modeller/` klasöründe başka dosya yok.
+- Aday modeller yalnız bellekte, yerel CPU ile uydurulup değerlendirildi. **Dosyaya yazılmadı, etkinleştirilmedi.**
+- Ücretli yapay zekâ çağrısı yok. Canlı müşteri verisi kullanılmadı.
+- **Haber şartı yok:** Bu evren canlı haberli fırsat listesi değildir.
+- **Bağımsız başarı kanıtı değildir:** Dönemler (2024, son 12 ay) ve planlar daha önce incelendi.
+
+## K.1 Ön kayıt ve sürümler
+
+**Ön kayıt:** `arastirma/faz5/deney_tanimi.json`, commit **`6430231`** (18:54). Kod ve testler commit `5dd858f`.
+Sonuçlar bu iki commit'ten **sonra** üretildi. Deneme listesi genişletilmedi.
+
+**Kabul kayıtları doğrulandı:**
+
+| Etiket | Commit |
+|---|---|
+| `faz2-kabul` | `6d7f5d5` |
+| `faz3-kabul` | `94d2fc8` |
+| `faz4-kabul` | `2538d28` |
+
+FAZ 5 dalı `faz4-rejim-temiz` (`2a04d04`) üstüne açıldı. Eski `faz4-rejim` dalı GitHub'da hâlâ duruyor; silinmesi
+kullanıcı adımıdır.
+
+**Veri:**
+
+- `planlar_seviyeli.csv` (SHA-256 `2413d1df…`) ve `arastirma_5y.db` (parmak izi `d563b954…`; FAZ 3 sorunları geçerli).
+- Üretilen hedef dosyası `hedefler.csv` (SHA-256 `233a6a83…`; yerel, Git dışı).
+
+## K.2 Hedef tanımları (iki ayrı hedef türü)
+
+**Giriş:**
+
+- Sinyal gününden sonraki işlem gününün açılışında alış.
+- Açılış azami girişin üstündeyse girişsiz (5.352 plan).
+- Açılış SL'nin altında ya da SL'ye eşitse girişsiz (214 plan).
+
+**Hedefler:**
+
+- **Getiri hedefi (zaman çıkışı) `H5_getiri` / `H10_getiri`:**
+  - Giriş günü 1. gün sayılır; çıkış 5. ya da 10. işlem gününün kapanışında. **Stop ve hedef uygulanmaz.**
+  - net % = (çıkış / dolum − 1) × 100 − 0,30.
+  - **R paydası = plan girişi − SL** (journal ile aynı), maliyet dahil.
+  - İkili hedef: `H*_pozitif` = net > 0.
+- **TP1 olay hedefi `H5_tp1` / `H10_tp1`:** İlk 5 ya da 10 gün içinde TP1'e SL'den önce ulaşılması.
+  - `journal.evaluate` mumlar ilk N günle sınırlanarak çalıştırıldı.
+  - Aynı mumda TP1 ve SL varsa SL önce sayılır.
+- Bu iki tür **karıştırılmadı.** `tp1_v1` bu hedeflerin tahmincisi olarak kullanılmadı.
+
+**Eksik veri:**
+
+- Girişten sonra N mum yoksa örnek dışı (5 günde 29, 10 günde 14).
+- Hissede eksik takvim günü olan pencereler tutuldu ve işaretlendi. Oranı: kırılımda %0,2, geri çekilmede %1,1.
+
+**Ortak örneklem:** 30.404 plan, 989 sinyal günü. `x_trend` dolu olanlar; dört hedefin hepsi aynı örneklerde.
+
+**Girdiler:** `model.py` içindeki NUM ve CAT sütunları; sinyal günü kapanışına kadarki veriden. Ertesi gün bilgisi ve
+sonuç sütunları kullanılmadı.
+
+**Bölümler:**
+
+| Sınama | Test dönemi | Test örneği | Gün | Eğitim |
+|---|---|---|---|---|
+| Ana | 2025-11-14 … 2026-10-30 | 6.729 | 238 | 22.517 örnek, 2025-09-29'a kadar (45 gün ambargo) |
+| Ek | 2024 | 7.264 | 248 | 8.780 örnek, 2023-11-16'ya kadar |
+
+- **λ seçimi** yalnız eğitim içinde: son %20'lik dilim doğrulama, aralarında 20 gün ambargo.
+- **Ön işleme** (doldurma, kırpma, standartlaştırma) yalnız eğitimden öğrenildi.
+- **Aynı hisse tekrarı:** Test örneklerinde aynı hissenin 10 gün içinde tekrar gelen sinyali %70–71. Gözlemler yüksek
+  oranda bağımlı.
+
+## K.3 Betimleme (tüm ortak örneklem; %95 aralık gün kümesi bootstrap)
+
+| Tür | n | gün | aynı hisse tekrar | 5 gün TP1 | 10 gün TP1 | 5 gün net % (R) | 10 gün net % (R) |
+|---|---|---|---|---|---|---|---|
+| kırılım | 12.032 | 962 | %55,5 | %13,1 (12,3…14,0) | %23,5 (22,4…24,8) | +0,44 (+0,10…+0,78); R +0,08 | +1,23 (+0,69…+1,82); R +0,20 |
+| geri çekilme | 18.298 | 985 | %80,4 | %6,9 (6,2…7,6) | %14,8 (13,7…15,9) | −0,14 (−0,56…+0,28); R −0,02 | +0,24 (−0,36…+0,81); R +0,06 |
+| destekten tepki | 74 | 64 | %64,9 | %8,1 | %16,2 | +0,47 (−1,40…+2,21) | +0,66 (−2,08…+3,49) — **örnek az** |
+
+Bunlar tekil işlem ortalamalarıdır. Portföy getirisi çıkarılmadı.
+
+## K.4 Sonuçlar (R0 sabit oran, R1 türe göre oran, M1 lojistik)
+
+Aralıklar %90, aylık blok bootstrap ile.
+
+| Hedef · sınama | Test oranı | R1 Brier / LogLoss / AUC | M1 Brier / LogLoss | M1 AUC (%90) | M1 Brier becerisi (R1'e göre, %90) | Ön kayıtlı ölçüt |
+|---|---|---|---|---|---|---|
+| H5_tp1 · ana | %8,1 | 0,0737 / 0,276 / 0,615 | 0,0710 / 0,258 | **0,730** (0,690…0,763) | +%3,7 (+2,3…+4,9) | geçti |
+| H5_tp1 · ek (2024) | %7,7 | 0,0726 / 0,277 / 0,570 | 0,0687 / 0,252 | **0,714** (0,689…0,738) | +%5,4 (+4,4…+6,7) | geçti |
+| H10_tp1 · ana | %16,2 | 0,1342 / 0,437 / 0,591 | 0,1300 / 0,422 | **0,667** (0,633…0,705) | +%3,1 (+1,1…+5,2) | geçti |
+| H10_tp1 · ek | %15,7 | 0,1352 / 0,443 / 0,569 | 0,1263 / 0,408 | **0,682** (0,659…0,702) | +%6,6 (+5,0…+8,3) | geçti |
+| H5_pozitif · ana | %44,7 | 0,2476 / 0,688 / 0,522 | 0,2471 / 0,687 | 0,530 (0,505…0,557) | +%0,2 (−0,6…+1,2) | geçmedi |
+| H5_pozitif · ek | %44,7 | 0,2488 / 0,691 / 0,555 | 0,2504 / 0,695 | 0,539 (0,518…0,555) | −%0,7 (−4,4…+2,7) | geçmedi |
+| H10_pozitif · ana | %44,3 | 0,2485 / 0,690 / 0,522 | 0,2485 / 0,690 | 0,518 (0,467…0,569) | −%0,0 (−1,6…+2,0) | geçmedi |
+| H10_pozitif · ek | %45,9 | 0,2501 / 0,693 / 0,571 | 0,2582 / 0,711 | 0,516 (0,481…0,560) | −%3,2 (−8,7…+1,0) | geçmedi |
+
+**Kalibrasyon (M1; 5 dilim, tahmin → gerçek):**
+
+- H5_tp1 · ana: 1,2→1,9 · 3,5→3,1 · 6,3→6,3 · 10,5→11,0 · 19,1→18,4. İyi.
+- H10_pozitif · ek: 31,5→44,9 … 63,8→49,1. **Kötü:** tahminler gerçekten fazla yayılıyor.
+
+**Ekonomik (tekil; M1'in üst %20'si ile kalanın karşılaştırması; aynı ufukta zaman çıkışı net %):**
+
+| | Üst %20 | Kalan |
+|---|---|---|
+| H5_tp1 · ana | −0,30 | −0,64 |
+| H5_tp1 · ek | +0,27 | −0,49 |
+| H10_tp1 · ana | −0,51 | −0,44 (ters) |
+| H10_tp1 · ek | +0,30 | −0,65 |
+
+Bu tekil işlem farkıdır; portföy getirisi değildir ve tek başına katkı sayılmaz.
+
+## K.5 Değerlendirme
+
+**Ön kayıtlı karar:**
+
+- `H5_tp1` ve `H10_tp1`: ölçüt **geçti** ("katkı").
+- `H5_pozitif` ve `H10_pozitif`: **katkı yok**. 5 ve 10 günlük maliyet sonrası getirinin yönü bu girdilerle türe göre
+  orandan daha iyi tahmin edilemedi.
+
+**"Katkı"nın anlamı sınırlıdır.** Sonradan yapılan tanı (`sonuclar/sonradan_tani.json`; karar ölçütü değildir, yeni
+model değildir):
+
+- Yalnız TP1'e uzaklık (`tp1_%`, tersten sıralı) tek başına 5 günlük TP1'de AUC 0,692 (ana) ve 0,693 (ek) veriyor.
+- Yani M1'in 0,71–0,73'lük ayırt etme gücünün **büyük kısmı mekanik**: hedef yakınsa kısa sürede ulaşılması daha
+  olası.
+- Bu, kârlı seçim kanıtı değildir:
+  - aynı modelin üst %20'sinde 5 günlük zaman çıkışı getirisi son 12 ayda yine **eksi** (−%0,30);
+  - 10 günlük TP1'de üst %20 kalandan daha kötü.
+- Ön kayıtlı referans listesinde "uzaklık" referansı yoktu; bu eksiklik ön kaydın bir zayıflığıdır.
+
+**Uygulanabilir katkı yok.** Kısa vadeli TP1 olayının olasılığı bir ölçüde tahmin edilebiliyor, ama bunun canlı
+seçim ya da kâr açısından değeri gösterilemedi. Dönemler önceden incelendi; aynı hisse bağımlılığı yüksek.
+
+**Öneri (yalnız öneri):**
+
+- Canlıda hiçbir şey değiştirilmesin; aday model etkinleştirilmesin.
+- İleride bir deney yapılırsa, ön kayda "hedef uzaklığı" gibi mekanik bir referans **baştan** konmalı. Yeni (dönem
+  dışı) veriyle sınanmalı.
+
+## K.6 Testler
+
+| Komut | Sonuç |
+|---|---|
+| `tests.test_faz5_hedef` | 10 test: zaman çıkışı getirisi ve R elle; TP1 olayı ile getirinin ayrı olduğu (TP1 görülse de 5. gün zarar); 7. günde TP1 → 5 günde 0, 10 günde 1; SL önce ve aynı mum kuralı; giriş dışlamaları ve eksik veri; pencere sonrası verinin hedefi değiştirmemesi; takvim boşluğu işaretlenir, silinmez; 45 gün ambargo ve bölüm sırası; ön işlemenin yalnız eğitimden öğrenilmesi; Log Loss elle |
+| Tam takım (ağ engelli) | **Ran 639 tests … OK**, ağ denemesi 0 (629 + 10) |
+
+## K.7 Değişen dosyalar (dal `faz5-hedef`)
+
+- **Yeni:**
+  - `arastirma/faz5/deney_tanimi.json` (ön kayıt)
+  - `arastirma/faz5/hedefler.py`, `arastirma/faz5/deney.py`
+  - `arastirma/faz5/sonuclar/deney_sonuclari.json`, `arastirma/faz5/sonuclar/sonradan_tani.json`
+  - `tests/test_faz5_hedef.py`
+- **Değişmeyen:** Canlı modüller, `modeller/` ve veritabanları.
+
+## K.8 Sınırlamalar
+
+1. Bağımsız doğrulama değildir; dönemler önceden incelendi.
+2. Tekil işlem sonucudur; portföy değildir. Aynı hisse tekrarı %70 civarında; aralıklar yalnız ay bloklarını hesaba
+   katar.
+3. FAZ 3 veri sorunları sürüyor: düzeltilmiş fiyatlar, taban kayması, sıçramalar, duyarlılık analizi yok.
+4. Hayatta kalma yanlılığı, güncel sektör listesi, haber şartı yok.
+5. Zaman çıkışı getirisi gerçek strateji kurallarından (stop, kısmi satış) farklıdır.
+6. Ön kayıtta mekanik bir referans yoktu (K.5).
+
+## K.9 FAZ 1 (ayrı)
+
+- 16.11 19:03 salt-okunur okuma: 5 tahmin, 0 sonuç, 0 değerlendirme, 0 olay. Son çalıştırma 18:23 akşam analizi; fiyatlar 16.11.
+- Akşam kaydı doğrulandı (Ek J2). **Gözlenmeyen:** 17.11 sabah kontrolü ve gerçek sonuçlandırma. FAZ 1 kabul edilmedi.
+
+**Onay beklenen:** FAZ 5 kabul kararı. FAZ 6'ya geçilmedi.

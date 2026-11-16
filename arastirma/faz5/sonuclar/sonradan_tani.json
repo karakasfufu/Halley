@@ -1,0 +1,31 @@
+{
+ "not": "SONRADAN TANI (post hoc): karar ölçütü DEĞİLDİR; yeni model değildir. Tek girdinin ters sırası ile AUC (eğitim yok).",
+ "ana": {
+  "H5_tp1": {
+   "tp1_%": 0.6922,
+   "tp1_atr": 0.694,
+   "stop_%": 0.6049,
+   "rr1": 0.6806
+  },
+  "H10_tp1": {
+   "tp1_%": 0.6563,
+   "tp1_atr": 0.6473,
+   "stop_%": 0.5786,
+   "rr1": 0.6548
+  }
+ },
+ "ek": {
+  "H5_tp1": {
+   "tp1_%": 0.693,
+   "tp1_atr": 0.6912,
+   "stop_%": 0.6027,
+   "rr1": 0.6674
+  },
+  "H10_tp1": {
+   "tp1_%": 0.6727,
+   "tp1_atr": 0.6637,
+   "stop_%": 0.5907,
+   "rr1": 0.6457
+  }
+ }
+}
