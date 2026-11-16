@@ -53,7 +53,7 @@ def dosya_ozeti(h):
     return out
 
 
-def yedek(h, etiket):
+def yedek(h, etiket, db_ek="o3_oncesi"):
     h = Path(h)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     kod = h / "data" / "yedek" / f"kod_{etiket}_{ts}"
@@ -64,7 +64,7 @@ def yedek(h, etiket):
         elif s.exists():
             kod.mkdir(parents=True, exist_ok=True)
             shutil.copy2(s, kod / k)
-    hedef_db = h / "data" / "yedek" / f"bist_haber_{ts}_o3_oncesi.db"
+    hedef_db = h / "data" / "yedek" / f"bist_haber_{ts}_{db_ek}.db"
     src = sqlite3.connect(f"file:{db_yolu(h).as_posix()}?mode=ro", uri=True)
     dst = sqlite3.connect(str(hedef_db))
     src.backup(dst)
