@@ -5388,3 +5388,112 @@ Herhangi biri eksikse durum uyarıdır ve her eksik ayrı yazılır:
   analizi.
 - Ardından defter, ai_calls ve OpenAI panelinden maliyet doğrulaması yapılır; sonra normal kullanım.
 - Bu ekte hiçbiri yapılmadı.
+
+
+---
+
+# EK O-3c (16.11.2026) — O3 kontrollü canlıya geçiş kaydı
+
+**Kapsam:** Kullanıcı onayı yalnız doğrulanmış O3 kapsamı içindir. Diğer entegrasyonlar (O2, O4–O6) ve müşteri
+yayını kapsam dışıdır. **Ücretli çağrı yapılmadı.**
+
+## O3c.1 Canlıya alınan sürüm
+
+| | |
+|---|---|
+| Önceki canlı sürüm | `main` `6a95652`. Kod dosyaları canlıyla birebir aynıydı (karşılaştırma: 0 fark). |
+| Canlıya alınan | Dal `o3-canli` `0e8bbaf` = `main` + yalnız iki O3 commit'i (`985b3d4` → `f22807a`, `31ed5ae` → `0e8bbaf`). Kod içeriği `o3-haber` dalındaki O3 dosyalarıyla aynıdır. |
+| Neden `o3-haber` değil | O dal FAZ 2–7 değişikliklerini de içeriyor (`defter.py`, `journal.py`, `regime.py`, `fiyat_izi.py`, `izleme.py`, panel). Bunlar canlıya **alınmadı**. |
+| Fark (10 dosya) | `app.py` (yalnız güncellik bölümü ve günlük sınır ayarı), `bist_haber/{__main__, ai_comment, ai_service, analyzer, pipeline}.py`, yeni `haber_kapsam.py`, `harcama.py`, `tests/test_o3_haber.py`, `.gitignore`. Belgeler canlıda değişmedi. |
+| Değişmeyenler | `watchdog.py`, `ready.py`, `db.py`, `defter.py`, `journal.py`, `tp1_model.py`, `modeller/tp1_v1.json` (özet aynı), `ayarlar.json` |
+| Testler (canlıya alınan kod, son metin değişikliği dahil) | `run_offline.py` → **590 test OK**, ağ denemesi 0 (559 + 31 O3) |
+
+## O3c.2 Maliyet varsayımları (geçişten önce doğrulandı)
+
+| Varsayım | Değer | Doğrulama |
+|---|---|---|
+| Model | `gpt-5-mini` (değişmedi) | OpenAI model sayfası. **Not:** sayfa modeli "deprecated" olarak işaretliyor. Model değiştirilmedi; kapanış tarihi izlenmeli. |
+| Fiyat | 0,25 $ girdi / 2,00 $ çıktı (1M token) | OpenAI model sayfasıyla aynı. Önbellekli girdi 0,025 $; üst sınırı yalnız düşürür. |
+| Çıktı sınırı | `max_completion_tokens` = 16.000 | API başvurusu: sınır görünür çıktı ile düşünme tokenlarının **toplamını** kapsar. Düşünme tokenları çıktı olarak faturalanır. Modelin kendi sınırı 128.000. |
+
+## O3c.3 Bütçe defteri geçiş öncesi harcamayı sayıyor
+
+Canlı veritabanı salt-okur açıldı; yeni kod ile eski hesap karşılaştırıldı.
+
+| | Yeni defter | Eski hesap |
+|---|---|---|
+| Haber, bu ay | 2,285221 $ | 2,285221 $ (`month_spend`) |
+| Haber, bugün | 0 | 0 |
+| Yapay zekâ yorumu, bu ay | 0 | 0 |
+
+- Defter boş başladığı için çift sayım yok. Eski harcama sıfırlanmadı; kalıcı kayıtlardan (analyses,
+  reanalysis_log, ai_comments) okunuyor.
+- `ai_calls` tablosu boş: ai_service katmanı geldikten sonra canlıda hiç ücretli çağrı olmadı.
+- **Sınır:** Bu sürümden önce yapılan "ucuz test" çağrılarının maliyeti hiçbir kayda yazılmıyordu. O tutar yeni
+  defterde de görünmez. Kesin tutar için OpenAI kullanım paneline bakılmalı.
+
+## O3c.4 Geçiş
+
+| Adım | Sonuç |
+|---|---|
+| Durdurma öncesi | Akşam analizi tamam (`hazir_durum.json`: aksam_gunu 16.11). Süren analiz yok, kilit yok, `bist_haber.db-*` yazma günlüğü yok. |
+| Durdurma | 21:23:50 (Halley, okuyucu, başlatıcı; 5 süreç). Durdurma sonrası tablo özetleri önceki ile aynı. |
+| Kod yedeği | `data/yedek/kod_main_6a95652_20261116_212401` (138 dosya, `.env` ve veri hariç). `main` ile 0 fark doğrulandı. Ayrıca git `6a95652`. |
+| Veritabanı yedeği | `data/yedek/bist_haber_20261116_212401_o3_oncesi.db` (37.584.896 bayt; SQLite yedekleme API'si). Bütünlük **ok**; yedek = canlı (24 tablo içerik özeti + 22 tetikleyici). |
+| Kopya provası (geçişten önce) | Aynı araçla canlı kopyasında: yedek → uygula → kontrol → **geri dönüş** → kontrol. Geri dönüşte kod dosyaları birebir eski hâline döndü; veri değişmedi; eski kod yeni tabloyla çalıştı. Provada bulunan hata düzeltildi: göç komutundaki göreli yol yanlış klasörde boş veritabanı açıyordu → mutlak yol. |
+| Göç | Yeni kodla, tek süreç: `harcama_rezervasyon` tablosu (yalnız `CREATE TABLE IF NOT EXISTS`). |
+| Önce / sonra | **24/24 tablo birebir aynı** (170.636 satır, satır içerik özeti). Yeni tablo boş. 22 koruma tetikleyicisi aynı. `integrity_check` ok. Canlı kod = `0e8bbaf` (0 fark). |
+| Yeniden başlatma | 21:25:01; sağlık OK; 2 okuyucu ve 2 panel süreci (başlatıcının olağan düzeni). Kesinti yaklaşık 1 dakika. |
+
+## O3c.5 Geçiş sonrası kontroller
+
+| Kontrol | Sonuç |
+|---|---|
+| Eski veri ve tahminler | Çalışırken yeniden ölçüldü: 24 tablo aynı. Tahmin 5, sonuç 0, değerlendirme 0, olay 0, analyses 155, impacts 151, news 9.090. |
+| Panel: güncellik | "🟠 Haber güncelliği: analiz bekliyor". Ayrıca "114 güncel haber henüz analiz edilmedi … İÇERMİYOR" ve "kapsam eksik: 9 güncel haberin metni alınamadı". KAP toplama boşluğu yok; kapsam 13.11 ve 16.11. Sayfada hata metni yok. |
+| Panel: bütçe | "bugün 0.00 / 0.50 $ · bu ay 2.29 / 10.00 $ (harcanmış sayılan …) · geçerli sınır: günlük (0.50 $ kaldı)", artı "kesin bütçe garantisi değildir" notu |
+| Bekçi | `watchdog.py` değişmedi; `ai=False` duruyor. Ayarlarda sabah haber kontrolü ve takip analizi kapalı. |
+| Rezervasyon tablosu | Var, şema doğru, 0 satır. `ai_calls` 0; bugün yeni analiz 0. |
+| Ağ | Tek haber adayının hesaplanmasında şirket istatistiği işlevi Yahoo'nun **ücretsiz** fiyat servisine bir istek attı ("bulunamadı" döndü). Ücretli değil; veritabanı salt-okur açıktı, yazılmadı. |
+
+## O3c.6 Geri dönüş (sınanmış)
+
+1. Halley durdurulur.
+2. `araclar/o3_gecis.py geri <canlı> data/yedek/kod_main_6a95652_20261116_212401` çalıştırılır: değişen 7 dosya yedekten geri
+   gelir, 3 yeni dosya silinir.
+3. **Veritabanına dokunulmaz.** `harcama_rezervasyon` tablosu zararsız kalır; yeni kullanıcı verisi korunur. Eski
+   yedek, yeni verinin üstüne yazılmaz.
+4. Yeniden başlatılır.
+
+## O3c.7 Ücretli doğrulama (BAŞLATILMADI; kullanıcının düğmesini bekliyor)
+
+**Kapsam:** Tek haber.
+
+- 🔬 Haber analizi ekranında **"Yalnız işaretlediklerim"** seçilir ve **yalnız bir** haber işaretlenir. Düğme
+  "🔬 1 haberi analiz et" yazmalıdır.
+- "Listedeki ilk N haber" seçeneğinin varsayılanı 30 haberdir; deneme için **kullanılmaz**.
+- "Haberleri güncelle" en fazla 10 haber analiz eder; o da kullanılmaz.
+
+**Önerilen haber:**
+
+- `kap:1698251`: ARDYZ, "Yeni İş İlişkisi", 16.11 09:20, metin 1.487 karakter.
+- Öncelik grubunda en üstte: "açık/bekleyen işlem".
+- Kapsam içinde olduğu için "sonradan analiz" işareti almaz.
+
+**Ayrılacak azami tutar (iş zarfı): 0,1058 $.**
+
+- Yüksek doğruluk profili: tam analiz + ikinci görüş = 2 çağrı.
+- Bu süreçteki ilk iş olduğu için `reasoning_effort` desteği henüz doğrulanmadı; bu yüzden 1 ek deneme payı var.
+- Her çağrı en fazla 16.000 çıktı tokenı.
+- Gerçek maliyet beklentisi yaklaşık 0,015 $ (Ekim–Kasım medyanı; en büyük 0,031 $).
+- Günlük kalan 0,50 $; zarf bu sınıra sığıyor.
+
+**Denemeden sonra yapılacak doğrulama:**
+
+- Defterde zarf satırı `zarf_kapali`; çağrı satırları `tamam` ve `kayda_gecti=1`.
+- `ai_calls` satırları `ok`, 400 hatası yok.
+- Defter tutarı = analyses tutarı.
+- Panel bütçe satırı güncellenmiş olmalı.
+- OpenAI kullanım panelinde aynı tutar görülmeli.
+
+İlk deneme doğrulanmadan kuyruk topluca işlenmez.

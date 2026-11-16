@@ -2022,3 +2022,11 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Bütün üretim yolları korumalı: haber analizi (bütçe verilmezse Ayarlar), derin inceleme, ucuz test, rapor yorumu, kaçırılan açıklaması, komut satırı. Gerçek istemci bütçesiz çağrı yapmaz (ButceKorumasiYok). Açık istisna: butcesiz_izin (yalnız sahte istemci), pilot (ayrı defter). gpt-5 için temperature baştan gönderilmiyor (zaten çıkarılıyordu; model aynı).
 - Güncellik: tam 'güncel' yalnız KAP listeleri eksiksiz + bekleyen yok + metinsiz güncel yok + takvim doğrulanmışsa; 'toplama eksik' / 'analiz bekliyor' / 'kapsam eksik' / 'takvim doğrulanmadı' ayrı. Panel: 'harcanmış sayılan', kesin garanti değildir.
 - Kanıt: test_o3_haber 31 OK; tam takım 687 OK, ağ 0. Kopya prova: yalnız yeni tablo; canlı dosya değişmedi. Zarf medyanı 0,071 $ (gerçek 0,015 $); günlük 0,50 $ ile ~28 haber (~32 yerine). Ek O-3b. Kontrollü canlı geçiş onayı bekleniyor.
+
+## 2026-11-16 21:25 — O3 CANLIYA ALINDI (kontrollü; yalnız O3; ücretli çağrı yok)
+- Canlı: dal o3-canli 0e8bbaf = main 6a95652 + yalnız iki O3 commit'i (FAZ 2–7 değişiklikleri canlıya alınmadı). 590 test OK, ağ 0.
+- Varsayımlar doğrulandı: gpt-5-mini 0,25 / 2,00 $ / 1M token; max_completion_tokens düşünme dahil toplamı sınırlar. OpenAI modeli "deprecated" işaretlemiş (model değiştirilmedi).
+- Defter geçiş öncesini sayıyor: ay 2,285221 $ = eski hesap; gün 0; çift sayım yok. Eski "ucuz test" maliyetleri hiç kaydedilmemişti (OpenAI paneli).
+- Durdurma 21:23:50; yedek data/yedek/kod_main_6a95652_20261116_212401 + bist_haber_20261116_212401_o3_oncesi.db (integrity ok, yedek = canlı); kopyada yedek→uygula→geri dönüş sınandı; göç yalnız harcama_rezervasyon; 24/24 tablo (170.636 satır) ve 22 tetikleyici aynı; yeniden başlatma 21:25:01 (~1 dk).
+- Panel: "analiz bekliyor" (114) + "kapsam eksik" (9), bütçe 0,00/0,50 · 2,29/10,00 $, garanti değildir notu. Bekçi ai=False. Geri dönüş aracı araclar/o3_gecis.py.
+- Bekleyen: tek haberlik ücretli deneme (öneri kap:1698251 ARDYZ; azami ayrılacak 0,1058 $; "Yalnız işaretlediklerim" + tek haber) — kullanıcının düğmesi. Ek O-3c.
