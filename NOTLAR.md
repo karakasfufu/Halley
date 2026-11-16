@@ -1960,3 +1960,8 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 
 ## 2026-11-16 — FAZ 3 KABUL EDİLDİ (commit 94d2fc8, etiket faz3-kabul); FAZ 4 onaylandı
 - Kapsam: metrik/izlenebilirlik altyapısı + veri envanteri. fiyat_izi canlıda değil; duyarlılık analizi yapılmadı.
+
+## 2026-11-16 — FAZ 4: strateji × rejim (dal faz4-rejim; araştırma; canlı değişmedi; KABUL BEKLİYOR)
+- Ön kayıt c1a4192 (sonuçlardan önce); rejim = canlı regime.py trend × oynaklık (karar anına kadarki veri; genişlik kullanılmadı); 30.470 tekil işlem (canli_ortak, s3 stop altı 217 çıkarıldı); gün kümesi bootstrap %95; n<30 / gün<20 YETERSİZ.
+- 23 ana grup, 15 yeterli; 8'inde R aralığı sıfırı dışlıyor ama aynı hisse 10 gün içinde tekrar %54–83 → bağımlı; anlamlılık iddiası yok. Kırılım tekil R +0,33 > geri çekilme +0,07; geri çekilme × yükseliş × yüksek oynaklık −0,35; dönemler arasında değişken; düşüş rejimi az.
+- Sonuç: uygulanabilir katkı yok; hipotez olarak kaydedildi. Portföy metriği çıkarılmadı. 629 test OK. Ayrıntı: Ek J.

@@ -3572,3 +3572,278 @@ Kullanıcı FAZ 3'ü onayladı ve FAZ 4'e başlamayı onayladı (16.11.2026). Ka
 - Kapsam: metrik ve izlenebilirlik altyapısı, veri güvenilirliği envanteri (Ek I, I2).
 - Kapsam dışı: tarihsel performansın güvenilirliği, veri sorunlarının etkisizliği, `fiyat_izi` canlı geçişi, duyarlılık analizi (yapılmadı).
 - Canlı kod ve veritabanı değişmedi.
+
+
+---
+
+# EK J (16.11.2026) — FAZ 4: strateji türü × piyasa rejimi (tekil işlem araştırması; dal `faz4-rejim`)
+
+**Konumu:**
+
+- Canlı kod, veritabanı, etkin model ve seçim kuralları **değişmedi**.
+- Model eğitilmedi; ücretli yapay zekâ çağrısı yok; güncelleme yayımlanmadı.
+- **Haber şartı yok:** Bu evren canlı haberli hazır fırsat listesi değildir.
+- **Bağımsız doğrulama değildir:** Kullanılan planlar ve dönemler daha önce incelendi (FAZ 2, `tp1_v1` eğitimi,
+  Aşama 6).
+- **Yalnız tekil işlem sonuçlarıdır:** Rejimlere ayrılmış tekil işlemlerden portföy getirisi ya da portföy düşüşü
+  **çıkarılmadı**. Aynı hissenin üst üste sinyalleri ayrı işlem sayılır; bu bir portföyün izleyebileceği yol değildir.
+
+## J.1 Ön kayıt, sürümler, yöntem
+
+**Ön kayıt:** `arastirma/faz4/rejim_tanimi.json`, commit **`c1a4192`** (17:31). Analiz kodu ve testleri commit
+`603ab1d`. Sonuçlar bu iki commit'ten **sonra** üretildi.
+
+**Rejim:** Canlı `bist_haber/regime.py` kullanıldı (değiştirilmedi; son değişiklik commit `d673cc0`, SHA-256
+`861fd47f…`).
+
+- **Trend:** BIST 100 kapanış, EMA50 ve EMA200 sıralaması. Sınıflar: yükseliş, düşüş, kararsız.
+- **Oynaklık:** 20 günlük ATR%'nin **o güne kadarki** son 252 gözlemdeki yüzdeliği. %30'un altı düşük, %70'in üstü
+  yüksek. Eşikler canlı kodda sabit; tüm dönemden hesaplanmaz.
+- **Genişlik kullanılmadı:** Canlı kodda sınıf eşiği yok; eşik koymak yeni bir kural olurdu.
+- **Karar anı:** Sinyal günü kapanışı. Yalnız o güne kadarki BIST 100 mumları kullanıldı. 25 Aralık gibi eksik
+  günlerde son mevcut gün alındı (canlıyla aynı).
+
+**Veri:**
+
+- `planlar_seviyeli.csv` (SHA-256 `2413d1df…`; FAZ 3 arşivinde).
+- `arastirma_5y.db` (bugünkü parmak izi `d563b954…`). FAZ 3'teki veri sorunları geçerli.
+
+**Örnek:**
+
+- Evren `canli_ortak`; yalnız sonucu kapanmış planlar.
+- Çıkarılanlar:
+  - 5.352 girişsiz (açılış azami girişin üstünde);
+  - 42 açık;
+  - **217** s3 tür A (açılış ≤ SL). Bunlar s2'deki yapay kârı taşıyordu; çıkarıldı.
+- Kalan **30.470** tekil işlem. Bütün sinyal günlerinin rejimi hesaplanabildi.
+- `mevcut_fiyat` türü bu evrende yok. "Destekten tepki" türünde toplam 74 örnek var.
+
+**Ölçütler:**
+
+- TP1 % = y (`tp1_hedefi`).
+- Kazanma % = maliyet sonrası net > 0.
+- Ortalama net % ve ortalama R (journal; komisyon %0,2 + kayma %0,1).
+- **%95 güven aralığı:** sinyal gününe göre **küme bootstrap** (2.000 tekrar, sabit tohum). Aynı günün gözlemleri
+  birlikte örneklenir.
+- **Yeterlilik:** `defter.guven`. n < 30 ya da bağımsız gün < 20 ise **YETERSİZ**.
+- **Aynı hisse uyarısı:** Önceki sinyalden 10 işlem günü içinde gelen sinyal payı.
+  - Bu pay **%54–83** ve çok yüksek. Aynı hisseden ilişkili gözlemler var.
+  - Gün kümesi aralıkları bunu **düzeltmez**. Gerçek belirsizlik tablolardakinden geniştir; örnek sayısı tek başına
+    güvenilirlik kanıtı değildir.
+- **Veri kalitesi:** Gösterge penceresinde (250 mum) ve tutma süresinde > %10,5 sıçrama olan plan payı (FAZ 3 tanımı).
+
+**Rejim gün dağılımı** (sinyal günleri):
+
+| Rejim | Gün |
+|---|---|
+| yükseliş / düşük | 286 |
+| yükseliş / normal | 226 |
+| yükseliş / yüksek | 112 |
+| kararsız / yüksek | 148 |
+| kararsız / normal | 135 |
+| kararsız / düşük | 38 |
+| düşüş / normal | 35 |
+| düşüş / yüksek | 14 |
+| düşüş / düşük | 0 |
+
+Düşüş rejimi az ve kümelenmiş (35 + 14 gün).
+
+## J.2 Sonuç tabloları
+
+Tablolar `arastirma/faz4/sonuclar/rejim_tablolari.md` dosyasından aynen alındı; tam veri `rejim_sonuclari.json`
+içinde.
+
+**Ana gruplar — tüm dönem (2022-11 … 2026-11-13): strateji × trend × oynaklık**
+
+| Grup | n | gün | TP1 % (%95) | kazanma % (%95) | ort. net % | ort. R (%95) | aynı hisse 10 gün içinde % | sıçrama gösterge/tutma % | durum |
+|---|---|---|---|---|---|---|---|---|---|
+| destekten tepki · düşüş · normal | 1 | 1 | 0.0 (—) | 0.0 (—) | -5.23 | -1.166 (—) | 0.0 | 0.0 / 0.0 | **YETERSİZ** |
+| destekten tepki · kararsız · düşük | 2 | 2 | 100.0 (100.0…100.0) | 100.0 (100.0…100.0) | 24.535 | 3.72 (+3.54…+3.90) | 100.0 | 0.0 / 0.0 | **YETERSİZ** |
+| destekten tepki · kararsız · normal | 11 | 11 | 27.27 (0.0…54.5) | 27.27 (0.0…54.5) | -1.859 | -0.298 (-0.99…+0.58) | 54.5 | 36.4 / 0.0 | **YETERSİZ** |
+| destekten tepki · kararsız · yüksek | 3 | 3 | 33.33 (0.0…100.0) | 66.67 (0.0…100.0) | 7.222 | 0.794 (-0.80…+2.59) | 33.3 | 0.0 / 0.0 | **YETERSİZ** |
+| destekten tepki · yükseliş · düşük | 37 | 31 | 24.32 (11.6…37.8) | 24.32 (11.6…37.8) | -0.093 | -0.101 (-0.65…+0.55) | 64.9 | 13.5 / 2.7 | düşük güven |
+| destekten tepki · yükseliş · normal | 17 | 13 | 23.53 (5.6…46.7) | 23.53 (5.6…46.7) | -0.309 | 0.069 (-0.81…+1.16) | 70.6 | 58.8 / 5.9 | **YETERSİZ** |
+| destekten tepki · yükseliş · yüksek | 3 | 3 | 0.0 (0.0…0.0) | 0.0 (0.0…0.0) | -7.83 | -1.03 (-1.04…-1.01) | 100.0 | 0.0 / 0.0 | **YETERSİZ** |
+| geri çekilme · düşüş · normal | 446 | 35 | 38.12 (30.5…46.1) | 50.22 (43.8…56.9) | 4.762 | 0.695 (+0.41…+1.00) | 79.4 | 9.2 / 0.0 | düşük güven |
+| geri çekilme · düşüş · yüksek | 19 | 7 | 47.37 (18.2…66.7) | 47.37 (18.2…66.7) | 3.458 | 0.721 (-0.26…+1.67) | 73.7 | 5.3 / 0.0 | **YETERSİZ** |
+| geri çekilme · kararsız · düşük | 592 | 38 | 20.95 (15.4…26.7) | 26.86 (20.9…32.9) | -1.463 | -0.147 (-0.35…+0.07) | 77.5 | 38.0 / 0.3 | düşük güven |
+| geri çekilme · kararsız · normal | 1888 | 135 | 27.22 (24.2…30.6) | 32.94 (29.5…36.7) | 0.592 | 0.103 (-0.03…+0.24) | 79.2 | 32.9 / 0.2 | orta güven |
+| geri çekilme · kararsız · yüksek | 1955 | 148 | 29.31 (26.4…32.1) | 36.06 (32.7…39.4) | 1.634 | 0.264 (+0.14…+0.39) | 82.5 | 20.1 / 0.9 | orta güven |
+| geri çekilme · yükseliş · düşük | 5920 | 286 | 24.41 (22.4…26.6) | 29.19 (27.1…31.5) | -0.536 | -0.033 (-0.12…+0.06) | 81.2 | 17.5 / 0.4 | orta güven |
+| geri çekilme · yükseliş · normal | 4990 | 226 | 31.5 (27.5…35.6) | 36.41 (32.4…40.6) | 1.797 | 0.272 (+0.11…+0.44) | 79.3 | 37.8 / 0.2 | orta güven |
+| geri çekilme · yükseliş · yüksek | 2523 | 111 | 16.88 (13.7…20.6) | 20.89 (17.4…25.1) | -2.832 | -0.354 (-0.49…-0.19) | 80.7 | 16.4 / 0.8 | orta güven |
+| kırılım · düşüş · normal | 320 | 35 | 31.87 (25.9…37.7) | 36.88 (30.7…42.5) | 0.835 | 0.171 (-0.08…+0.43) | 53.8 | 9.4 / 0.3 | düşük güven |
+| kırılım · düşüş · yüksek | 40 | 13 | 30.0 (0.0…47.1) | 37.5 (0.0…62.5) | 0.1 | 0.162 (-0.95…+0.93) | 37.5 | 15.0 / 0.0 | **YETERSİZ** |
+| kırılım · kararsız · düşük | 222 | 37 | 29.73 (23.0…37.3) | 31.98 (24.7…39.9) | 0.678 | 0.098 (-0.20…+0.45) | 55.9 | 29.7 / 0.0 | düşük güven |
+| kırılım · kararsız · normal | 1050 | 129 | 31.71 (28.6…34.8) | 37.71 (33.8…41.2) | 0.526 | 0.126 (-0.02…+0.26) | 55.8 | 16.3 / 0.2 | orta güven |
+| kırılım · kararsız · yüksek | 769 | 135 | 38.75 (35.1…42.2) | 43.43 (39.2…47.5) | 2.459 | 0.375 (+0.23…+0.52) | 54.7 | 16.4 / 0.4 | orta güven |
+| kırılım · yükseliş · düşük | 4346 | 286 | 34.93 (32.6…37.2) | 38.68 (36.1…41.2) | 1.205 | 0.235 (+0.13…+0.35) | 55.9 | 27.6 / 0.1 | orta güven |
+| kırılım · yükseliş · normal | 4039 | 224 | 41.45 (37.5…45.8) | 45.46 (41.1…50.3) | 3.258 | 0.484 (+0.30…+0.68) | 55.7 | 29.6 / 0.4 | orta güven |
+| kırılım · yükseliş · yüksek | 1277 | 110 | 33.2 (28.5…37.6) | 38.84 (33.6…43.8) | 2.39 | 0.339 (+0.08…+0.58) | 54.3 | 45.3 / 0.8 | orta güven |
+
+**Strateji türü — tüm dönem**
+
+| Grup | n | gün | TP1 % (%95) | kazanma % (%95) | ort. net % | ort. R (%95) | aynı hisse 10 gün içinde % | sıçrama gösterge/tutma % | durum |
+|---|---|---|---|---|---|---|---|---|---|
+| destekten tepki | 74 | 64 | 25.68 (16.2…35.7) | 27.03 (17.1…37.3) | 0.174 | -0.004 (-0.42…+0.43) | 64.9 | 25.7 / 2.7 | düşük güven |
+| geri çekilme | 18333 | 986 | 26.36 (24.8…27.9) | 31.59 (29.9…33.2) | 0.233 | 0.066 (+0.00…+0.13) | 80.4 | 25.2 / 0.4 | orta güven |
+| kırılım | 12063 | 969 | 36.7 (35.0…38.5) | 41.01 (39.2…43.0) | 2.016 | 0.325 (+0.24…+0.41) | 55.5 | 27.9 / 0.3 | orta güven |
+
+**Rejim (türler birleşik) — tüm dönem**
+
+| Grup | n | gün | TP1 % (%95) | kazanma % (%95) | ort. net % | ort. R (%95) | aynı hisse 10 gün içinde % | sıçrama gösterge/tutma % | durum |
+|---|---|---|---|---|---|---|---|---|---|
+| düşüş · normal | 767 | 35 | 35.46 (29.6…41.1) | 44.59 (39.3…49.9) | 3.111 | 0.474 (+0.25…+0.70) | 68.6 | 9.3 / 0.1 | düşük güven |
+| düşüş · yüksek | 59 | 14 | 35.59 (7.7…48.6) | 40.68 (7.7…58.9) | 1.181 | 0.342 (-0.59…+0.85) | 49.2 | 11.9 / 0.0 | **YETERSİZ** |
+| kararsız · düşük | 816 | 38 | 23.53 (19.1…28.5) | 28.43 (23.6…33.4) | -0.817 | -0.071 (-0.25…+0.12) | 71.7 | 35.7 / 0.2 | düşük güven |
+| kararsız · normal | 2949 | 135 | 28.82 (26.4…31.4) | 34.62 (31.7…37.7) | 0.559 | 0.109 (+0.00…+0.22) | 70.8 | 27.0 / 0.2 | orta güven |
+| kararsız · yüksek | 2727 | 148 | 31.98 (29.5…34.4) | 38.17 (35.3…41.0) | 1.873 | 0.296 (+0.19…+0.40) | 74.6 | 19.0 / 0.7 | orta güven |
+| yükseliş · düşük | 10303 | 286 | 28.85 (27.1…30.8) | 33.17 (31.2…35.2) | 0.2 | 0.08 (+0.00…+0.16) | 70.5 | 21.7 / 0.3 | orta güven |
+| yükseliş · normal | 9046 | 226 | 35.93 (32.9…39.1) | 40.43 (37.0…43.9) | 2.445 | 0.366 (+0.23…+0.51) | 68.8 | 34.1 / 0.3 | orta güven |
+| yükseliş · yüksek | 3803 | 112 | 22.35 (19.0…25.9) | 26.9 (23.0…30.9) | -1.083 | -0.122 (-0.29…+0.05) | 71.9 | 26.1 / 0.8 | orta güven |
+
+**2022 son (11–12. ay): strateji × trend**
+
+| Grup | n | gün | TP1 % (%95) | kazanma % (%95) | ort. net % | ort. R (%95) | aynı hisse 10 gün içinde % | sıçrama gösterge/tutma % | durum |
+|---|---|---|---|---|---|---|---|---|---|
+| destekten tepki · yükseliş | 3 | 3 | 0.0 (0.0…0.0) | 0.0 (0.0…0.0) | -7.549 | -0.972 (-1.04…-0.87) | 100.0 | 0.0 / 0.0 | **YETERSİZ** |
+| geri çekilme · yükseliş | 990 | 38 | 32.63 (21.2…45.3) | 35.25 (23.2…48.5) | 1.183 | 0.293 (-0.24…+0.87) | 71.8 | 9.7 / 1.8 | düşük güven |
+| kırılım · yükseliş | 907 | 38 | 48.07 (38.6…57.1) | 49.39 (39.9…58.6) | 3.372 | 0.497 (+0.17…+0.82) | 63.9 | 10.6 / 2.4 | düşük güven |
+
+**2023: strateji × trend**
+
+| Grup | n | gün | TP1 % (%95) | kazanma % (%95) | ort. net % | ort. R (%95) | aynı hisse 10 gün içinde % | sıçrama gösterge/tutma % | durum |
+|---|---|---|---|---|---|---|---|---|---|
+| destekten tepki · kararsız | 6 | 6 | 50.0 (16.7…83.3) | 50.0 (16.7…83.3) | 9.22 | 1.031 (-0.42…+2.67) | 66.7 | 66.7 / 0.0 | **YETERSİZ** |
+| destekten tepki · yükseliş | 13 | 10 | 15.38 (0.0…36.4) | 15.38 (0.0…36.4) | -2.392 | -0.2 (-1.09…+0.89) | 92.3 | 84.6 / 0.0 | **YETERSİZ** |
+| geri çekilme · kararsız | 1239 | 81 | 23.65 (19.9…27.9) | 29.46 (25.3…34.3) | 0.506 | 0.018 (-0.15…+0.20) | 81.2 | 83.9 / 0.9 | orta güven |
+| geri çekilme · yükseliş | 3698 | 167 | 28.91 (24.1…33.8) | 32.42 (27.4…37.7) | 0.41 | 0.135 (-0.06…+0.33) | 79.4 | 74.0 / 0.3 | orta güven |
+| kırılım · kararsız | 248 | 70 | 29.03 (22.7…35.7) | 31.85 (25.0…39.0) | 0.29 | 0.088 (-0.17…+0.35) | 56.0 | 80.6 / 0.4 | orta güven |
+| kırılım · yükseliş | 2480 | 165 | 40.2 (35.6…45.5) | 45.97 (40.6…51.9) | 4.176 | 0.618 (+0.39…+0.87) | 54.8 | 83.2 / 0.1 | orta güven |
+
+**2024 (FAZ 2'de incelendi): strateji × trend**
+
+| Grup | n | gün | TP1 % (%95) | kazanma % (%95) | ort. net % | ort. R (%95) | aynı hisse 10 gün içinde % | sıçrama gösterge/tutma % | durum |
+|---|---|---|---|---|---|---|---|---|---|
+| destekten tepki · kararsız | 3 | 3 | 0.0 (0.0…0.0) | 33.33 (0.0…100.0) | -2.919 | -0.503 (-1.09…+0.59) | 0.0 | 0.0 / 0.0 | **YETERSİZ** |
+| destekten tepki · yükseliş | 12 | 11 | 41.67 (16.7…66.7) | 41.67 (16.7…66.7) | 6.912 | 0.834 (-0.49…+2.24) | 83.3 | 16.7 / 16.7 | **YETERSİZ** |
+| geri çekilme · düşüş | 44 | 9 | 56.82 (50.9…64.3) | 56.82 (50.9…64.3) | 5.885 | 0.994 (+0.74…+1.33) | 77.3 | 13.6 / 0.0 | **YETERSİZ** |
+| geri çekilme · kararsız | 619 | 79 | 27.79 (23.8…31.6) | 34.41 (29.3…39.0) | 0.022 | 0.074 (-0.10…+0.24) | 76.9 | 11.0 / 0.8 | orta güven |
+| geri çekilme · yükseliş | 3610 | 161 | 22.66 (20.0…25.5) | 29.31 (26.5…32.5) | -0.583 | -0.062 (-0.17…+0.06) | 82.1 | 7.3 / 0.7 | orta güven |
+| kırılım · düşüş | 114 | 9 | 37.72 (25.6…51.0) | 45.61 (32.1…59.1) | 2.815 | 0.558 (+0.05…+1.15) | 45.6 | 14.0 / 0.9 | **YETERSİZ** |
+| kırılım · kararsız | 623 | 78 | 32.58 (28.7…36.5) | 39.33 (34.6…43.5) | 0.989 | 0.167 (-0.01…+0.35) | 54.3 | 8.3 / 0.3 | orta güven |
+| kırılım · yükseliş | 2270 | 160 | 38.02 (34.6…41.4) | 43.3 (39.5…47.2) | 2.349 | 0.413 (+0.24…+0.60) | 53.5 | 24.2 / 0.2 | orta güven |
+
+**2025-01-01 … 2025-11-13: strateji × trend**
+
+| Grup | n | gün | TP1 % (%95) | kazanma % (%95) | ort. net % | ort. R (%95) | aynı hisse 10 gün içinde % | sıçrama gösterge/tutma % | durum |
+|---|---|---|---|---|---|---|---|---|---|
+| destekten tepki · düşüş | 1 | 1 | 0.0 (—) | 0.0 (—) | -5.23 | -1.166 (—) | 0.0 | 0.0 / 0.0 | **YETERSİZ** |
+| destekten tepki · kararsız | 1 | 1 | 100.0 (—) | 100.0 (—) | 13.26 | 3.542 (—) | 100.0 | 0.0 / 0.0 | **YETERSİZ** |
+| destekten tepki · yükseliş | 18 | 14 | 11.11 (0.0…27.3) | 11.11 (0.0…27.3) | -4.16 | -0.788 (-1.13…-0.27) | 44.4 | 5.6 / 0.0 | **YETERSİZ** |
+| geri çekilme · düşüş | 413 | 28 | 37.05 (29.1…46.0) | 50.12 (43.1…57.3) | 4.718 | 0.679 (+0.38…+1.00) | 80.1 | 8.7 / 0.0 | düşük güven |
+| geri çekilme · kararsız | 1490 | 87 | 29.33 (26.1…33.1) | 35.17 (31.6…39.6) | 1.315 | 0.229 (+0.09…+0.38) | 80.9 | 7.0 / 0.5 | orta güven |
+| geri çekilme · yükseliş | 2095 | 102 | 26.25 (23.0…29.7) | 29.69 (26.3…33.3) | 0.118 | 0.022 (-0.10…+0.15) | 82.9 | 5.9 / 0.0 | orta güven |
+| kırılım · düşüş | 227 | 28 | 31.28 (25.3…37.5) | 35.68 (29.6…41.9) | 0.416 | 0.072 (-0.16…+0.32) | 57.7 | 7.5 / 0.0 | düşük güven |
+| kırılım · kararsız | 782 | 87 | 37.98 (34.2…41.8) | 43.61 (38.8…48.1) | 2.394 | 0.376 (+0.21…+0.54) | 55.2 | 9.8 / 0.3 | orta güven |
+| kırılım · yükseliş | 1805 | 102 | 33.19 (29.1…37.3) | 36.73 (31.8…41.7) | 1.005 | 0.141 (-0.08…+0.37) | 55.0 | 7.5 / 0.1 | orta güven |
+
+**son 12 ay 2025-11-14 … 2026-11-13 (FAZ 2'de incelendi): strateji × trend**
+
+| Grup | n | gün | TP1 % (%95) | kazanma % (%95) | ort. net % | ort. R (%95) | aynı hisse 10 gün içinde % | sıçrama gösterge/tutma % | durum |
+|---|---|---|---|---|---|---|---|---|---|
+| destekten tepki · kararsız | 6 | 6 | 33.33 (0.0…66.7) | 33.33 (0.0…66.7) | -1.589 | -0.279 (-1.02…+0.49) | 66.7 | 0.0 / 0.0 | **YETERSİZ** |
+| destekten tepki · yükseliş | 11 | 9 | 36.36 (9.1…66.7) | 36.36 (9.1…66.7) | 1.227 | 0.369 (-0.68…+1.60) | 54.5 | 9.1 / 0.0 | **YETERSİZ** |
+| geri çekilme · düşüş | 8 | 5 | 12.5 (0.0…50.0) | 12.5 (0.0…50.0) | -2.205 | -0.072 (-0.92…+2.10) | 37.5 | 0.0 / 0.0 | **YETERSİZ** |
+| geri çekilme · kararsız | 1087 | 74 | 28.43 (24.5…32.5) | 35.33 (30.9…39.9) | 0.78 | 0.196 (+0.02…+0.37) | 81.0 | 2.6 / 0.0 | orta güven |
+| geri çekilme · yükseliş | 3040 | 155 | 22.47 (19.8…25.3) | 27.76 (25.1…30.6) | -0.719 | -0.114 (-0.23…+0.02) | 80.8 | 3.8 / 0.0 | orta güven |
+| kırılım · düşüş | 19 | 11 | 0.0 (0.0…0.0) | 0.0 (0.0…0.0) | -7.572 | -0.984 (-1.10…-0.87) | 21.1 | 15.8 / 0.0 | **YETERSİZ** |
+| kırılım · kararsız | 388 | 66 | 32.22 (26.7…38.1) | 35.05 (29.3…41.2) | 0.086 | 0.06 (-0.13…+0.26) | 57.2 | 8.8 / 0.0 | orta güven |
+| kırılım · yükseliş | 2200 | 155 | 32.77 (29.9…35.9) | 35.41 (32.3…38.8) | 0.405 | 0.107 (+0.00…+0.22) | 55.8 | 5.8 / 0.0 | orta güven |
+
+## J.3 Okuma (betimleyici; strateji seçimi ya da eşik önerisi değildir)
+
+**Çoklu karşılaştırma:**
+
+- Tüm dönemde 23 ana grup var; 15'i yeterli.
+- Yeterli grupların **8'inde** ortalama R'nin %95 aralığı sıfırı dışlıyor. Bağımsız gruplar için rastlantıyla
+  beklenen sayı yaklaşık 0,8.
+- Ama gruplar bağımsız değil: aynı günler, aynı hisseler, 10 gün içinde tekrar eden sinyaller (%54–83). Bu yüzden bu
+  karşılaştırma **anlamlılık kanıtı sayılmaz**. Düzeltilmiş anlamlılık iddia edilmez.
+
+**Görülenler** (yalnız betimleme):
+
+- **Kırılım ve geri çekilme:** Tüm dönemde kırılımın tekil ortalama R'si (+0,33; %95 +0,24…+0,41) geri çekilmeden
+  (+0,07; +0,00…+0,13) yüksek. Kırılım, yeterli rejimlerin çoğunda geri çekilmenin üstünde; istisna düşüş / normal (geri çekilme +0,70, kırılım +0,17).
+- **Yükseliş + yüksek oynaklıkta geri çekilme:** Ortalama R −0,35 (−0,49…−0,19; 2.523 işlem, 111 gün).
+- **Döneme göre değişim:** Kırılım × yükseliş 2022 son, 2023 ve 2024'te pozitif. 2025 ilk dönemde aralık sıfırı
+  içeriyor; son 12 ayda +0,11 (+0,00…+0,22) ile sınırda.
+- **Son 12 ayda geri çekilme × yükseliş:** −0,11 (−0,23…+0,02).
+- **Düşüş rejimi:** Gün sayısı az (35 + 14) ve tek tek dönemlerde çoğu grup YETERSİZ. Tüm dönemdeki pozitif düşüş
+  grupları birkaç kümelenmiş döneme dayanıyor.
+- **Tekil ile portföy farkı:** Tekil ortalamalar pozitif olabilir, ama aynı dönemdeki FAZ 2 portföyü zararlı (Ek H10).
+  Tekil sonuç, sınırlı pozisyonla ve sıralamayla seçilen işlemlerin sonucu değildir. Buradan portföy getirisi
+  çıkarılmamalı.
+- **Veri kalitesi:** 2023 gruplarında gösterge penceresinde sıçrama payı **%74–85**; bu pencereler 2022–2023
+  sıçramalarını kapsıyor. Bu, yüzde bu kadarının hatalı olduğu anlamına gelmez; sonuçların etkilenmediğini de
+  göstermez. **Duyarlılık analizi yapılmadı.** Tutma süresinde sıçrama payı çoğu grupta %1'in altında.
+
+**Katkı değerlendirmesi:**
+
+- Ön kayıtlı rejim sınıfları, strateji türleri arasında tutarlı ve sağlam bir ayrım kanıtı **vermiyor**. Sebepler:
+  - etki dönemler arasında işaret ve büyüklük değiştiriyor;
+  - düşüş rejimi örneği az;
+  - gözlemler yüksek oranda ilişkili;
+  - veri kalitesi uyarıları var;
+  - bu dönemler daha önce incelendi.
+- Bu nedenle **uygulanabilir bir katkı bulunmadı.** Bulgular yalnız ileride dönem dışı (yeni) veriyle sınanacak
+  hipotez olarak kaydedildi:
+  - "kırılım, geri çekilmeden iyi";
+  - "geri çekilme, yükseliş + yüksek oynaklıkta zayıf".
+
+**Canlı için öneri (yalnız öneri, uygulanmadı):**
+
+1. Canlı tahmin defterinin rejim tablosu (`defter.ozet → rejim`) bugünkü gibi `guven(n, gun)` ile sınırlansın. Bu
+   çalışma, aynı hisseden ilişkili gözlemler yüzünden ek bir "aynı hisse tekrar payı" uyarısının yararlı olacağını
+   gösteriyor.
+2. Hiçbir strateji ya da rejim kuralı değiştirilmesin. Bu hipotezler, FAZ 1 defterinde biriken dönem dışı kayıtlarla
+   ayrıca sınanabilir.
+
+## J.4 Testler
+
+| Komut | Sonuç |
+|---|---|
+| `tests.test_faz4_rejim` | 8 test. **Gelecek bağımsızlığı:** gelecek mumlar bozulduğunda ya da hiç olmadığında geçmiş günlerin rejimi aynı; her gün yalnız o güne kadarki veriyle aynı; kısa geçmişte rejim yok; eksik günde son mevcut gün. **İstatistik:** küme bootstrap tekrarlanabilir; tek günde aralık yok; bağımlı günlerde aralık bağımsız varsayıma göre geniş. Grup özeti elle hesapla doğrulandı; n < 30 ve gün < 20 YETERSİZ. **Süzgeç:** canli_ortak evreni, kapanmış sonuç, s3 stop altı girişsiz, tekrar bayrağı, sıçrama bayrakları. |
+| Tam takım (ağ engelli) | **Ran 629 tests … OK**, ağ denemesi 0 (621 + 8) |
+
+## J.5 Değişen dosyalar (dal `faz4-rejim`)
+
+- **Yeni:**
+  - `arastirma/faz4/rejim_tanimi.json` (ön kayıt)
+  - `arastirma/faz4/rejim_analiz.py`, `arastirma/faz4/tablo_yaz.py`
+  - `arastirma/faz4/sonuclar/rejim_sonuclari.json`, `arastirma/faz4/sonuclar/rejim_tablolari.md`
+  - `tests/test_faz4_rejim.py`
+- **Değişmeyen:** Canlı modüller (`regime`, `defter`, `journal`, `ready`), model ve veritabanları.
+- **Ayrıca:** FAZ 3 kabul kaydı (Ek I3, etiket `faz3-kabul`) `faz3-metrik` dalında.
+
+## J.6 Sınırlamalar
+
+1. Bağımsız doğrulama değildir; dönemler ve planlar önceden incelendi.
+2. Tekil işlem sonucudur; portföy değildir. Aynı hisse ve aynı gün bağımlılığı yüksektir; aralıklar yalnız gün
+   kümesini hesaba katar.
+3. FAZ 3 veri sorunları geçerli:
+   - düzeltilmiş fiyatlar;
+   - iki indirme bloğu arasındaki taban kayması;
+   - sıçramalar (gösterge penceresinde yaygın);
+   - duyarlılık analizi yok.
+4. Hayatta kalma yanlılığı ve güncel sektör listesi sorunu sürüyor. Haber şartı yok.
+5. Düşüş rejimi örneği az. Rejim sınıfları yalnız BIST 100'e dayanır; hisse ya da sektör rejimi yok.
+6. Çok sayıda karşılaştırma yapıldı; iyi görünen gruplar rastlantı olabilir.
+
+## J.7 FAZ 1 (ayrı)
+
+- 16.11 17:40'te canlı veritabanı salt-okunur okundu: 2 tahmin, 0 sonuç, 0 değerlendirme, 0 olay.
+- Son çalıştırma 16.11 09:42 sabah kontrolü; fiyatlar 13.11'e kadar. Bu akşamki analiz henüz çalışmadı.
+- **FAZ 1 kabul edilmedi.**
+
+**Onay beklenen:** FAZ 4 kabul kararı. FAZ 5'e geçilmedi; canlıya alma yok.
