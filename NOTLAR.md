@@ -1972,3 +1972,4 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - BAHKM/ENERY (16.11 girişli): hazır fırsat durumu 'giris' (açılış ≤ azami), tahmin açık; nihai sonuç yok (beklenen: henüz TP/SL/30 gün yok). v1 sütun özeti d5d7973ca0bbe41e değişmedi.
 - Sonuç 0, ayrı değerlendirme 0, olay 0 (hata yok). Kapsam 5/5.
 - HENÜZ GÖZLENMEYEN: gerçek sonuçlandırma (TP/SL), yarın sabah kontrolü (17.11), s1→s2 yeniden değerlendirme yolu (s1 sonucu yok). FAZ 1 kabul edilmedi.
+- Not: bekçi rapor dosyası (canlı veriden gerçek rapor) yanlışlıkla 31dbcf7'de repoya eklendi; bu commit'le kaldırıldı. Dosya Git geçmişinde (özel repo) duruyor; geçmişten silmek zorla göndermeyi gerektirir ve kullanıcı kararına bırakıldı.
