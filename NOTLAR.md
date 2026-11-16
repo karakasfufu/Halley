@@ -1957,3 +1957,6 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Yeniden değerlendirme (eğitim yok, EĞİTİM İÇİ): tp1_v1 sabit, 34.579 örnek; AUC 0,6361 → 0,6347 (tp1_hedefi, 91 değişen) → 0,6350 (+s3, 250 çıkan). Dönem dışı: kat modelleri saklanmadığı için yapılamadı.
 - Köken: tp1_v1 ← etiket2.csv, oturum günlüğü komut+çıktısıyla bağlandı (kriptografik değil); 86 fark = x_trend süzgeci. Kanıtlar data/backtest/arsiv/faz3_koken_20261116/ (435 MB, Git dışı, manifest Git'te).
 - 621 test OK. FAZ 3 kabul önerisi: metrik/izlenebilirlik altyapısı + veri envanteri olarak; duyarlılık analizi yapılmadı.
+
+## 2026-11-16 — FAZ 3 KABUL EDİLDİ (commit 94d2fc8, etiket faz3-kabul); FAZ 4 onaylandı
+- Kapsam: metrik/izlenebilirlik altyapısı + veri envanteri. fiyat_izi canlıda değil; duyarlılık analizi yapılmadı.

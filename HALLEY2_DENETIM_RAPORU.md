@@ -3562,3 +3562,13 @@ eşleşti. Girdileri farklı olan 0.
   09:42 sabah kontrolü. Fiyatlar 13.11'e kadar.
 - Bu ekten önce yeni bir okuma: **16.11 17:23**, durum aynı (2 tahmin, 0 sonuç, 0 değerlendirme, 0 olay, son çalıştırma 09:42 sabah kontrolü). Bu akşamki analiz henüz çalışmadı.
 - **FAZ 1 kabul edilmedi.**
+
+---
+
+# EK I3 (16.11.2026) — FAZ 3 KABUL KAYDI
+
+Kullanıcı FAZ 3'ü onayladı ve FAZ 4'e başlamayı onayladı (16.11.2026). Kabul edilen sürüm: commit `94d2fc8` (dal `faz3-metrik`), etiket `faz3-kabul`.
+
+- Kapsam: metrik ve izlenebilirlik altyapısı, veri güvenilirliği envanteri (Ek I, I2).
+- Kapsam dışı: tarihsel performansın güvenilirliği, veri sorunlarının etkisizliği, `fiyat_izi` canlı geçişi, duyarlılık analizi (yapılmadı).
+- Canlı kod ve veritabanı değişmedi.
