@@ -16,6 +16,12 @@ veri kalitesi ya da maliyet ayarı tek başına değişirse yeni tahmin SAYILMAZ
 Kural sürümü s2 (Ek F): TP1 olayı = TP1 hedefine SL'den önce ulaşıldı (doğrudan TP2 açılışı dahil); maliyet tahmin
 anındaki sözleşmeden; giriş günü mumu eksikse nihai sonuç yazılmaz ("veri_eksik"); MAE/MFE yalnız pozisyon süresince
 (çıkış mumunda yalnız çıkış fiyatı; günlük mum yaklaşığı).
+Kural sürümü s3 (O2, 16.11.2026; Ek H4 / Ek O): YENİ tahminlerin sözleşmesi. Giriş günü açılışı SL'ye eşit ya da
+altındaysa giriş yoktur ("girissiz", neden "açılış stopun altında veya eşit"; journal.giris_kosulu). Açılış SL'nin
+üstündeyse sonuç s2 ile aynıdır (journal.evaluate kural="s3"). Çıkışlar gerçek satış değil, kurala göre varsayımsal.
+SÜRÜM AYRIMI: her tahmin KENDİ sözleşmesindeki kuralla sonuçlanır (s2 tahmini s2 ile; FAZ 1 kanıtları değişmez).
+s2 sonucunun s3 ile yeniden değerlendirmesi `tahmin_degerlendirme`ye AYRI satır olarak yazılır; ölçümde ayrı grup
+(ölçüm kuralı) olarak gösterilir, s2 ölçümüyle BİRLEŞTİRİLMEZ. Eski (s1) sonuçların s2 değerlendirmesi aynen sürer.
 Seçim kuralları, eşikler, TP1 modeli ve yapay zekâ kullanımı DEĞİŞMEZ; bu modül yalnız kaydeder ve ölçer. YZ yok.
 """
 import hashlib
@@ -27,7 +33,9 @@ from typing import Dict, List, Optional
 
 from . import config
 
-KURAL_SURUM = "s2"
+KURAL_SURUM = "s3"                # YENİ tahminlerin sözleşmesi (O2). Eski sözleşmeler kendi kuralıyla sonuçlanır.
+KURALLAR = ("s2", "s3")           # bu kodun uygulayabildiği sonuçlandırma kuralları
+YENIDEN_DEGERLENDIRME = {"s1": "s2", "s2": "s3"}   # sonuç kuralı → ayrı yeniden değerlendirme kuralı
 MALIYET_PROTOKOL = "ayar_tahmin_ani_v1"   # komisyon ve kayma, tahmin anındaki Halley ayarından dondurulur
 MAE_MFE_YONTEM = ("gunluk_s2: giriş mumu (açılıştan sonra) ve aradaki mumlar tam; çıkış mumunda açılışta çıkışsa "
                   "yalnız açılış, gün içi çıkışsa yalnız çıkış fiyatı, süre dolduysa tam mum; R paydası planlanan "
@@ -40,7 +48,7 @@ TEKNIK_ALANLAR = ("tarih", "son_fiyat", "trend", "rsi14", "macd_hist", "adx", "a
                   "destek_20g", "direnc_20g", "islem_hacmi_tl", "fiyat_sma50_%", "fiyat_sma200_%", "perf_20g_%")
 TABLO_ANAHTAR = ("tur", "trend", "atr_%", "rsi")   # benzer durumlar tablosunun grup anahtarı (tp1_model._table_key)
 GRUP_ALANLARI = ("model_surum", "ozellik_surum", "parametre_surum", "kural_surum", "maliyet_protokol", "komisyon_pct",
-                 "kayma_pct")
+                 "kayma_pct", "olcum_kurali")
 ETIKET_UYUMSUZLUGU = ("Etkin model (tp1_v1) ESKİ hedef tanımıyla eğitildi: o etikette fiyatın doğrudan TP2 üstünde "
                       "açıldığı durumlar 'TP1'e ulaşmadı' sayılmıştı (eğitim planlarının %0,26'sı; 34.665 planda 91). "
                       "Canlı ölçüm YENİ tanımı kullanır (doğrudan TP2 açılışı da TP1'e ulaşmış sayılır). Bu yüzden canlı "
@@ -180,6 +188,8 @@ def kaydet(conn, p: Dict, hazir_firsat_id: Optional[int], giris_gunu: str, anali
         veri = {"veri_uyarilari": list(t.get("veri_uyarilari") or []), "veri_kritik": bool(t.get("veri_kritik")),
                 "gun_sayisi": t.get("gun_sayisi"), "son_fiyat_gunu": t.get("tarih")}
         mal = maliyet_ayari()                              # değerlendirme sözleşmesi tahmin anında dondurulur
+        from . import journal as _j
+        kural_yeni = _j.yeni_kural()                       # O2: s3 (geri dönüş ayarıyla s2); tahminle dondurulur
         prev = conn.execute("SELECT id FROM tahmin WHERE ticker=? AND giris_gunu=? ORDER BY id DESC LIMIT 1",
                             (p["ticker"], giris_gunu)).fetchone()
         now = now or _now()
@@ -196,7 +206,7 @@ def kaydet(conn, p: Dict, hazir_firsat_id: Optional[int], giris_gunu: str, anali
              GECERLILIK_GUN, p.get("genel_puan"), p.get("teknik_skor"), p.get("haber_skoru"), p.get("kaynak", "haber"),
              p.get("risk"), json.dumps(f, ensure_ascii=False, default=str),
              json.dumps(teknik, ensure_ascii=False, default=str), json.dumps(rejim, ensure_ascii=False, default=str),
-             json.dumps(veri, ensure_ascii=False, default=str), int(bool(sonradan)), KURAL_SURUM,
+             json.dumps(veri, ensure_ascii=False, default=str), int(bool(sonradan)), kural_yeni,
              mal["komisyon_pct"], mal["kayma_pct"], MALIYET_PROTOKOL))
         conn.commit()
         if not cur.rowcount:    # aynı anda başka süreç yazdıysa
@@ -282,22 +292,37 @@ def mae_mfe(held: List[Dict], fill: float, res: Dict, risk: float) -> Dict:
             "yaklasik": yaklasik}
 
 
-def _degerlendir(t: Dict, bars: List[Dict], kom: float, kay: float) -> Dict:
-    """Bir tahminin fiyatlara göre durumu: {"durum": "acik"|"veri_eksik"|"sonuc", "alanlar": {...}}."""
+def sozlesme_kurali(t: Dict) -> str:
+    """Tahminin sonuçlandırma kuralı: kendi sözleşmesi; sözleşmesi eksik eski (v1) kayıt s2 ile (FAZ 1 v2'deki gibi)."""
+    k = t.get("kural_surum") or "s2"
+    return k if k in KURALLAR else "s2"
+
+
+def _degerlendir(t: Dict, bars: List[Dict], kom: float, kay: float, kural: str = "s2") -> Dict:
+    """Bir tahminin fiyatlara göre durumu: {"durum": "acik"|"veri_eksik"|"sonuc", "alanlar": {...}}.
+    kural: "s2" (FAZ 1 sözleşmesi; DEĞİŞMEDİ) | "s3" (O2: açılış ≤ SL → girişsiz; çıkışlar varsayımsal)."""
     from . import journal
+    if kural not in KURALLAR:
+        raise ValueError(f"kural: {KURALLAR}")
     gun = next((b for b in bars if b["date"] == t["giris_gunu"]), None)
     if gun is None:
         if any(b["date"] > t["giris_gunu"] for b in bars):
             return {"durum": "veri_eksik"}             # sonraki günler var, giriş günü yok: doğrulanmadan nihai yok
         return {"durum": "acik"}
     acilis = gun.get("open") or gun["close"]
-    if acilis > t["azami_giris"] + 1e-9:
+    if kural == "s3":
+        neden = journal.giris_kosulu(acilis, t["azami_giris"], t["sl"])
+        if neden:
+            return {"durum": "sonuc", "alanlar": {"sonuc_turu": "girissiz", "neden": neden,
+                                                   "giris_gunu_gercek": gun["date"],
+                                                   "ayrinti": {"acilis": acilis, "kural": "s3"}}}
+    elif acilis > t["azami_giris"] + 1e-9:
         return {"durum": "sonuc", "alanlar": {"sonuc_turu": "girissiz", "neden": "açılış azami girişin üstünde",
                                                "giris_gunu_gercek": gun["date"], "ayrinti": {"acilis": acilis}}}
     rec = {"kaynak": "gercek", "gercek_giris_gunu": t["giris_gunu"], "gercek_giris_fiyati": acilis,
            "signal_day": t["signal_day"], "senaryo": t["tur"], "sl": t["sl"], "tp1": t["tp1"], "tp2": t["tp2"],
            "giris": t["giris"], "alarm": None, "gecerlilik": GECERLILIK_GUN}
-    res = journal.evaluate(rec, bars, kom, kay)
+    res = journal.evaluate(rec, bars, kom, kay, kural=kural)
     if res.get("durum") != "kapandı":
         return {"durum": "acik"}
     after = [b for b in bars if b["date"] > t["signal_day"]]
@@ -312,7 +337,9 @@ def _degerlendir(t: Dict, bars: List[Dict], kom: float, kay: float) -> Dict:
         "cikis_nedeni": res.get("sonuc"), "cikis_gunu": res.get("cikis_gunu"), "islem_gunu": n,
         "net_getiri_pct": res.get("net_getiri_pct"), "r": res.get("r"), "mae_r": mm["mae_r"], "mfe_r": mm["mfe_r"],
         "mae_mfe_yontem": MAE_MFE_YONTEM, "mae_mfe_yaklasik": mm["yaklasik"], "ayni_gun_belirsiz": int(bool(bel)),
-        "belirsiz_gunler": bel, "ayrinti": {"bacaklar": res.get("bacaklar"), "olaylar": res.get("olaylar")}}}
+        "belirsiz_gunler": bel, "ayrinti": dict({"bacaklar": res.get("bacaklar"), "olaylar": res.get("olaylar")},
+                                                 **({"kural": "s3", "gerceklesme": res.get("gerceklesme")}
+                                                    if kural == "s3" else {}))}}
 
 
 _SONUC_ALANLARI = ("sonuc_turu", "neden", "giris_gunu_gercek", "giris_fiyati", "tp1_goruldu", "tp1_olayi", "sl_goruldu",
@@ -329,21 +356,22 @@ def _satir(k: Dict) -> Dict:
     return d
 
 
-def _sonuc_yaz(conn, tid: int, tur: str, now: datetime, **k) -> None:
+def _sonuc_yaz(conn, tid: int, tur: str, now: datetime, kural: str = KURAL_SURUM, **k) -> None:
+    """Nihai sonuç, tahminin KENDİ sözleşme kuralıyla yazılır (kural)."""
     k["sonuc_turu"] = tur
     d = _satir(k)
     v2 = "tp1_olayi" in _cols(conn, "tahmin_sonuc")
     alan = [a for a in _SONUC_ALANLARI if v2 or a not in ("tp1_olayi", "komisyon_pct", "kayma_pct", "maliyet_kaynagi",
                                                             "mae_mfe_yontem", "mae_mfe_yaklasik")]
     conn.execute(f"INSERT OR IGNORE INTO tahmin_sonuc(tahmin_id,{','.join(alan)},degerlendirme_zamani,kural_surum) "
-                 f"VALUES(?,{','.join('?' * len(alan))},?,?)", [tid] + [d[a] for a in alan] + [_iso(now), KURAL_SURUM])
+                 f"VALUES(?,{','.join('?' * len(alan))},?,?)", [tid] + [d[a] for a in alan] + [_iso(now), kural])
 
 
-def _degerlendirme_yaz(conn, tid: int, now: datetime, gerekce: str, **k) -> None:
+def _degerlendirme_yaz(conn, tid: int, now: datetime, gerekce: str, kural: str = KURAL_SURUM, **k) -> None:
     d = _satir(k)
     conn.execute(f"INSERT OR IGNORE INTO tahmin_degerlendirme(tahmin_id,kural_surum,{','.join(_SONUC_ALANLARI)},gerekce,"
                  f"degerlendirme_zamani) VALUES(?,?,{','.join('?' * len(_SONUC_ALANLARI))},?,?)",
-                 [tid, KURAL_SURUM] + [d[a] for a in _SONUC_ALANLARI] + [gerekce, _iso(now)])
+                 [tid, kural] + [d[a] for a in _SONUC_ALANLARI] + [gerekce, _iso(now)])
 
 
 def _maliyet(t: Dict, yedek: Optional[Dict], s1_ayrinti: Optional[str] = None) -> Dict:
@@ -366,8 +394,9 @@ def _maliyet(t: Dict, yedek: Optional[Dict], s1_ayrinti: Optional[str] = None) -
 
 def sonuclandir(conn, now: Optional[datetime] = None, commission_pct: Optional[float] = None,
                 slippage_pct: Optional[float] = None, bars_fn=None) -> Dict:
-    """Açık tahminlerden nihai sonucu belli olanlara TEK sonuç satırı yazar; eski kuralla (s1) yazılmış fiyat
-    sonuçlarına ayrı s2 değerlendirmesi ekler (Ek F). commission_pct/slippage_pct yalnız sözleşmesi EKSİK eski kayıtlar
+    """Açık tahminlerden nihai sonucu belli olanlara TEK sonuç satırı yazar — her tahmin KENDİ sözleşme kuralıyla
+    (sozlesme_kurali). Eski kuralla yazılmış fiyat sonuçlarına ayrı yeniden değerlendirme ekler: s1 → s2 (Ek F),
+    s2 → s3 (O2); eski satırlar değişmez. commission_pct/slippage_pct yalnız sözleşmesi EKSİK eski kayıtlar
     için yedek değerdir. Hata fırlatmaz; hata `defter_olay`'a yazılır."""
     from . import journal
     out = {"incelenen": 0, "yazilan": 0, "yeniden_degerlendirilen": 0, "veri_eksik": 0, "hata": None}
@@ -384,27 +413,31 @@ def sonuclandir(conn, now: Optional[datetime] = None, commission_pct: Optional[f
         for t in acik:
             out["incelenen"] += 1
             t = dict(t)
+            kural = sozlesme_kurali(t)
             sinir = f"{t['giris_gunu']}T{ACILIS_SINIRI}"
             if t["tahmin_zamani"][:16] >= sinir:
-                _sonuc_yaz(conn, t["id"], "gec_kayit", now, neden=f"giriş günü {ACILIS_SINIRI}'ten sonra kaydedildi")
+                _sonuc_yaz(conn, t["id"], "gec_kayit", now, kural=kural,
+                           neden=f"giriş günü {ACILIS_SINIRI}'ten sonra kaydedildi")
                 out["yazilan"] += 1
                 continue
             newer = conn.execute("SELECT id FROM tahmin WHERE ticker=? AND giris_gunu=? AND id>? AND substr(tahmin_zamani,1,16)<? "
                                  "ORDER BY id DESC LIMIT 1", (t["ticker"], t["giris_gunu"], t["id"], sinir)).fetchone()
             if newer:
-                _sonuc_yaz(conn, t["id"], "yerini_aldi", now, neden=f"açılıştan önce daha yeni tahmin: #{newer[0]}")
+                _sonuc_yaz(conn, t["id"], "yerini_aldi", now, kural=kural,
+                           neden=f"açılıştan önce daha yeni tahmin: #{newer[0]}")
                 out["yazilan"] += 1
                 continue
             if t["hazir_firsat_id"]:
                 hf = conn.execute("SELECT durum, iptal_nedeni FROM hazir_firsat WHERE id=?",
                                   (t["hazir_firsat_id"],)).fetchone()
                 if hf and hf["durum"] == "iptal":
-                    _sonuc_yaz(conn, t["id"], "iptal", now, neden=hf["iptal_nedeni"] or "hazır fırsat iptal edildi")
+                    _sonuc_yaz(conn, t["id"], "iptal", now, kural=kural,
+                               neden=hf["iptal_nedeni"] or "hazır fırsat iptal edildi")
                     out["yazilan"] += 1
                     continue
             bars = [b for b in bars_fn(t["ticker"], t["signal_day"]) if b.get("close")]
             mal = _maliyet(t, yedek)
-            d = _degerlendir(t, bars, mal["komisyon_pct"], mal["kayma_pct"])
+            d = _degerlendir(t, bars, mal["komisyon_pct"], mal["kayma_pct"], kural)
             if d["durum"] == "veri_eksik":
                 out["veri_eksik"] += 1
                 olay(conn, "veri_eksik", f"veri_eksik:{t['id']}", "giriş günü mumu yok, sonraki günler var; nihai "
@@ -417,20 +450,22 @@ def sonuclandir(conn, now: Optional[datetime] = None, commission_pct: Optional[f
             if k["sonuc_turu"] == "tamamlandi":
                 k.update(mal)
                 k["ayrinti"] = dict(k.get("ayrinti") or {}, komisyon_pct=mal["komisyon_pct"], kayma_pct=mal["kayma_pct"])
-            _sonuc_yaz(conn, t["id"], k.pop("sonuc_turu"), now, **k)
+            _sonuc_yaz(conn, t["id"], k.pop("sonuc_turu"), now, kural=kural, **k)
             out["yazilan"] += 1
-        # eski kural (s1) ile yazılmış FİYAT sonuçları → ayrı s2 değerlendirmesi (s1 kaydı değişmez)
+        # eski kuralla yazılmış FİYAT sonuçları → ayrı yeniden değerlendirme (s1 → s2, s2 → s3; eski kayıt değişmez)
         if _var(conn, "tahmin_degerlendirme"):
-            eski = conn.execute(
-                "SELECT t.*, s.sonuc_turu AS s_tur, s.neden AS s_neden, s.ayrinti_json AS s_ayrinti, s.kural_surum AS s_kural "
-                "FROM tahmin t JOIN tahmin_sonuc s ON s.tahmin_id=t.id LEFT JOIN tahmin_degerlendirme d "
-                "ON d.tahmin_id=t.id AND d.kural_surum=? WHERE s.kural_surum<>? AND d.id IS NULL "
-                "AND s.sonuc_turu IN ('tamamlandi','girissiz')", (KURAL_SURUM, KURAL_SURUM)).fetchall()
-            for t in eski:
+            eski = []
+            for kaynak_k, yeni_k in YENIDEN_DEGERLENDIRME.items():
+                eski += [(yeni_k, r) for r in conn.execute(
+                    "SELECT t.*, s.sonuc_turu AS s_tur, s.neden AS s_neden, s.ayrinti_json AS s_ayrinti, "
+                    "s.kural_surum AS s_kural FROM tahmin t JOIN tahmin_sonuc s ON s.tahmin_id=t.id LEFT JOIN "
+                    "tahmin_degerlendirme d ON d.tahmin_id=t.id AND d.kural_surum=? WHERE s.kural_surum=? AND d.id IS NULL "
+                    "AND s.sonuc_turu IN ('tamamlandi','girissiz')", (yeni_k, kaynak_k)).fetchall()]
+            for yeni_k, t in eski:
                 t = dict(t)
                 bars = [b for b in bars_fn(t["ticker"], t["signal_day"]) if b.get("close")]
                 mal = _maliyet(t, yedek, t["s_ayrinti"])
-                d = _degerlendir(t, bars, mal["komisyon_pct"], mal["kayma_pct"])
+                d = _degerlendir(t, bars, mal["komisyon_pct"], mal["kayma_pct"], yeni_k)
                 if d["durum"] != "sonuc":
                     if d["durum"] == "veri_eksik":
                         out["veri_eksik"] += 1
@@ -439,8 +474,8 @@ def sonuclandir(conn, now: Optional[datetime] = None, commission_pct: Optional[f
                 if k["sonuc_turu"] == "tamamlandi":
                     k.update(mal)
                     k["ayrinti"] = dict(k.get("ayrinti") or {}, komisyon_pct=mal["komisyon_pct"], kayma_pct=mal["kayma_pct"])
-                _degerlendirme_yaz(conn, t["id"], now, f"{t['s_kural']} sonucunun {KURAL_SURUM} kuralıyla ayrı "
-                                   f"değerlendirmesi (s1 kaydı değiştirilmedi)", **k)
+                _degerlendirme_yaz(conn, t["id"], now, f"{t['s_kural']} sonucunun {yeni_k} kuralıyla ayrı "
+                                   f"değerlendirmesi ({t['s_kural']} kaydı değiştirilmedi)", kural=yeni_k, **k)
                 out["yeniden_degerlendirilen"] += 1
         conn.commit()
     except Exception as e:
@@ -482,17 +517,23 @@ def model_surumleri(conn) -> List[Dict]:
         "GROUP BY model_surum ORDER BY son DESC")]
 
 
-def _grup_of(r: Dict) -> Dict:
+def _grup_of(r: Dict, olcum: Optional[str] = None) -> Dict:
+    """olcum: bu grubun ölçümünde kullanılan sonuç kuralı. Varsayılan = sözleşme kuralı (eski v1 kayıtta s2, FAZ 1
+    v2'deki gibi). s2 tahminlerinin s3 yeniden değerlendirmesi olcum="s3" ile AYRI grup olur."""
     return {"model_surum": r["model_surum"], "ozellik_surum": r["ozellik_surum"], "parametre_surum": r["parametre_surum"],
             "kural_surum": r.get("kural_surum") or "eksik", "maliyet_protokol": r.get("maliyet_protokol") or "eksik",
-            "komisyon_pct": r.get("komisyon_pct"), "kayma_pct": r.get("kayma_pct")}
+            "komisyon_pct": r.get("komisyon_pct"), "kayma_pct": r.get("kayma_pct"),
+            "olcum_kurali": olcum or sozlesme_kurali(r)}
 
 
 def grup_etiketi(g: Dict) -> str:
     mal = ("maliyet eksik" if g["maliyet_protokol"] == "eksik" else
            f"maliyet %{g['komisyon_pct']:g}+%{g['kayma_pct']:g}")
     return (f"{g['model_surum']} · özellik {g['ozellik_surum'][:6]} · parametre {g['parametre_surum'][:6]} · "
-            f"kural {g['kural_surum']} · {mal}")
+            f"kural {g['kural_surum']} · {mal}"
+            + (f" · ölçüm {g['olcum_kurali']} (ayrı yeniden değerlendirme)"
+               if g.get("olcum_kurali") and g["olcum_kurali"] != (g["kural_surum"] if g["kural_surum"] != "eksik" else "s2")
+               else ""))
 
 
 def gruplar(conn) -> List[Dict]:
@@ -502,15 +543,23 @@ def gruplar(conn) -> List[Dict]:
         return []
     v2 = "kural_surum" in _cols(conn, "tahmin")
     ek = ", kural_surum, maliyet_protokol, komisyon_pct, kayma_pct" if v2 else ""
-    rows = [dict(r) for r in conn.execute(f"SELECT model_surum, ozellik_surum, parametre_surum{ek}, tahmin_zamani "
+    rows = [dict(r) for r in conn.execute(f"SELECT id, model_surum, ozellik_surum, parametre_surum{ek}, tahmin_zamani "
                                           "FROM tahmin")]
+    yeniden = {}
+    if _var(conn, "tahmin_degerlendirme"):
+        for tid, k in conn.execute("SELECT tahmin_id, kural_surum FROM tahmin_degerlendirme"):
+            yeniden.setdefault(tid, set()).add(k)
     acc: Dict[str, Dict] = {}
     for r in rows:
-        g = _grup_of(r)
-        k = json.dumps(g, sort_keys=True, default=str)
-        a = acc.setdefault(k, {"grup": g, "n": 0, "son": ""})
-        a["n"] += 1
-        a["son"] = max(a["son"], r["tahmin_zamani"])
+        olcumler = [sozlesme_kurali(r)]
+        if r.get("kural_surum") and YENIDEN_DEGERLENDIRME.get(r["kural_surum"]) in yeniden.get(r["id"], ()):
+            olcumler.append(YENIDEN_DEGERLENDIRME[r["kural_surum"]])     # ayrı ölçüm grubu (birleştirilmez)
+        for o in olcumler:
+            g = _grup_of(r, o)
+            k = json.dumps(g, sort_keys=True, default=str)
+            a = acc.setdefault(k, {"grup": g, "n": 0, "son": ""})
+            a["n"] += 1
+            a["son"] = max(a["son"], r["tahmin_zamani"])
     return sorted(acc.values(), key=lambda a: a["son"], reverse=True)
 
 
@@ -522,16 +571,16 @@ def kayit_zamani(tahmin_zamani: str, giris_gunu: str) -> str:
     return "sabah" if (tahmin_zamani or "")[:10] >= giris_gunu else "aksam"
 
 
-def _etkin_sonuclar(conn) -> Dict[int, Dict]:
-    """Tahmin başına ölçümde kullanılacak sonuç: varsa güncel kuralın (s2) ayrı değerlendirmesi, yoksa nihai sonuç
-    satırı. Kaynağı ('sonuc' / 'degerlendirme') ve kural sürümü işaretlenir."""
+def _etkin_sonuclar(conn, olcum: str = "s2") -> Dict[int, Dict]:
+    """Tahmin başına, ölçüm kuralı `olcum` için kullanılacak sonuç: varsa o kuralın ayrı değerlendirmesi, yoksa nihai
+    sonuç satırı (kuralı farklıysa ozet onu 'bekliyor' sayar). Kaynağı ('sonuc' / 'degerlendirme') işaretlenir."""
     out: Dict[int, Dict] = {}
     for r in conn.execute("SELECT * FROM tahmin_sonuc"):
         d = dict(r)
         d["_kaynak"] = "sonuc"
         out[d["tahmin_id"]] = d
     if _var(conn, "tahmin_degerlendirme"):
-        for r in conn.execute("SELECT * FROM tahmin_degerlendirme WHERE kural_surum=?", (KURAL_SURUM,)):
+        for r in conn.execute("SELECT * FROM tahmin_degerlendirme WHERE kural_surum=?", (olcum,)):
             d = dict(r)
             d["_kaynak"] = "degerlendirme"
             out[d["tahmin_id"]] = d
@@ -584,14 +633,16 @@ def ozet(conn, grup: Dict, kaynak: Optional[str] = None, tur: Optional[str] = No
         raise TypeError("ozet() bir sürüm grubu (gruplar() öğesi) ister; yalnız model sürümüyle birleşik hesap yapılmaz")
     if not tablo_var(conn):
         return {"tablo_yok": True}
+    olcum = grup.get("olcum_kurali") or (grup.get("kural_surum") if grup.get("kural_surum") in KURALLAR else "s2")
+    hedef = dict({k: grup.get(k) for k in GRUP_ALANLARI}, olcum_kurali=olcum)
     rows = [dict(r) for r in conn.execute("SELECT * FROM tahmin")]
-    rows = [r for r in rows if _grup_of(r) == {k: grup.get(k) for k in GRUP_ALANLARI}]
+    rows = [r for r in rows if _grup_of(r, olcum) == hedef]
     for col, val in (("kaynak", kaynak), ("tur", tur), ("analiz", analiz), ("bant", bant)):
         if val:
             rows = [r for r in rows if r.get(col) == val]
     if kayit:
         rows = [r for r in rows if kayit_zamani(r["tahmin_zamani"], r["giris_gunu"]) == kayit]
-    son = _etkin_sonuclar(conn)
+    son = _etkin_sonuclar(conn, olcum)
     say = {"tahmin": len(rows), "sonradan": sum(r["sonradan"] for r in rows), "acik": 0, "veri_eksik": 0,
            "s1_bekliyor": 0, "tamamlandi": 0, "belirsiz": 0}
     for k in OLCULMEYEN:
@@ -605,11 +656,11 @@ def ozet(conn, grup: Dict, kaynak: Optional[str] = None, tur: Optional[str] = No
             say["veri_eksik" if _veri_eksik_mi(conn, r) else "acik"] += 1
             continue
         tur_ = s["sonuc_turu"]
-        if s["_kaynak"] == "sonuc" and s.get("kural_surum") != KURAL_SURUM and tur_ in ("tamamlandi", "girissiz"):
+        if s["_kaynak"] == "sonuc" and s.get("kural_surum") != olcum and tur_ in ("tamamlandi", "girissiz"):
             if tur_ == "girissiz" and s.get("neden") == "giriş günü işlem verisi yok":
                 say["veri_eksik"] += 1                      # s1'in eksik veride yazdığı "girişsiz" nihai sayılmaz
             else:
-                say["s1_bekliyor"] += 1                     # s2 değerlendirmesi henüz yok → metrik dışında
+                say["s1_bekliyor"] += 1                     # bu ölçüm kuralının değerlendirmesi henüz yok → metrik dışı
             continue
         say[tur_] = say.get(tur_, 0) + 1
         if tur_ == "tamamlandi":

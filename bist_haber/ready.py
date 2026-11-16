@@ -533,7 +533,15 @@ def opening_check(conn, quotes: Dict[str, Dict], now: Optional[datetime] = None)
             out["veri_yok"].append(r["ticker"])
             continue
         conn.execute("UPDATE hazir_firsat SET acilis=?, guncellendi=? WHERE id=?", (q["acilis"], _iso(now), r["id"]))
-        if q["acilis"] > r["azami_giris"]:
+        if q["acilis"] <= r["sl"] + 1e-9 and journal.yeni_kural() == "s3":
+            # O2 (kural s3, Ek H4): açılış stopun altında ya da eşit → plan geçersiz, alım önerilmez (yapay kâr yok)
+            conn.execute("UPDATE hazir_firsat SET durum='girissiz', iptal_nedeni=?, sonuc_json=?, guncellendi=? WHERE id=?",
+                         (f"açılış {q['acilis']:.2f} TL, zarar durdurun ({r['sl']:.2f}) altında ya da eşit — plan "
+                          "geçersiz, alım önerilmez", json.dumps({"sonuc": "açılış stopun altında veya eşit",
+                                                                 "acilis": q["acilis"], "kural": "s3"},
+                                                                ensure_ascii=False), _iso(now), r["id"]))
+            out["iptal"].append((r["ticker"], q["acilis"], r["azami_giris"]))
+        elif q["acilis"] > r["azami_giris"]:
             # 2026-11-15 denetim: bu "giriş olmadı"dır, sabah iptali değil (Performans'ta yanlış kutuya düşüyordu);
             # evaluate_all ile aynı durum ('girissiz') ve sonuç kaydı.
             conn.execute("UPDATE hazir_firsat SET durum='girissiz', iptal_nedeni=?, sonuc_json=?, guncellendi=? WHERE id=?",
@@ -563,16 +571,26 @@ def evaluate_all(conn) -> Dict:
         n += 1
         if first["date"] != r["giris_gunu"]:
             pass   # o gün işlem yoksa (veri eksikse) ilk işlem gününün açılışı kullanılır
-        if first["open"] > r["azami_giris"] + 1e-9:
+        # O2: henüz girilmemiş öneri s3 ile (açılış ≤ SL → girişsiz); s3'ten önce girilmiş ('giris') öneri kendi
+        # kuralıyla sürer (sonuçta saklı kural yoksa s2) — geçmişe dönük değişmez.
+        kural = journal.kural_sec(dict(r), girilmis=("giris",))
+        neden = (journal.giris_kosulu(first["open"], r["azami_giris"], r["sl"]) if kural == "s3" and r["durum"] != "giris"
+                 else ("açılış azami girişin üstünde" if first["open"] > r["azami_giris"] + 1e-9 else None))
+        if neden:
             conn.execute("UPDATE hazir_firsat SET durum='girissiz', acilis=?, sonuc_json=?, guncellendi=? WHERE id=?",
-                         (first["open"], json.dumps({"sonuc": "açılış azami girişin üstünde", "acilis": first["open"]},
+                         (first["open"], json.dumps(dict({"sonuc": neden, "acilis": first["open"]},
+                                                         **({"kural": "s3"} if kural == "s3" else {})),
                                                     ensure_ascii=False), _iso(_now()), r["id"]))
             changed += 1
             continue
         rec = {"kaynak": "gercek", "gercek_giris_gunu": first["date"], "gercek_giris_fiyati": first["open"],
                "signal_day": r["signal_day"], "senaryo": r["tur"], "sl": r["sl"], "tp1": r["tp1"], "tp2": r["tp2"],
                "giris": r["giris"], "alarm": None, "gecerlilik": 1}
-        res = journal.evaluate(rec, bars, comm, slip)
+        res = journal.evaluate(rec, bars, comm, slip, kural=kural)
+        if kural == "s3":
+            res.setdefault("kural", "s3")                     # açık öneride de sürüm damgası (sonraki turda aynı kural)
+            # öneri sonucu kullanıcının alışı değildir: alış da kurala göre (açılış), çıkış varsayımsal
+            res["gerceklesme"] = dict(res.get("gerceklesme") or {}, alis="kural_simulasyonu_acilis")
         durum = "kapandi" if res["durum"] == "kapandı" else "giris"
         if durum != r["durum"] or json.dumps(res, ensure_ascii=False) != r.get("sonuc_json"):
             changed += 1

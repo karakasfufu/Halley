@@ -29,6 +29,70 @@ DEFAULT_COMMISSION_PCT = 0.20   # alış + satış toplamı (pilotla aynı varsa
 DEFAULT_SLIPPAGE_PCT = 0.10     # alış + satış toplamı kayma
 MIN_TRADES_FOR_STATS = 30
 OPEN_STATES = ("bekliyor", "açık", "açık (TP1 görüldü)")
+GIRILMIS_STATES = ("açık", "açık (TP1 görüldü)")
+KURAL_YENI = "s3"                 # O2 (16.11.2026): yeni kayıtların gerçekleşme kuralı (varsayılan)
+KURAL_AYARI = "gerceklesme_kurali"   # GÜVENLİ GERİ DÖNÜŞ anahtarı: "s2" yazılırsa YENİ kayıtlar yeniden s2 ile başlar;
+                                     # s3 ile başlamış kayıtlar (saklı kural / tahmin sözleşmesi) kendi kuralıyla sürer.
+
+
+def yeni_kural() -> str:
+    """Yeni kayıtların kuralı: ayarlardaki gerceklesme_kurali (s2 | s3), yoksa s3. Geçersiz değer s3 sayılır."""
+    try:
+        from . import pipeline
+        k = pipeline.load_settings().get(KURAL_AYARI, KURAL_YENI)
+    except Exception:
+        k = KURAL_YENI
+    return k if k in ("s2", "s3") else KURAL_YENI
+STOP_KAYIP_NOTU = ("Bu tutar, satışın stop fiyatından gerçekleştiği varsayımıyla hesaplanır. Fiyat stopun altında "
+                   "açılırsa (boşluk) ya da kayma varsayımı aşılırsa kayıp daha büyük olabilir; bu bir üst sınır "
+                   "değildir. Emrin gerçekleşmesi ve Midas emir türleri (ör. limitli emir) Halley tarafından "
+                   "doğrulanmadı.")
+GIRIS_KAYNAGI = {"azami_giris": "azami girişe göre ön hesap (en kötü giriş; alış henüz yok)",
+                 "gercek_alis": "sizin girdiğiniz gerçek alış fiyatı",
+                 "plan_giris": "planlanan giriş fiyatı (alış henüz yok)"}
+
+
+def kural_sec(rec: Dict, girilmis=GIRILMIS_STATES) -> str:
+    """Bir kaydın hangi gerçekleşme kuralıyla değerlendirileceği (O2; sürüm sabitleme):
+    - sonucunda saklı kural varsa o (bir kez s3 ile değerlendirilen kayıt s3 kalır);
+    - kullanıcının kaydettiği gerçek alış → s3 (alış korunur, çıkış 'varsayımsal' etiketlenir);
+    - s3'ten ÖNCE girilmiş (açık) sanal pozisyon → s2 ile sürer (önceden açık pozisyon; geçmişe dönük değişmez);
+    - henüz girilmemiş (bekliyor / aday) yeni öneri → s3."""
+    s = rec.get("sonuc_json")
+    try:
+        saklı = (json.loads(s) or {}).get("kural") if s else None
+    except (TypeError, ValueError):
+        saklı = None
+    if saklı in ("s2", "s3"):
+        return saklı
+    if rec.get("kaynak") == "gercek":
+        return yeni_kural()
+    return "s2" if rec.get("durum") in girilmis else yeni_kural()
+
+
+def degerlendir(rec: Dict, bars: List[Dict], commission_pct: float, slippage_pct: float,
+                girilmis=GIRILMIS_STATES) -> Dict:
+    """Ürün yollarının ortak girişi (O2): kural_sec ile sürüm seçilir, evaluate AYNEN çağrılır (kural yeniden
+    yazılmaz). s3 sonucuna — açık ya da bekleyen olsa da — sürüm damgası konur, böylece sonraki değerlendirmede aynı
+    kural sürer; açık pozisyonda alışın kaynağı ve çıkışın henüz olmadığı yazılır."""
+    kural = kural_sec(rec, girilmis)
+    res = evaluate(rec, bars, commission_pct, slippage_pct, kural=kural)
+    if kural == "s3":
+        res.setdefault("kural", "s3")
+        if res.get("giris_gunu") and "gerceklesme" not in res:
+            res["gerceklesme"] = {"alis": "kullanici_kaydi" if rec.get("kaynak") == "gercek" else "kural_simulasyonu",
+                                  "cikis": "henuz_yok_acik_pozisyon"}
+    return res
+
+
+def risk_ozeti(capital: float, risk_pct: float, entry: float, sl: float, cost_pct: float, kaynak: str) -> Dict:
+    """Panel için pozisyon hesabı + hangi giriş fiyatının kullanıldığı. position_size aynen kullanılır.
+    kaynak: 'azami_giris' | 'gercek_alis' | 'plan_giris'."""
+    if kaynak not in GIRIS_KAYNAGI:
+        raise ValueError(f"kaynak: {tuple(GIRIS_KAYNAGI)}")
+    ps = position_size(capital, risk_pct, entry, sl, cost_pct)
+    return dict(ps, giris_fiyati=entry, giris_kaynagi=kaynak, giris_kaynagi_tr=GIRIS_KAYNAGI[kaynak],
+                stop_kayip=ps["azami_kayip"], stop_kayip_notu=STOP_KAYIP_NOTU)
 
 
 def _now() -> str:
@@ -88,9 +152,27 @@ def record_real(conn, auto_id: int, fill_day: str, fill_price: float) -> int:
 
 
 # ---------------------------------------------------------------- değerlendirme
+def giris_kosulu(acilis: Optional[float], azami: float, sl: float) -> Optional[str]:
+    """Ek H4 (araştırma, kural s3): HENÜZ ALINMAMIŞ yeni önerinin açılışta giriş koşulu. None = geçerli; aksi halde
+    girişsiz nedeni. Açılış SL'ye eşit ya da altındaysa plan geçersizdir (alış yapılmaz, getiri yazılmaz).
+    Canlı kodda henüz KULLANILMIYOR; canlı kural ayrı onayla değişir."""
+    if not acilis:
+        return "açılış fiyatı yok"
+    if acilis > azami + 1e-9:
+        return "açılış azami girişin üstünde"
+    if acilis <= sl + 1e-9:
+        return "açılış stopun altında veya eşit"
+    return None
+
+
 def evaluate(rec: Dict, bars: List[Dict], commission_pct: float = DEFAULT_COMMISSION_PCT,
-             slippage_pct: float = DEFAULT_SLIPPAGE_PCT) -> Dict:
-    """rec: günlük satırı; bars: signal_day SONRASI günlük barlar (tarih sıralı). Durum ve sonucu döndürür."""
+             slippage_pct: float = DEFAULT_SLIPPAGE_PCT, kural: str = "s2") -> Dict:
+    """rec: günlük satırı; bars: signal_day SONRASI günlük barlar (tarih sıralı). Durum ve sonucu döndürür.
+    kural: "s2" (varsayılan, canlıdaki mevcut davranış) | "s3" (Ek H4, araştırma): alış fiyatı SL'ye eşit ya da altındaysa
+    (gerçekleşmiş alış ya da açılışta dolan limit emir) alış günü satışı STOP fiyatından değil ALIŞ fiyatından yazılır —
+    stop alışla birlikte tetiklenmiş sayılır; ek kayma, genel kayma varsayımı içindedir. Yapay kâr oluşmaz."""
+    if kural not in ("s2", "s3"):
+        raise ValueError("kural: s2 | s3")
     sl, tp1, tp2, kind = rec["sl"], rec["tp1"], rec["tp2"], rec["senaryo"]
     bars = [b for b in bars if b["date"] > rec["signal_day"] and b.get("close")]
     hl = lambda b: (b.get("high") or b["close"], b.get("low") or b["close"], b.get("open") or b["close"])
@@ -131,6 +213,9 @@ def evaluate(rec: Dict, bars: List[Dict], commission_pct: float = DEFAULT_COMMIS
         exit_idx = j
         h, l, o = hl(b)
         if j == 0 and limit_day:
+            if kural == "s3" and fill <= stop + 1e-12:
+                legs.append((1.0, fill, "SL varsayımı (alış stopun altında)"))
+                break
             if l <= stop:
                 legs.append((1.0, stop, "SL (alış günü)"))
                 break
@@ -191,6 +276,17 @@ def evaluate(rec: Dict, bars: List[Dict], commission_pct: float = DEFAULT_COMMIS
                r=round(r_mult - cost / 100 * fill / risk, 3) if r_mult is not None else None,
                acilis_sl_alti=fill <= sl,
                islem_gunu=exit_idx + 1)
+    if kural == "s3":
+        # Ek H5: gerçek bilgi ile varsayımı ayır. Kullanıcı satış fiyatı girmez; bütün çıkışlar KURALA GÖRE hesaplanır.
+        out.update(kural="s3", gerceklesme={
+            "alis": "kullanici_kaydi" if rec["kaynak"] == "gercek" else "kural_simulasyonu",
+            "cikis": "varsayimsal_kural_simulasyonu",
+            "not": "Satış fiyatı kullanıcı tarafından girilmedi; çıkış fiyatları günlük mumlarla kurala göre hesaplandı. "
+                   f"Maliyet varsayımı: komisyon %{commission_pct:g} + kayma %{slippage_pct:g} (gidiş-dönüş)."})
+        if final.startswith("SL varsayımı"):
+            out["cikis_varsayimi"] = ("Alış fiyatı SL'ye eşit ya da altında: stopun alışla birlikte tetiklendiği "
+                                      "VARSAYILDI; satış fiyatı = alış fiyatı, ek kayma genel kayma varsayımı içinde. "
+                                      "Gerçekleşmiş satış değildir.")
     return out
 
 
@@ -204,7 +300,7 @@ def update_all(conn, commission_pct: float = DEFAULT_COMMISSION_PCT, slippage_pc
     n = changed = 0
     changes = []
     for r in conn.execute("SELECT * FROM trade_journal WHERE durum IN (?,?,?)", OPEN_STATES).fetchall():
-        res = evaluate(dict(r), bars_for(conn, r["ticker"], r["signal_day"]), commission_pct, slippage_pct)
+        res = degerlendir(dict(r), bars_for(conn, r["ticker"], r["signal_day"]), commission_pct, slippage_pct)
         conn.execute("UPDATE trade_journal SET durum=?, sonuc_json=?, guncellendi=? WHERE id=?",
                      (res["durum"], json.dumps(res, ensure_ascii=False), _now(), r["id"]))
         n += 1

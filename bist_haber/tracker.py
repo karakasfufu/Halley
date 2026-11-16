@@ -295,7 +295,8 @@ def close_check(conn, day: str, now: Optional[datetime] = None) -> Dict:
         n0 = _count(conn, tk)
         # 1) senaryoların durumu (işlem günlüğüyle aynı kurallar)
         for rec in scenarios(conn, tk, active_only=True):
-            res = journal.evaluate(dict(rec, kaynak="takip"), journal.bars_for(conn, tk, rec["signal_day"]), comm, slip)
+            res = journal.degerlendir(dict(rec, kaynak="takip"), journal.bars_for(conn, tk, rec["signal_day"]), comm,
+                                      slip)
             old, new = rec["durum"], res["durum"]
             sid, nm = rec["id"], _sname(rec)
             if old == "bekliyor" and res.get("giris_gunu"):

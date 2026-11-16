@@ -239,7 +239,7 @@ class S1Yeniden(Base):
         self.assertEqual(self.conn.execute("SELECT * FROM tahmin_sonuc WHERE tahmin_id=?", (tid,)).fetchall(), once)
         d = dict(self.conn.execute("SELECT * FROM tahmin_degerlendirme WHERE tahmin_id=?", (tid,)).fetchone())
         self.assertEqual((d["kural_surum"], d["tp1_olayi"], d["maliyet_kaynagi"], d["komisyon_pct"]),
-                         (defter.KURAL_SURUM, 1, "s1_sonuclandirma_ayari", 0.2))
+                         ("s2", 1, "s1_sonuclandirma_ayari", 0.2))     # s1 → s2 yolu O2'de aynen sürer
         g = next(x["grup"] for x in defter.gruplar(self.conn) if x["grup"]["maliyet_protokol"] == "eksik")
         o = defter.ozet(self.conn, g)
         self.assertEqual((o["olculen"], o["metrik"]["tp1_%"]), (1, 100.0))   # ölçüm s2 değerlendirmesini kullanır

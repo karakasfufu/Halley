@@ -822,6 +822,21 @@ def md(text: str) -> str:
     return "".join("\\" + ch if ch in "~*_`" else ch for ch in str(text))
 
 
+def risk_satiri(entry: float, sl: float, kaynak: str) -> "str | None":
+    """O2 (Z2): pozisyon hesabı satırı — hangi giriş fiyatının kullanıldığı açıkça yazılır; 'stop seviyesinde tahmini
+    kayıp' kesin üst sınır değildir. Sermaye / risk girilmediyse None."""
+    if not (capital > 0 and risk_pct > 0):
+        return None
+    try:
+        r = journal.risk_ozeti(capital, risk_pct, entry, sl, commission + slippage, kaynak)
+    except ValueError as e:
+        return f"🧮 Pozisyon hesaplanamadı: {e}"
+    return (f"🧮 Pozisyon hesabı — giriş fiyatı **{r['giris_fiyati']:,.2f} TL ({r['giris_kaynagi_tr']})**, sermaye "
+            f"{capital:,.0f} TL, risk %{risk_pct:g}: **{r['adet']} adet** ≈ {r['tutar']:,.0f} TL · **stop seviyesinde "
+            f"tahmini kayıp ≈ {r['stop_kayip']:,.0f} TL** (%{r['azami_kayip_%']:.2f}, komisyon ve kayma dahil) · "
+            f"sınırlayan: {r['sinirlayan']}. {r['stop_kayip_notu']} Yalnız hesaplamadır.")
+
+
 def entry_block(g: dict) -> None:
     """Parça A2: kırılım / geri çekilme / destekten tepki senaryoları (kodla, kredi harcamaz)."""
     st.markdown("**🧭 Giriş senaryoları** <span class='news-meta'>(her zaman mevcut fiyattan alım gerekmez; "
@@ -841,14 +856,9 @@ def entry_block(g: dict) -> None:
         c3.metric("TP1", f"{best['tp1']:.2f} TL", f"{best['tp1_%']:+.1f}%")
         c4.metric("TP2", f"{best['tp2']:.2f} TL", f"{best['tp2_%']:+.1f}%")
         c5.metric("Risk / getiri", f"1 : {best['rr1']:.1f}", f"TP2'de 1 : {best['rr2']:.1f}", delta_color="off")
-        if capital > 0 and risk_pct > 0:
-            try:
-                ps = journal.position_size(capital, risk_pct, best["giris"], best["sl"], commission + slippage)
-                st.caption(f"🧮 Pozisyon hesabı (sizin girdiğiniz sermaye {capital:,.0f} TL ve risk %{risk_pct:g}): "
-                           f"**{ps['adet']} adet** ≈ {ps['tutar']:,.0f} TL; SL'ye gelinirse en fazla ≈ {ps['azami_kayip']:,.0f} TL "
-                           f"(%{ps['azami_kayip_%']:.2f}, maliyet dahil). Sınırlayan: {ps['sinirlayan']}. Yalnız hesaplamadır.")
-            except ValueError as e:
-                st.caption(f"🧮 Pozisyon hesaplanamadı: {e}")
+        _rs = risk_satiri(best["giris"], best["sl"], "plan_giris")
+        if _rs:
+            st.caption(_rs)
         st.caption("Kutulardaki yüzdeler: seviyenin giriş fiyatına uzaklığı; «fiyattan» yazan, girişin bugünkü fiyata "
                    "uzaklığı (+ ise fiyatın o kadar yükselmesi beklenir). Risk/getiri 1 : 2,5 = olası kazanç olası zararın "
                    "2,5 katı (1'in altı elverişsiz).")
@@ -1169,6 +1179,22 @@ def ready_card(r: dict) -> None:
         if not teknik_:
             st.caption(news_line(tk))
         st.caption("Neden: " + r["neden"])
+        _rs = risk_satiri(r["azami_giris"], r["sl"], "azami_giris")
+        if _rs:
+            st.caption(_rs)
+            with st.expander("🧮 Gerçek alış fiyatınızla yeniden hesapla (isteğe bağlı)"):
+                px_ = st.number_input("Gerçek alış fiyatınız (TL)", 0.0, 1e7, 0.0, 0.01, format="%.2f",
+                                      key=f"rc_px_{r['id']}",
+                                      help="Midas'ta gerçekleşen alış fiyatınız. Hiçbir yere kaydedilmez; yalnız bu "
+                                           "hesap için kullanılır.")
+                if px_ > 0:
+                    if px_ <= r["sl"]:
+                        st.warning(f"Alış fiyatı ({px_:.2f}) zarar durdurun ({r['sl']:.2f}) altında ya da eşit: plan "
+                                   "geçersizdir; pozisyon hesabı yapılmaz.")
+                    else:
+                        st.caption(risk_satiri(px_, r["sl"], "gercek_alis"))
+        elif capital <= 0 or risk_pct <= 0:
+            st.caption("🧮 Pozisyon hesabı için ⚙️ Ayarlar'da sermaye ve risk yüzdesi girin.")
         with st.expander("📈 Grafik ve olası fiyat aralığı"):
             chart_block(tk, tech(tk), None, r, key=f"rc_{r['id']}")
 
@@ -2486,9 +2512,12 @@ def page_gunluk() -> None:
                         "Sinyal günü": jr["signal_day"], "Senaryo": entries.NAMES.get(jr["senaryo"], jr["senaryo"]),
                         "Giriş": jr["giris"], "SL": jr["sl"], "TP1": jr["tp1"], "TP2": jr["tp2"],
                         "Durum": jr["durum"], "Sonuç": res.get("sonuc", ""), "Alış günü": res.get("giris_gunu", ""),
-                        "Net %": res.get("net_getiri_pct", res.get("acik_getiri_%")), "R": res.get("r")})
+                        "Net %": res.get("net_getiri_pct", res.get("acik_getiri_%")), "R": res.get("r"),
+                        "Gerçekleşme": gerceklesme_etiketi(jr["kaynak"], res)})
         st.caption("Tablo başlığının üstüne gelince sütunun açıklaması çıkar. Bekliyor/iptal satırlarında Net % boştur "
-                   "(alım olmadı).")
+                   "(alım olmadı). **Gerçekleşme:** satış fiyatı hiçbir kayıtta girilmez; çıkışlar (TP, SL, başabaş, süre) "
+                   "günlük mumlarla kurala göre hesaplanır, yani **varsayımsaldır**. Gerçek işlemde yalnız alış sizin "
+                   "kaydınızdır. Emrin Midas'ta gerçekleşmesi Halley tarafından doğrulanmaz.")
         st.dataframe(dash_cells(pd.DataFrame(tbl), ["Giriş", "SL", "TP1", "TP2", "Net %", "R"]),
                      hide_index=True, width="stretch", column_config=JOURNAL_COLS)
         open_auto = [jr for jr in rows_j if jr["kaynak"] == "otomatik" and jr["durum"] in journal.OPEN_STATES]
@@ -2514,20 +2543,33 @@ def page_gunluk() -> None:
         st.info("Henüz kayıt yok. Panelde uygun giriş senaryosu çıktığında kendiliğinden eklenir.")
 
 
+def gerceklesme_etiketi(kaynak: str, res: dict) -> str:
+    """O2: sonucun hangi kısmı gerçek bilgi, hangisi varsayım (kural s3 ayrımı; eski kayıtlarda kaynaktan çıkarılır)."""
+    if not res or res.get("durum") in ("bekliyor", "iptal", "iptal (gerçekleşmedi)") or not res.get("giris_gunu"):
+        return "—"
+    alis = "alış: sizin kaydınız" if kaynak == "gercek" else "alış: kurala göre (sanal)"
+    cikis = ("çıkış: kurala göre, varsayımsal (satış girilmedi)" if res.get("durum") == "kapandı"
+             else "açık: son kapanışa göre")
+    son = " · ⚠️ alış stopun altında: stop alışla tetiklenmiş sayıldı" if res.get("cikis_varsayimi") else ""
+    return f"{alis} · {cikis}{son}"
+
+
 def page_performans() -> None:
     page_head(PAGE_PERF, "Hangi strateji gerçekten işe yarıyor? Yalnız kayıtlı sonuçlardan, kodla hesaplanır.")
     section_title("✅", "Hazır fırsatlar — gerçek sonuçlar", note="bekleyen senaryolardan ayrı ölçülür")
     kay = st.radio("Hangi fırsatlar?", ["Hepsi", "📰 Haberli", "📐 Yalnız teknik"], horizontal=True, key="pf_kay")
     kay_ = {"Hepsi": None, "📰 Haberli": "haber", "📐 Yalnız teknik": "teknik"}[kay]
     pf = ready.performance(conn, kay_)
-    st.caption("Giriş = planlanan günün AÇILIŞ fiyatı (açılış azami girişin üstündeyse 'giriş olmadı'); sonra işlem "
-               "günlüğüyle aynı kurallar: TP1'de yarısı satılır, stop girişe çekilir; TP2, SL ya da 30 işlem günü. "
-               "Komisyon ve kayma düşülür.")
+    st.caption("Giriş = planlanan günün AÇILIŞ fiyatı (açılış azami girişin üstündeyse ya da — kural s3 ile — zarar "
+               "durdurun altında veya eşitse 'giriş olmadı'); sonra işlem günlüğüyle aynı kurallar: TP1'de yarısı "
+               "satılır, stop girişe çekilir; TP2, SL ya da 30 işlem günü. Komisyon ve kayma düşülür. Bu sonuçlar sizin "
+               "alışınız değildir: alış ve çıkış kurala göre hesaplanır (varsayımsal).")
     k = st.columns(5)
     k[0].metric("Önerilen", pf["onerilen"])
     k[1].metric("Kapanan", pf["kapanan"])
     k[2].metric("Açık", pf["acik"])
-    k[3].metric("Giriş olmadı", pf["girissiz"], help="açılış azami girişin üstündeydi")
+    k[3].metric("Giriş olmadı", pf["girissiz"], help="açılış azami girişin üstündeydi ya da (kural s3) zarar "
+                                                       "durdurun altında / eşitti")
     k[4].metric("Sabah iptal", pf["sabah_iptal"], help="kötü haber ya da bozulan plan")
     if pf["kapanan"]:
         st.dataframe(pd.DataFrame([{x: pf[x] for x in ("Kazanma %", "TP1 %", "TP2 %", "SL %", "Başabaş %", "Süre doldu %",

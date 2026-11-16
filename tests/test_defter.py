@@ -276,7 +276,7 @@ class Olcum(Base):
              json.dumps(rejim or {"trend": "yükseliş", "oynaklik": "normal"})))
         self.conn.execute("INSERT INTO tahmin_sonuc(tahmin_id,sonuc_turu,tp1_goruldu,tp1_olayi,net_getiri_pct,r,mae_r,mfe_r,"
                           "islem_gunu,degerlendirme_zamani,kural_surum) VALUES(?,?,?,?,?,?,-0.5,1.0,5,'z',?)",
-                          (cur.lastrowid, sonuc, y, y, 2.0 if y else -2.0, r if y else -1.0, defter.KURAL_SURUM))
+                          (cur.lastrowid, sonuc, y, y, 2.0 if y else -2.0, r if y else -1.0, "s2"))   # sözleşmesiz (v1) kayıt s2 ile sonuçlanır (O2)
 
     def test_known_metrics_and_versions_not_mixed(self):
         ps = [0.1, 0.2, 0.3, 0.3, 0.4, 0.5, 0.25, 0.35, 0.45, 0.15]
