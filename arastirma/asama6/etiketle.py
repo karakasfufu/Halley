@@ -68,6 +68,9 @@ def work(tk):
         row = {"ticker": tk, "tarih": d, "tur": best["tur"], "risk": risk, "trend": t["trend"],
                "hacim_tl": t["islem_hacmi_tl"], "ertesi_kilitli": int(nxt["high"] == nxt["low"]),
                "acilis_bosluk_%": round((nxt["open"] / t["son_fiyat"] - 1) * 100, 3) if nxt.get("open") else None,
+               # FAZ 2 (16.11.2026): portföy simülatörü için mutlak plan seviyeleri (karar anında bilinen değerler)
+               "kapanis": t["son_fiyat"], "giris": e, "sl": sl, "tp1": tp1, "tp2": best["tp2"], "azami": azami,
+               "teknik_skor": ts["skor"],
                **{k: (round(v, 6) if isinstance(v, float) else v) for k, v in f.items()}}
         if not nxt.get("open") or nxt["open"] > azami + 1e-9:
             row.update(sonuc="girissiz", y="", r="", net="", gun="")
