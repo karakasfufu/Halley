@@ -2041,3 +2041,9 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Kapsam: Ek O-3c canlı geçiş + Ek O-3d tek haber doğrulaması. Kabul kaydı Ek O-3e.
 - Açık: OpenAI kullanım ekranı karşılaştırması (aynı proje/model/zaman/kapsam; fark nedeni doğrulanmadan eski testlere bağlanmaz); kayıtsız geçmiş maliyet bilinmiyor (sıfır değil); "günde ~28 haber" kapasite garantisi değil; kuyruk topluca işlenmez.
 - Sonraki: O2 geliştirme/test onaylandı (canlı ve müşteri yayını hariç).
+
+## 2026-11-16 — O2 geliştirme/test: stop altı gerçekleşme s3 + risk gösterimi (dal o2-s3 819d8c3; canlı değişmedi)
+- s3 araştırmadan birebir; yollar: yeni öneri s3 (açılış ≤ SL girişsiz), önceden açık pozisyon s2 sabit, gerçek alış korunur + çıkış varsayımsal; sürüm damgası (açık s3 kaydın s2ye dönmesi hatası bulundu, düzeltildi).
+- Tahmin defteri: yeni sözleşme s3; her tahmin kendi kuralıyla; s2→s3 ayrı değerlendirme ve ayrı ölçüm grubu (birleştirilmez). FAZ 1: mevcut 5 tahmin s2 ile sonuçlanır (kopyada A=B).
+- Panel: "stop seviyesinde tahmini kayıp", giriş kaynağı (azami giriş ön hesap / gerçek alış / plan), üst sınır değil + Midas doğrulanmadı uyarısı.
+- Geri dönüş: kod geri dönüşü s3 tahmini varken hatalı sonuç yazar (kopya E) → ayar gerceklesme_kurali=s2 (kopya F doğru). 622 test OK, ağ 0. Ek O-2. Canlıya geçiş onay bekliyor (O1 + 17.11 açılış kontrolünden sonra önerilir).

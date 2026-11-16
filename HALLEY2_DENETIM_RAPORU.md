@@ -5594,3 +5594,198 @@ süreçler arası rezervasyon, tek analiz kilidi, sonradan analiz işareti.
 
 **Sonraki adım:** O2 geliştirme ve test (kullanıcı onayı, 16.11). Canlıya alma ve müşteri yayını bu onayın kapsamında
 değildir.
+
+
+---
+
+# EK O-2 (16.11.2026) — O2 geliştirme ve test raporu: stop altı gerçekleşme (s3) ve risk gösterimi (dal `o2-s3`)
+
+**Konumu:**
+
+- Yalnız geliştirme ve test. Canlı kod, canlı veritabanı ve müşteri sürümü **değişmedi**.
+- Ücretli çağrı yapılmadı; yapay zekâ kullanılmadı.
+- Dal `o2-s3`, canlı sürümün (`o3-canli` `0e8bbaf`) üstüne kuruldu. FAZ 3–7 değişiklikleri bu dalda **yok**.
+- **Kural yeniden yazılmadı.** s3 kuralı araştırma dalından (`faz2-portfoy`, Ek H4/H9) birebir alındı:
+  `journal.giris_kosulu` ve `journal.evaluate(kural="s3")`. Satır sonu dışında fark yok. Testleri de
+  (`tests/test_kural_s3.py`, 21 test) aynen alındı. `arastirma/asama6/portfoy.py` yalnız bu testlerin bağımlılığı;
+  uygulama onu kullanmaz. Portföy simülatörü ürüne **bağlanmadı**.
+
+## O2.1 Üç yol ayrıldı
+
+| Yol | Kural | Davranış |
+|---|---|---|
+| **Yeni öneri** (hazır fırsat `aday` / `onaylandi`; sanal işlem ve takip senaryosu `bekliyor`) | s3 | Açılış SL'ye eşit ya da altında → **girişsiz** ("açılış stopun altında veya eşit"): alım önerilmez, getiri yazılmaz. Açılış kontrolü (`opening_check`) ve akşam değerlendirmesi (`evaluate_all`) aynı kuralı kullanır. SL'nin üstünde girilirse sonuç s2 ile aynıdır. |
+| **Önceden açık pozisyon** (s3'ten önce girilmiş: hazır fırsat `giris`, sanal işlem `açık`) | s2 (sabit) | Girildiği kuralla sürer; **geçmişe dönük değişmez**. Sonucunda saklı kural yoksa s2 kabul edilir. |
+| **Kullanıcının gerçek alışı** (`trade_journal` `kaynak='gercek'`) | s3 | Alış kaydı ve fiyatı **korunur**. Satış girilmediği için çıkış **varsayımsal** etiketlenir (`gerceklesme.cikis = varsayimsal_kural_simulasyonu`); açıkken `henuz_yok_acik_pozisyon`. SL'nin altındaki alış zaten kayıtta reddediliyordu (değişmedi). |
+
+**Sürüm sabitleme:**
+
+- s3 ile bir kez değerlendirilen kayda `"kural": "s3"` damgası konur (açık ve bekleyen kayıtlar dahil). Sonraki
+  değerlendirmelerde aynı kural sürer.
+- Testte bulunan hata: araştırma kodu s3 etiketini yalnız kapanmış sonuca koyuyordu. Bu yüzden açık bir s3 pozisyonu
+  sonraki turda s2'ye dönebiliyordu.
+- Düzeltme kuralın içinde değil, çağıranda yapıldı: `journal.degerlendir`. Bu durum testle sabitlendi.
+
+**Panel etiketleri:**
+
+- İşlem günlüğünde yeni "Gerçekleşme" sütunu var. Örneğin: "alış: sizin kaydınız · çıkış: kurala göre, varsayımsal
+  (satış girilmedi)". Stopun altındaki alışta uyarı gösterilir.
+- Hazır fırsat sonuçları için şu not eklendi: "Bu sonuçlar sizin alışınız değildir: alış ve çıkış kurala göre
+  hesaplanır (varsayımsal)."
+
+## O2.2 Tahmin defteri: yeni sözleşme sürümü s3; sürümler birleştirilmez
+
+- **Yeni tahminler** `kural_surum = "s3"` sözleşmesiyle kaydedilir. Açılış ≤ SL ise sonuç girişsiz olur.
+- **Her tahmin kendi sözleşmesindeki kuralla sonuçlanır** (`defter.sozlesme_kurali`).
+  - s2 tahmini s2 ile sonuçlanır.
+  - Sözleşmesiz eski (v1) kayıt FAZ 1 v2'deki gibi s2 ile sonuçlanır.
+  - Eski sonuç satırları değişmez; değiştirilemezlik tetikleyicileri aynen çalışıyor (testli).
+- s2 sonucunun **s3 ile yeniden değerlendirmesi** `tahmin_degerlendirme`ye ayrı satır olarak eklenir (s1 → s2
+  mekanizmasının aynısı). s1 → s2 yolu aynen sürer.
+- **Performans:**
+  - Grup anahtarına "ölçüm kuralı" eklendi.
+  - "kural s2" grubu yalnız s2 sonuçlarıyla ölçülür.
+  - s2 tahminlerinin s3 yeniden değerlendirmesi **ayrı grup** olarak görünür: "… · ölçüm s3 (ayrı yeniden
+    değerlendirme)".
+  - s3 sözleşmeli tahminler ayrı grup oluşturur.
+  - **Hiçbir hesap iki sürümü birleştirmez.**
+
+## O2.3 Risk gösterimi (Z2)
+
+- Panelde **"stop seviyesinde tahmini kayıp"** ifadesi kullanılıyor; eski "SL'ye gelinirse en fazla" ifadesi
+  kaldırıldı.
+- Her pozisyon satırı **hangi giriş fiyatının** kullanıldığını yazar:
+  - Hazır fırsat kartı: **azami girişe göre ön hesap** ("en kötü giriş; alış henüz yok").
+  - İsteğe bağlı **"Gerçek alış fiyatınızla yeniden hesapla"**: kullanıcının girdiği fiyatla hesaplanır, hiçbir yere
+    kaydedilmez. SL'nin altında ya da eşit fiyat girilirse "plan geçersizdir" uyarısı çıkar ve hesap yapılmaz.
+  - Hisse analizi senaryosu: "planlanan giriş fiyatı (alış henüz yok)".
+- **Uyarı metni (her satırda):** "Bu tutar, satışın stop fiyatından gerçekleştiği varsayımıyla hesaplanır. Fiyat
+  stopun altında açılırsa (boşluk) ya da kayma varsayımı aşılırsa kayıp daha büyük olabilir; bu bir üst sınır
+  değildir. Emrin gerçekleşmesi ve Midas emir türleri (ör. limitli emir) Halley tarafından doğrulanmadı."
+- `journal.position_size` **değişmedi**. Yeni `journal.risk_ozeti` onu aynen çağırır; yalnız giriş kaynağını ve
+  metni ekler.
+- Sermaye girilmemişse kartta "⚙️ Ayarlar'da sermaye ve risk yüzdesi girin" yazar.
+
+## O2.4 Güvenli geri dönüş (provada bulunan sınır üzerine eklendi)
+
+- **Sınır:** O2 canlıyken s3 sözleşmeli bir tahmin kaydedilir, sonra **kod** eski sürüme döndürülürse, eski kod o
+  tahmini s2 ile sonuçlandırır. Provada (kopya E) "tamamlandi" yazıldı; doğrusu "girişsiz". Sonuç satırı
+  değiştirilemez olduğu için bu hata **kalıcı** olur.
+- **Çözüm:** Ayar `gerceklesme_kurali` = `"s2"`. Kod geri alınmadan **yeni** kayıtlar s2 ile başlar. s3 ile başlamış
+  tahminler ve kayıtlar kendi kuralıyla sürer.
+  - Provada (kopya F): s3 tahmini yine "girişsiz (s3)" sonuçlandı; yeni bekleyen kayıtlar s2 ile kaldı. Testli.
+- **Geri dönüş sırası:**
+  1. Önce ayar.
+  2. Kod geri dönüşü yalnız **hiç s3 sözleşmeli tahmin yoksa** yapılır. Aksi halde s3 kayıtları yanlış kuralla
+     sonuçlanır.
+
+## O2.5 Kanıt
+
+**Testler (ağ engelli; ağ denemesi 0):**
+
+| Komut | Sonuç |
+|---|---|
+| `tests.test_kural_s3` (araştırmadan, değişmeden) | 21 OK |
+| `tests.test_o2_s3` (yeni) | 11 OK |
+| Regresyon: `test_defter`, `test_faz1_dogrulama`, `test_ready`, `test_tracker`, `test_panel_flows`, `test_accuracy`, `test_review_fixes`, `test_entries`, `test_journal` | OK (225 + 103 seçili koşu) |
+| Tam takım (`run_offline.py`, commit `819d8c3`) | **Ran 622 tests … OK** (590 + 21 + 11), ağ denemesi 0 |
+
+`test_o2_s3` kapsamı:
+
+- yeni öneride açılış SL'nin altında / eşit / üstünde / azami girişin üstünde (akşam değerlendirmesi ve açılış
+  kontrolü);
+- önceden açık pozisyon s2 ile sürer ve sonucu eski hesapla aynıdır;
+- gerçek alış: alış korunur, açıkken ve kapanınca etiketler doğru, ikinci turda s3 korunur; sanal yeni / eski
+  ayrımı; SL altı gerçek alış reddi;
+- tahmin defteri:
+  - s2 / s3 sözleşmeleri kendi kuralıyla sonuçlanır;
+  - s3 yeniden değerlendirmesi ayrı satırdır;
+  - tekrar çalıştırmada değiştirilemez tablolar SHA-256 ile aynıdır;
+  - üç ayrı ölçüm grubu oluşur ve sayımları doğrudur;
+  - güncelleme ve silme reddedilir;
+- risk: `position_size` aynen kullanılır; azami girişte başlangıç riski ≤ bütçe; giriş kaynağı; metin;
+- panel (gerçek arayüz testi):
+  - kartta "azami girişe göre ön hesap" ve uyarı metni;
+  - gerçek alış fiyatıyla yeniden hesap;
+  - SL altı fiyatta "plan geçersizdir";
+  - günlükte "varsayımsaldır";
+- güvenli geri dönüş ayarı.
+
+**İki eski test güncellendi.** Davranış değişmedi; yalnız `defter.KURAL_SURUM` sembolü artık "yeni sözleşme" (s3)
+anlamına geldiği için o satırlarda açıkça `"s2"` yazıldı:
+
+- `test_defter.Olcum._ins`: sözleşmesiz kaydın sonucu s2;
+- `test_faz1_dogrulama.S1Yeniden`: s1 → s2.
+
+**Canlı veritabanı kopyası provası (16.11 akşamı, canlı salt-okur kopyalandı):**
+
+| Kopya | İşlem | Sonuç |
+|---|---|---|
+| A (canlı kod) ve B (O2) | Aynı işlemler: tahmin sonuçlandırma, hazır fırsat değerlendirmesi, işlem günlüğü güncellemesi | `tahmin` (5), `tahmin_sonuc` (0), `tahmin_degerlendirme` (0), `defter_olay` (0): A = B = önce (**SHA-256 aynı**). Hazır fırsatlarda yalnız `guncellendi` zamanı farklı. İşlem günlüğünde yalnız 19 `bekliyor` kayda `"kural": "s3"` damgası eklendi. 1 `açık` sanal pozisyon s2 ile **aynen** kaldı. Bütünlük ok, 22 tetikleyici. |
+| C | O2 ile çalıştır → kodu geri al → eski kodla çalıştır | Dosyalar eski hâliyle birebir. Değiştirilemez tablolar önceki ile aynı. Bütünlük ok. |
+| D | O2 + s3 sözleşmeli deneme tahmini (açılış SL'nin altında) | s3 → "girişsiz: açılış stopun altında veya eşit" |
+| E | D'deki gibi, ama kod geri alınmış | **Hatalı:** s3 sözleşmesi s2 ile "tamamlandi" yazıldı. Geri dönüş sınırı → O2.4. |
+| F | O2 + s3 tahmini + `gerceklesme_kurali = "s2"` | s3 tahmini yine "girişsiz (s3)"; yeni bekleyen kayıtlar s2 |
+
+**Şema değişikliği yok.** Yeni bilgiler mevcut alanlarda tutulur:
+
+- `tahmin.kural_surum` ve `tahmin_degerlendirme.kural_surum` değerleri;
+- `ayrinti_json` ve `sonuc_json` içinde `kural` ile `gerceklesme`.
+
+## O2.6 Canlı geçişin FAZ 1 kanıtlarına etkisi
+
+- **Mevcut 5 tahmin değişmez:**
+  - BAHKM ve ENERY (16.11) sözleşmesiz v1 kaydı;
+  - INVES, ENERY ve METRO (17.11) s2 sözleşmeli.
+  - Hepsi kendi kuralıyla, **s2** ile sonuçlanır. FAZ 1'in beklenen gerçek sonuçlandırması (O1) aynı kurala göre
+    yazılır; kopyada A = B.
+- **Eklenen tek şey:** s2 tahmini sonuçlandıktan sonra `tahmin_degerlendirme`ye ayrı bir s3 satırı eklenir.
+  Performans ekranında ayrı "ölçüm s3" grubu görünür. FAZ 1 gruplarının sayıları değişmez. v1 kayıtlarına s3 satırı
+  eklenmez.
+- **Hazır fırsatlar:**
+  - 1 ve 2 (`giris`) s2 ile sürer.
+  - 5, 6 ve 7 (17.11 `aday`): O2, 17.11 açılış kontrolünden **önce** canlıya alınırsa bunlara s3 giriş kuralı
+    uygulanır. Bu durumda açılış ≤ SL ise hazır fırsat "girişsiz" olur, ama aynı planın tahmini (s2 sözleşmesi)
+    s2 ile sonuçlanır.
+  - İki kayıt bu kenar durumda farklı sonuç gösterebilir. **Öneri:** geçiş bu adayların açılış kontrolünden sonra
+    yapılmalı. Ek O'ya göre O2'nin canlıya geçişi zaten O1'e bağlı: en az bir gerçek sonuçlandırma.
+- **İşlem günlüğü:** 19 bekleyen sanal kayıt s3 ile (damgalı), 1 açık kayıt s2 ile sürer.
+
+## O2.7 Değişen dosyalar (dal `o2-s3`, `o3-canli`ya göre)
+
+- `bist_haber/journal.py`:
+  - s3 (araştırmadan birebir);
+  - `kural_sec`, `degerlendir`, `yeni_kural` (geri dönüş ayarı);
+  - `risk_ozeti`, `STOP_KAYIP_NOTU`;
+  - `update_all` sürüm seçimiyle.
+- `bist_haber/defter.py`: `KURAL_SURUM = "s3"`, `sozlesme_kurali`, kurala göre `_degerlendir`; sonuç ve
+  değerlendirme yazımı tahminin kendi kuralıyla; `YENIDEN_DEGERLENDIRME` (s1 → s2, s2 → s3); ölçüm kuralı grubu.
+- `bist_haber/ready.py`: açılış kontrolü ve akşam değerlendirmesinde s3 giriş koşulu; önceden girilmiş öneride s2.
+- `bist_haber/tracker.py`: takip senaryoları `journal.degerlendir` ile.
+- `app.py`: `risk_satiri`, hazır fırsat kartında pozisyon hesabı ve gerçek fiyatla yeniden hesap, işlem günlüğünde
+  "Gerçekleşme", performans açıklamaları.
+- Testler:
+  - yeni `tests/test_o2_s3.py`;
+  - araştırmadan `tests/test_kural_s3.py` ve `arastirma/asama6/portfoy.py` (test bağımlılığı);
+  - güncellenen `tests/test_defter.py` ve `tests/test_faz1_dogrulama.py` (birer satır).
+
+## O2.8 Sınırlar ve canlıya geçiş (onaylanmadı)
+
+**Sınırlar:**
+
+- Emrin gerçekleşmesi ve Midas emir türleri doğrulanmadı.
+  - Azami girişe göre ön hesap "en kötü giriş" varsayımıdır.
+  - Gerçekte azami limitli emir yoksa gerçek fiyatla yeniden hesap kullanılmalıdır (Ek O: Midas doğrulaması
+    kullanıcının adımı).
+- "Stop seviyesinde tahmini kayıp" bir üst sınır değildir (boşluk, kayma).
+- Gerçek satış fiyatı hiçbir yerde girilmiyor; bütün çıkışlar varsayımsaldır.
+- Kod geri dönüşü yalnız s3 sözleşmeli tahmin yokken güvenlidir (O2.4).
+
+**Canlıya geçiş** (Ek O ortak koşulları + O2 koşulları):
+
+- O1: en az bir gerçek sonuçlandırma gözlemi;
+- 17.11 adaylarının açılış kontrolünden sonra;
+- yedek, kopyada prova, aktif iş yokken geçiş;
+- geri dönüş önce `gerceklesme_kurali = "s2"` ayarıyla.
+
+**Onay beklenen:** O2'nin canlıya geçişi. Müşteri yayını ve diğer entegrasyonlar başlatılmadı.
