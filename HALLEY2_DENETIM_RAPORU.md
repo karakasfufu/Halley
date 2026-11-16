@@ -3101,3 +3101,266 @@ sonra Ek H4'ün 24 koşusunun hepsi aynı metrikleri verdi (regresyon: **True**)
 
 **Uyarı:** Haber şartı yoktur. Hayatta kalma yanlılığı vardır ve sektör listesi güncel listedir. Sonuçlar geriye dönük
 düzeltmelerden sonra üretildi; dönem dışı kanıt değildir.
+
+
+---
+
+# EK I (16.11.2026) — FAZ 3: backtest metrikleri, MAE/MFE ve veri güvenilirliği (dal `faz3-metrik`, araştırma)
+
+**Konumu:**
+
+- Canlı kod ve canlı veritabanı **değişmedi**; veritabanları yalnız okundu. Göç yalnız kopyada denendi.
+- Model eğitilmedi; etkin model, seçim eşikleri ve FAZ 2 ayarları değişmedi.
+- Bayraklı veri silinmedi, düzeltilmedi, analizden çıkarılmadı.
+- FAZ 2 kabul sonuçları yeniden üretilmedi; kabul dosyaları (`sonuclar_faz2/kabul/`) okundu.
+- Bu çalışma geriye dönük incelemedir, dönem dışı kanıt değildir.
+
+## I.1 Metrik doğrulaması (MDD, Sortino, kâr faktörü)
+
+Bağımsız kod (`arastirma/faz3/metrikler.py`) aynı tanımlarla, ayrı yazılmış olarak çalıştırıldı.
+
+- **Kabul dosyaları:** 8 kabul koşusunun **8'inde de** 10 metrik simülatörle aynı (`sonuclar/metrik_mae.json → dogrulama`):
+  toplam getiri, MDD, Sortino, Sharpe, kâr faktörü, ardışık kayıp, düşüş süresi, kapanan sayısı, ortalama R, kazanma.
+- **Rastgele sınama:** 50 rastgele eğri ve işlem kümesinde iki kod aynı sonucu verdi.
+- **Hata:** Metrik hesabında hata bulunmadı; önce/sonra farkı yok.
+- **Tanımlar** (`metrikler.py` başı):
+  - MDD ve düşüş süresi gün sonu özsermayesinden ölçülür; gün içi dip görülmez.
+  - Sortino'da hedef 0 ve risksiz faiz 0; aşağı yönlü sapma bütün günlere bölünür.
+  - Kâr faktörü yalnız kapanmış işlemlerden, maliyet dahil hesaplanır; sıfır net işlem kayıp tarafında sayılır.
+- **Canlı panel metriği (`journal.metrics`) farklı şeyi ölçer:** işlem başınadır, portföy metriği değildir.
+  - kâr faktörü net yüzdelerle (eşit ağırlık);
+  - azami düşüş kümülatif R ile;
+  - "Sharpe" işlem başına (anakütle sapması).
+
+  Elle hesapla doğrulandı (`test_panel_metrics_by_hand`).
+
+## I.2 Ek metrikler ve dağılımlar (FAZ 2 kabul ana sonucu, canli_ortak)
+
+| | 12 ay · planlanan | 12 ay · azami | 2024 · planlanan | 2024 · azami |
+|---|---|---|---|---|
+| CAGR | −%25,3 | −%21,8 | +%23,1 | +%19,7 |
+| Yıllık oynaklık | %21,8 | %18,0 | %22,8 | %18,9 |
+| Calmar / kurtarma çarpanı | −0,71 / −0,63 | −0,69 / −0,61 | 1,17 / 0,81 | 1,20 / 0,88 |
+| Ulcer endeksi | 17,3 | 15,3 | 8,2 | 6,9 |
+| Piyasada kalma (≥ 1 pozisyon) | %99,6 | %99,6 | %100 | %100 |
+| Ödeme oranı (ort. kazanç / ort. kayıp) | 2,05 | 2,05 | 2,68 | 2,71 |
+| Beklenen net / işlem (TL) | −212 | −183 | +159 | +137 |
+| En kötü gün | −%4,5 | −%4,0 | −%5,0 | −%4,0 |
+
+**Dağılımlar** (iki adet yönteminde aynı işlemler; yüzdelikler):
+
+| | 12 ay | 2024 |
+|---|---|---|
+| Net getiri % (p5 / p25 / medyan / p75 / p95) | −10,5 / −6,6 / −4,4 / −0,3 / +16,0 | −10,5 / −5,9 / −4,4 / +10,4 / +20,8 |
+| R (p5 / medyan / p95) | −1,32 / −1,03 / +3,25 | −1,27 / −1,02 / +3,81 |
+| İşlem günü (p5 / p25 / medyan / p75 / p95) | 1 / 2 / 6 / 12 / 30 | 1 / 3 / 7 / 14 / 30 |
+| R kovaları (<−1,5 / −1,5…−0,5 / −0,5…0,5 / 0,5…1,5 / ≥1,5) | 3 / 86 / 14 / 10 / 17 | 3 / 78 / 5 / 3 / 34 |
+| Ardışık kayıp serileri (uzunluk: adet) | 1:5, 2:5, 3:4, 4:1, 5:3, 6:1, 7:1, 8:2, 9:1, **14:1** | 1:8, 2:3, 3:4, 4:5, 5:1, 6:1, 7:2, **14:1** |
+
+- Aylık getiriler ve `yalniz_teknik` değerleri `sonuclar/metrik_mae.json` içinde.
+- 12 aylık CAGR dönem bir yıl olduğu için toplam getiriye yakındır.
+
+## I.3 MAE/MFE, R paydası ve günlük veri belirsizliği (`arastirma/faz3/mae_mfe.py`)
+
+**İşlem içi pencere** (`defter.mae_mfe` ile aynı, `gunluk_s2`):
+
+- Giriş mumu tamdır (giriş açılışta). Ara mumlar tamdır.
+- Çıkış mumu: açılışta çıkışsa yalnız açılış; gün içi çıkışsa yalnız çıkış fiyatı; süre dolduysa tam mum.
+- **Gün içi çıkışta değer bir alt sınırdır:** o gün çıkıştan önce daha kötü ya da iyi bir fiyat görülmüş olabilir.
+  - "Yaklaşık" işaretli işlem: 12 ay 109 / 130, 2024 97 / 123.
+- Ölçülen şey fiyat hareketidir, pozisyon kâr/zararı değildir (TP1'den sonra yarı pozisyon kalır).
+
+**İki R paydası:**
+
+- `R_plan` = (fiyat − dolum) / (plan girişi − SL). journal ve defterle aynıdır.
+- `R_dolum` = (fiyat − dolum) / (dolum − SL). Dolum ≤ SL ise **tanımsızdır**: 4 işlemde böyle (stop altı varsayımsal
+  çıkışlar).
+- Dolum plan girişinin üstündeyse `R_plan` riski küçük gösterir.
+  - Örnek, MAE medyanı (12 ay, azami adet): `R_plan` −0,97, `R_dolum` −1,00.
+  - Dağılımın kuyruğu: p5 değeri `R_plan`'de −1,23, `R_dolum`'da −1,05.
+
+| canli_ortak · azami | MAE R_plan (p5 / medyan / p95) | MFE R_plan (p5 / medyan / p95) |
+|---|---|---|
+| 12 ay | −1,23 / −0,97 / −0,03 | 0,00 / 0,83 / 3,84 |
+| 2024 | −1,20 / −0,98 / −0,10 | 0,00 / 0,85 / 5,17 |
+
+**Çıkış sonrası hareket (işlem içi DEĞİL; ayrı alan):** Çıkıştan sonraki 10 mumun en yükseği ve en düşüğü, çıkış
+fiyatına göre.
+
+- 12 ay: medyan +%6,7 / −%6,7. 2024: +%7,9 / −%5,5.
+- Yalnız bağlam içindir. Kaçırılan kazanç ya da kaçınılan zarar olarak **kesin ölçüm gibi okunmamalı**; aynı
+  pencerede iki yön birden vardır.
+
+## I.4 Veri güvenilirliği: bulgular ve ayrımlar
+
+Tarama `veri_guvenilirlik.py`, ayrıştırma `veri_ayrintilari.py` ve `aday_maruziyeti.py` ile yapıldı.
+Kapsam: `arastirma_5y.db`, 631 hisse, 674.958 mum.
+
+| Bulgu | Sayı | Ayrım / yorum |
+|---|---|---|
+| Eksik gün (hissenin ilk-son mumu arasında) | 348 | **329**'u tek bir gün: **2024-04-09**, o gün 631 hissenin yalnız 218'i var. Piyasa geneli düşük kapsama; bayram arifesi yarım günü ile uyumlu, ama doğrulanmadı. **Hata sayılmadı.** Kalan **19** tekil/kısa eksik "olası veri eksikliği". ≥ 5 ardışık eksik (olası işlem durdurma) 0. |
+| Geç başlayan hisse | 191 | Veritabanı başlangıcından (2021-11-15) sonra başlıyor. Halka arz mı veri başlangıcı mı **ayrılamadı**; ilk mumdan önceki günler eksik sayılmadı. |
+| Sıfır hacim / bayat (OHLC aynı + hacim 0) | 4.296 / 3.762 | İşlem görmeyen gün ya da taşınmış eski fiyat; ayrılamadı. |
+| OHLC tutarsız | 25 | Veri hatası belirtisi. |
+| > %10,5 tek gün sıçrama | 605 (> %25: 83) | Günlük fiyat sınırı ±%10. Bunların 106'sı KAP'taki bir sermaye, hak kullanımı ya da kâr payı bildirimine ±5 gün yakın. **Yakınlık kurumsal işlemi kanıtlamaz.** Açık veri hatası örneği: TRHOL +%10.124 ve ertesi gün −%99. KAP listesi 2022-10-17'den önceyi kapsamıyor (33 sıçrama kapsam dışı). |
+| Son güne gelmeyen hisse | 1 | ISKUR (son mum 2026-08-12). Borsadan çıkış mı veri kesintisi mi doğrulanmadı. |
+
+**İki veritabanı farkı: geçmiş veri değişmiş.**
+
+- Ortak 156.441 günde, %0,1'i aşan fark 4 hissede ve 927 günde var: MGROS −%1,32, FLAP −%1,07, ETILR −%0,29, KBORU
+  −%0,19.
+- Örüntü dört hissede de aynı: **2025-11-10 … 2026-10-12** arasında sabit oran, sonrasında fark yok.
+- MGROS örneği: canlı veritabanında 13.10.2026 öncesi değerler 501,0 ve 503,0 gibi yuvarlak; araştırma
+  veritabanında ×0,987.
+- Yorum: Araştırma veritabanının son bir yıllık bloğu, 13.10 civarındaki bir olaydan sonra yeniden indirilmiş ve
+  geriye dönük düzeltilmiş olabilir. Bloğun öncesi eski indirmeden kalma; bu yüzden **araştırma veritabanında
+  2025-11-07 → 2025-11-10 sınırında %0,2–1,3 taban kayması olası**.
+  - Bu örüntü geriye dönük temettü ya da bölünme düzeltmesiyle **uyumlu**. Ancak yakın KAP kâr payı bildirimi
+    bulunamadı, **neden kesinleştirilmedi**. Fark temettü düzeltmesine bağlanmadı.
+
+**Geçmişte erişilebilir veri ile bugünkü düzeltilmiş veri:**
+
+- Fiyatlar `auto_adjust=True` ile, yani sonraki kurumsal işlemler için geriye dönük düzeltilmiş olarak indiriliyor.
+  Bu yüzden geçmiş bir günde gerçekte görülen fiyat ile veritabanındaki fiyat farklı olabilir.
+- Getiri oranları büyük ölçüde korunur. Mutlak fiyat ve TL hacim etkilenebilir. Hak kullanım günündeki gerçek
+  düşüş, düzeltilmiş seride görünmeyebilir; bu da stop tetiklenmesini değiştirebilir.
+- **Düzeltilmemiş fiyat elimizde olmadığından etki ÖLÇÜLEMEDİ.** Geleceğe bakma var ya da yok diye kesin bir iddia
+  yapılmadı.
+- Maruziyet (FAZ 2 kabul, canli_ortak): tutma süresinde KAP kâr payı ya da sermaye bildirimi olan işlem 12 ayda
+  14 / 130, 2024'te 14 / 123. Gösterge penceresinde neredeyse hepsi.
+
+**Seçim ve sıralama belirsizliği** ("pozisyon açıkken bayraklı gün yok" bulgusunun sınırı):
+
+- FAZ 2 kabul işlemlerinde tutma süresinde bayraklı mum 0. 250 günlük gösterge penceresinde sıçrama ya da tutarsızlık
+  2–15 işlemde var.
+- **Bütün aday planların** %27,1'inde (12.412 / 45.737; canli_ortak %26,9) gösterge penceresinde > %10,5 sıçrama var.
+- Bu planlar seçilen, elenen ve sıralamada geride kalan adaylardır. Sıçramalı veri göstergeleri, dolayısıyla teknik
+  skoru ve sıralamayı etkilemiş olabilir; hangi adayın seçileceği değişebilirdi.
+- Etki ölçülmedi. Ölçmek için düzeltilmemiş ya da temizlenmiş seriyle **ayrı bir duyarlılık koşusu** gerekir. Bu
+  yapılmadı; orijinal sonuçlar korunurken ayrı onayla yapılabilir.
+
+## I.5 Fiyat izlenebilirliği: `bist_haber/fiyat_izi.py` (sürüm `fiyat_izi_v1`, HAZIRLIK)
+
+Canlı kod bu modülü **çağırmıyor**; `db.connect` göçü otomatik yapmıyor.
+
+**Tablolar** (yalnız ekleme; ekle-yalnız tetikleyicilerle korunuyor):
+
+- `fiyat_indirme`: her indirmenin zamanı, kaynağı ve kaynak sürümü, indirme ayarları (period, interval,
+  auto_adjust), düzeltme türü, kod sürümü, hisse ve satır sayısı, değişen satır sayısı, yazılan satırların SHA-256
+  özeti.
+- `fiyat_eski`: bir indirme mevcut satırı farklı değerle değiştirirse **eski satır** saklanır. Böylece belli bir
+  indirmeden önceki durum birebir geri kurulabilir (`durum_once`).
+- `prices.indirme_id`: satırın bugünkü değerini koyan indirme. Değişmeyen satır yeniden yazılmaz. Eski satırlarda
+  NULL, yani "bilinmiyor"; **uydurulmaz**.
+- `veri_anlik`: backtest veri kümesinin ayrı SQLite dosyası olarak anlık görüntüsü ve parmak izi (`anlik_goruntu`).
+
+**Geçmiş için sınır:**
+
+- Bu tablolar kurulmadan önceki fiyat sürümleri **korunmamıştır ve geri oluşturulamaz**.
+- Araştırma veritabanının bugünkü parmak izi alındı (`sonuclar/arastirma_db_parmak_izi.json`, SHA-256 `d563b954…`).
+  FAZ 2 kabul koşusuyla aynı veri olduğu **doğrulanamaz**; yalnız boyut ve son fiyat günü aynı.
+
+**Kopyada prova** (`kopyada_goc.py`, `sonuclar/kopyada_goc.json`; canlı dosyanın değiştirilme zamanı aynı kaldı):
+
+1. Canlı veritabanının sqlite yedek kopyası alındı: bütünlük ok.
+2. Göç yapıldı (otomatik yedekli): bütünlük ok.
+3. 24 eski tablonun satır özetleri aynı; fiyat parmak izi aynı.
+4. Bugünkü `db.connect` açtı. `prices.update`'in bugünkü yazma ifadesi çalıştı (`indirme_id` NULL kaldı).
+5. Sahte indirme denendi: 3 değişen satır `fiyat_eski`'ye yazıldı; önceki durum **birebir** geri kuruldu.
+6. Geri dönüş (yedek geri yükleme) denendi: bütünlük ok, tablolar göç öncesiyle aynı, yeni tablo yok.
+
+**Testte bulunup düzeltilen tasarım hatası:** Değişmeyen satırlar da yeni indirme numarasıyla yeniden yazılıyordu;
+önceki durum yanlış kuruluyordu. Artık yalnız yeni ya da değişen satır yazılıyor.
+
+**Canlıya alma (onaylanmadı):**
+
+- `prices.update` yazımı `fiyat_izi.yaz` üzerinden yapılır; göç bir kez çalıştırılır.
+- Yedek, bütünlük kontrolü ve geri dönüş adımları FAZ 1 v2 geçişindeki gibidir.
+- Göç yalnız ekleme yaptığı için eski kod yeni tablo ve sütunları yok sayar.
+- Yedek yalnız göçten sonra yeni kullanıcı verisi yoksa geri yüklenir.
+
+**Depolama:** Her indirme yalnız değişen satırları saklar. Düzeltme olayı başına yaklaşık bir yıllık satır (~250 /
+hisse) birikir. Anlık görüntü dosyası ~10–40 MB'tır.
+
+## I.6 Borsadan çıkan hisseler ve tarihsel sektör: kaynaklar
+
+| Kaynak | Ne sağlar | Durum |
+|---|---|---|
+| [Borsa İstanbul pay piyasası verileri](https://borsaistanbul.com/en/data/equity-market-data) | "Borsa İstanbul pazarlarından kalıcı olarak çıkarılan şirketler" dosyası (şirket listesi) | Erişilebilir, indirilmedi. Fiyat geçmişi içermiyor. |
+| Borsa İstanbul DataStore ([veri sayfası](https://www.borsaistanbul.com/en/data/equity-market-data/market-data)) | Gün sonu fiyat ve hacim (akademik dışı kullanımda pazar başına aylık 50 TL bildirildi) | Ücretli. Borsadan çıkan hisseleri kapsayıp kapsamadığı **doğrulanamadı**. |
+| [BIST sektör endeksleri](https://borsaistanbul.com/en/index/1/8/sector) + sektör değişikliği duyuruları ([örnek](https://borsaistanbul.com/en/announcement/15358/changes-be-made-within-scope-bist-stock-indices-due-sector-change-arsan-tekstil)) | Güncel bileşenler ve tek tek değişiklik duyuruları | Tarihsel sektör arşivi **bulunamadı**. Duyurulardan yeniden kurmak mümkün ama emek ister ve eksik kalabilir. |
+| KAP / araştırma veritabanındaki `kap_liste` (2022-10-17'den beri) | İşlem sırası kapatma ve kottan çıkarma duyuruları | 7 bildirim (ör. OLMK, TIRE). Finansal rapor veren ama fiyat verisi olmayan 167 kod var; bunların çoğu borçlanma aracı ihraççısı ya da fon. Borsadan çıkan pay **ayrılamadı**. |
+
+**Sınırlama (sürüyor):**
+
+- Hayatta kalma yanlılığı giderilemedi.
+- Sektör listesi güncel KAP listesi (09.11.2026).
+- Borsadan çıkan hisselerin fiyat geçmişi ve tarihsel sektör ücretli ya da elle kurulacak kaynaklara bağlı; bu
+  fazda alınmadı. Veri satın alma ya da indirme ayrı karar ister.
+
+## I.7 Model metriklerinin kökeni (`sonuclar/model_metrik_kokeni.json`)
+
+| | `tp1_v1` |
+|---|---|
+| Model dosyası | `bist_haber/modeller/tp1_v1.json`, SHA-256 `09f8e5e0…` |
+| Kod | commit `e90d0ab` (2026-11-15 12:03; model dosyasının tek commit'i) |
+| Eğitim | 34.579 plan, 587 hisse, 2022-11-09 … 2026-11-12, TP1 %29,3 |
+| Sınama (dosyadan) | Son 12 ay: AUC 0,605 (%90 aralık 0,567–0,646), Brier becerisi %2,81 |
+| Etiket sürümü | **`etiket2.csv` en olası, kesin değil** |
+| Etiket tanımı | y = `tp1_goruldu`, journal s2 |
+| Veri sürümü | Etiketleme anındaki parmak izi kayıtlı değil |
+
+- **Etiket sürümü gerekçesi:** Model `etiket3.csv`'den (12:45) önce kaydedilmiş, yani etiket3 olamaz. etiket ve
+  etiket2 aynı kapanmış sayıyı (34.665) ve aynı TP1 oranını veriyor; model girdileri etiket2 sütunlarıyla
+  eşleşiyor. Dosyaların SHA-256 değerleri kayıtta.
+- **Dikkat:** Etiket dosyaları eski oturumun geçici klasöründe, repoda değil.
+- **Doğrulanmayan:** Modelin 34.579 planı ile filtrelenmiş 34.665 arasındaki 86 fark.
+
+**Sonradan bulunan etiket sorunları (eski metrikler korunur):**
+
+| Sorun | Etki |
+|---|---|
+| `tp1_hedefi` (Ek F-A) | 91 plan |
+| s3 stop altı girişsiz (Ek H4) | ~293 plan; y = 0, örnek çıkar |
+| Fiyat taban kayması (I.4) | Ölçülmedi |
+
+Düzeltilmiş etiketlerle yeniden sınama **yapılmadı**, çünkü sınama model uydurmayı gerektirir ve model eğitimi yasak.
+Etki yalnız sayı olarak raporlandı.
+
+## I.8 Testler
+
+| Komut | Sonuç |
+|---|---|
+| `tests.test_faz3_metrik` | 8 test: elle hesap (MDD, Sortino, Sharpe, CAGR, Ulcer), sıfır net kayıp sayılır, ardışık seriler, tanımsız durumlar, 50 rastgele çapraz doğrulama, canlı panel metriği, MAE/MFE alt sınır, iki R paydası, çıkış sonrası ayrımı |
+| `tests.test_fiyat_izi` | 7 test: yedekli göç, satırlar aynı, tekrar göç yok, eski yazıcı çalışır, başarısız göç geri alınır, değişen satır korunur ve önceki durum birebir kurulur (iki indirmeli), ekle-yalnız, parmak izi sıra bağımsız, anlık görüntü |
+| Tam takım (ağ engelli, `run_offline.py`) | **Ran 618 tests … OK**, ağ denemesi 0 (603 + 15 yeni) |
+
+## I.9 Değişen dosyalar (dal `faz3-metrik`)
+
+- **Yeni:**
+  - `bist_haber/fiyat_izi.py` (canlıya bağlı değil)
+  - `arastirma/faz3/{veri_guvenilirlik, veri_ayrintilari, yeniden_duzeltme, aday_maruziyeti, metrikler, mae_mfe,
+    faz3_hesap, kopyada_goc}.py`
+  - `arastirma/faz3/sonuclar/*.json`
+  - `tests/test_faz3_metrik.py`, `tests/test_fiyat_izi.py`
+- **Değişmeyen:** Canlı modüller (journal, ready, defter, prices, db), simülatör ve FAZ 2 kabul dosyaları.
+
+## I.10 Kalan sınırlamalar
+
+1. Düzeltilmemiş fiyat yok. Geçmişte erişilebilir fiyatla fark ve etkisi ölçülemedi.
+2. Sıçramalı ya da şüpheli veriyle duyarlılık koşusu yapılmadı (ayrı onayla yapılabilir).
+3. Hayatta kalma yanlılığı ve güncel sektör listesi sürüyor (I.6).
+4. Eksik gün, halka arz ve işlem durdurma ayrımı kısmen yapılabildi (I.4).
+5. MAE/MFE gün içi çıkışlarda alt sınırdır.
+6. Model etiket sürümü olasılıkla bağlandı; etiket dosyaları repoda değil.
+7. Fiyat izlenebilirliği yalnız hazırlık; canlıya alınana kadar yeni indirmeler de izlenmiyor.
+
+## I.11 FAZ 1 canlı doğrulaması (ayrı)
+
+16.11 14:32'de canlı veritabanı salt-okunur okundu:
+
+- 2 tahmin (BAHKM, ENERY; giriş günü 16.11), 0 sonuç, 0 değerlendirme, 0 olay.
+- Son çalıştırma 16.11 09:42 sabah kontrolü. Fiyatlar 13.11'e kadar.
+- Geçişten sonra akşam analizi henüz yok. **FAZ 1 kabul edilmedi.**
+
+**Onay beklenen:** FAZ 3 kabulü, canlıya alma (`fiyat_izi`) ve FAZ 4. Hiçbiri yapılmadı.

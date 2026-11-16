@@ -1944,3 +1944,10 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - FAZ 2 kabul işlemlerine etkisi: tutma süresinde bayraklı mum 0; 22 günlük sinyal penceresinde 0–1; 250 günlük gösterge penceresinde sıçrama/tutarsızlık ortak 12 ay 2, 2024 15, teknik 12 ay 5, 2024 14 işlem. Sonuçlar değiştirilmedi.
 - Yeniden düzeltme (yeniden_duzeltme.py): prices.update auto_adjust=True + INSERT OR REPLACE, kaynak/zaman kaydı yok. Araştırma ve canlı DB ortak 156.441 günde %0,1 üstü fark 927 gün / 4 hisse (MGROS −%1,32, FLAP −%1,07).
 - KALAN: metrik doğrulama ve ek metrikler, dağılımlar, MAE/MFE tanımı, fiyat kaynağı şeması ve kopyada göç testi, delist/tarihsel sektör kaynak araştırması, model metrik kaynağı, testler ve FAZ 3 raporu.
+
+## 2026-11-16 — FAZ 3 tamamlandı (dal faz3-metrik; araştırma; canlı kod/DB değişmedi; KABUL BEKLİYOR)
+- Metrikler: bağımsız kodla 8 kabul koşusunda 10 metrik birebir; hata yok. Ek metrikler (CAGR, oynaklık, Calmar, Ulcer, ödeme oranı, dağılımlar, ardışık kayıp serileri) eklendi.
+- MAE/MFE: iki R paydası (plan/dolum), gün içi çıkış alt sınırı (12 ay 109/130), çıkış sonrası hareket ayrı alan.
+- Veri: 348 eksik günün 329'u tek piyasa geneli gün (2024-04-09), 19 olası veri eksikliği; 605 sıçramanın 106'sı KAP bildirimine yakın (kanıt değil); iki DB farkı 4 hissede 2025-11-10…2026-10-12 sabit oran (neden kesinleşmedi; araştırma DB'sinde blok sınırı taban kayması olası); adayların %27'sinin gösterge penceresinde sıçrama; düzeltilmemiş fiyat yok → etki ölçülmedi.
+- fiyat_izi_v1 (hazırlık): fiyat_indirme/fiyat_eski/veri_anlik + prices.indirme_id; kopyada göç/geri kurma/geri dönüş provası tamam; testte bulunan 'değişmeyen satırı yeniden yazma' hatası düzeltildi.
+- Delist/sektör: BIST kalıcı çıkarılanlar listesi ve DataStore (ücretli) var; tarihsel sektör arşivi bulunamadı. Model kökeni: tp1_v1 ← etiket2.csv (en olası), e90d0ab. 618 test OK. Ayrıntı: HALLEY2_DENETIM_RAPORU Ek I.
