@@ -29,3 +29,6 @@ dongu_*.txt
 **/faz1_sabah_*.txt
 **/*canli_rapor*
 **/*bekci_rapor*
+
+# O3 haber analizi kilidi (yerel)
+data/*.kilit
