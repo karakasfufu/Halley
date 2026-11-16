@@ -4924,8 +4924,8 @@ onay gerektirir.
 | | |
 |---|---|
 | **Kapsam — gerçekleşme (s3)** | Yeni önerilerde açılış ≤ SL → **girişsiz** (`ready.opening_check`, `ready.evaluate_all`). Tahmin defteri **s3 kural sürümü**: yeni s3 değerlendirme satırları; s2 satırları değişmez (s1 → s2 mekanizması). `journal.evaluate` canlı çağrılarında `kural="s3"`. Kullanıcının kaydettiği alışta kayıt korunur; çıkış "varsayımsal" olarak etiketlenir. Paneldeki gerçek alış kayıtlarında "kurala göre hesaplanan sonuç (satış girilmedi)" notu. |
-| **Kapsam — risk (Z2)** | Panelde adet ve "SL'de en fazla kayıp" **azami girişe göre** (en kötü durum). İsteğe bağlı: kullanıcının gireceği gerçek alış fiyatıyla yeniden hesap. Açıklama metni eklenir. `journal.position_size` değişmez; çağıran fiyatı seçer. |
-| **Bağımlılık** | O1 (gerçek sonuçlandırma gözlemi). Z2 için **Midas emir türlerinin kullanıcı tarafından doğrulanması** (azami limitli emir). Doğrulanmazsa "gerçek fiyatla yeniden hesap" seçeneği kullanılır. |
+| **Kapsam — risk (Z2)** | Panelde adet ve **"stop seviyesinde tahmini kayıp"** (eski adı "SL'de en fazla kayıp"; Ek O düzeltmesi) **azami girişe göre** (en kötü durum). İsteğe bağlı: kullanıcının gireceği gerçek alış fiyatıyla yeniden hesap. Açıklama metni: "Bu tutar, satışın stop fiyatından gerçekleştiği varsayımıyla hesaplanır. Fiyat stopun altında açılırsa (boşluk) ya da kayma varsayımı (%0,1) aşılırsa kayıp daha büyük olabilir; bu bir üst sınır değildir." `journal.position_size` değişmez; çağıran fiyatı seçer. |
+| **Bağımlılık** | **Geliştirme ve test aşaması** bağımlılıktan bağımsızdır: Midas doğrulaması ya da O1 beklenmeden dalda yapılabilir. Hem "azami girişe göre" hem "gerçek fiyatla yeniden hesap" seçenekleri, varsayılanı değişmeden uygulanıp test edilir. **Canlıya geçiş** iki şarta bağlıdır: (1) O1, yani en az bir gerçek sonuçlandırma gözlemi; (2) Z2'nin varsayılan seçeneği için Midas emir türlerinin kullanıcı tarafından doğrulanması (azami limitli emir). Doğrulanmazsa canlıda "gerçek fiyatla yeniden hesap" seçeneği kullanılır. |
 | **Dosyalar** | `bist_haber/journal.py` (canlı çağrılarda s3; varsayılan parametre kararı), `ready.py`, `defter.py` (`KURAL_SURUM = "s3"`, girişsiz nedeni, ayrı değerlendirme), `tracker.py` (çağrı), `app.py` (etiketler, adet ve azami kayıp gösterimi). Şema değişikliği **yok**. |
 | **Test** | Mevcut `test_kural_s3` (21) + yeni: `ready` alt sınırı (stop altı, eşit, üstü); defter s3 değerlendirmesinin s2 satırlarını değiştirmediği; `trade_journal` `sonuc_json`'da `kural` ve `gerceklesme` alanları; panel adet ve azami kayıp gösterimi (azami girişte başlangıç riski ≤ bütçe); `test_panel_flows`. |
 | **Canlıya geçiş** | Ortak koşullar. Ek olarak kopyada: mevcut tahmin ve sonuç satırlarının SHA-256 özeti değişmez; s3 satırları yalnız eklenir. Etkilenen canlı kayıt sayısı raporlanır (bugün 0). |
@@ -5003,7 +5003,7 @@ onay gerektirir.
 | 2 | O3 haber göstergesi ve politika | — | 1–1,25 gün |
 | 3 | O4 fiyat izlenebilirliği | — | 1 gün |
 | 4 | O5 izleme (K1 kapalı) | — | 0,5–0,75 gün |
-| 5 | O2 s3 ve risk | O1 + Midas doğrulaması | 2–2,5 gün |
+| 5 | O2 s3 ve risk: geliştirme ve test hemen yapılabilir; canlıya geçiş O1 ve Midas doğrulamasından sonra | O1 + Midas (yalnız canlıya geçiş) | 2–2,5 gün |
 | 6 | O6 birleştirme, paket, kurulum, yayın | O2–O5 kararları | 1,5 gün + müşteri desteği |
 | | **Toplam** | | **≈ 6–7 iş günü** + FAZ 1 kanıt bekleme süresi |
 
@@ -5013,3 +5013,177 @@ onay gerektirir.
 
 **Onay beklenen:** Her adımın uygulanması için ayrı onay. Bu plan kapsamında hiçbir kod değişikliği, ücretli çağrı,
 model eğitimi ya da canlıya geçiş yapılmadı.
+
+
+---
+
+# EK O-3 (16.11.2026) — O3 geliştirme ve test raporu: haber güncellik göstergesi ve bütçeli politika (dal `o3-haber`)
+
+**Konumu:**
+
+- Canlı kod, canlı veritabanı ve müşteri sürümü **değişmedi**. Yalnız `o3-haber` dalında (`faz7-vade` üstünde).
+- **Ücretli API çağrısı yapılmadı.** Bütün analiz testleri sahte istemciyle (taklit) çalıştı.
+- Bekçinin ücretli analizi **kapalı kalıyor** (`ai=False`; testli).
+- Şema değişikliği **yok**: `news`, `analyses`, `impacts.flag` ve `kap_coverage` mevcut alanları kullanıldı. Kilit
+  `data/haber_analiz.kilit` (`.gitignore`'da).
+
+**Test sırasında bir ağ isteği oldu:** Geliştirme sırasında iki testi ağ engelli koşucu yerine doğrudan çalıştırdım.
+Testler KAP'ın **ücretsiz, herkese açık** şirket listesi adresine istek attı ve KAP "429 – istek sınırı" döndürdü.
+
+- Ücretli çağrı değildir; veri yazılmadı.
+- İlgili testlerde şirket evreni artık taklit ediliyor.
+- Bundan sonra yalnız ağ engelli koşucu kullanıldı. Seçili testler ve tam takım: **0 bağlantı denemesi.**
+
+## O3.1 Davranış
+
+**Kapsam (son iki BIST işlem günü)** — `bist_haber/haber_kapsam.kapsam_baslangici`:
+
+- Bugün işlem günüyse bugün ve önceki işlem günü; değilse (hafta sonu ya da tatil) son iki işlem günü.
+- Başlangıç, iki günden ilkinin 00:00'ı (TR). Aradaki hafta sonu ve tatil haberleri de kapsamdadır. Yarım günler
+  (arefe) işlem günü sayılır.
+- **Takvim kaynağı:** `bist_haber/market_calendar.py`.
+  - 2026: Midas destek sayfası ve hisse.net; iki liste birebir aynı.
+  - 2027: yalnız yasayla sabit milli tatiller.
+  - Dini bayramları içeren bilinen takvimin (2026-12-31) ötesinde uyarı döner.
+- Önceki kural "5 takvim günü" idi (`config.AUTO_ANALYSIS_MAX_AGE_DAYS`). "Haberleri güncelle" ve maliyet tahmini artık
+  işlem günü kapsamını kullanıyor.
+
+**Eski haberler:**
+
+- Silinmez, analiz edilmiş sayılmaz; "kapsam dışı (eski)" olarak sayılır.
+- Geçmişe dönük analiz yalnız 🔬 Haber analizi ekranında kullanıcının kendi seçimiyle yapılır.
+- Kapsam dışındaki bir haber analiz edilirse etkileri **`sonradan_analiz`** olarak işaretlenir (`impacts.flag`).
+- Geçmiş tahminler değişmez: tahmin defteri ve hazır fırsat tahmin anındaki haber puanını dondurur.
+
+**Tekrarlar:** Mevcut `dedupe.filter_duplicates` (içerik özeti ve başlık), ücretli çağrıdan **önce** çalışıyor. Bu
+testle doğrulandı: iki aynı haber → tek çağrı.
+
+**Bütçe:**
+
+- Aylık bütçe (`haber_butce_usd`) ve günlük sınır (`haber_gunluk_butce_usd`, varsayılan **0,50 $**, Ayarlar'da) birlikte
+  uygulanır; **daha kısıtlayıcı olan** geçerlidir.
+- Uygulandığı yerler: `within_budget`, `analyze` içindeki çalışma sırası, ayrıca "Haberleri güncelle", seçili analiz ve
+  sabah ya da takip analizi (bu ikisi kapalı).
+- **Gerçekleşen maliyet** (kayıtlı tokenlar) ve **tahmini üst sınır** ayrı raporlanır (`gerceklesen_usd`,
+  `tahmini_ust_usd`).
+- Bütçe verilmeyen yollarda (test, pilot, komut satırı) davranış aynı kaldı.
+
+**Testte bulunup düzeltilen sorun:**
+
+- Haber başına üst tahmin, gerçek çıktı uzun olduğunda gerçek maliyetin altında kalabiliyordu. Paralel başlayan
+  analizler günlük sınırı aşıyordu: 0,05 $ sınırında 0,071 $.
+- **Düzeltme:** Bütçeli çalışmada ilk gerçek maliyet görülene kadar **tek iş** yürütülüyor. Sonra her haberin tahmini,
+  o çalışmada gözlenen en yüksek gerçek haber maliyetiyle büyütülüyor. Düzeltmeden sonra 0,0428 $ ≤ 0,05 $.
+- **Kalan risk:** İlk haberin tahmin hatası kadar aşım olabilir. Tahmini maliyet bir üst sınır **garantisi değildir**;
+  bu yüzden gerçekleşen ayrıca gösteriliyor.
+
+**Eşzamanlılık:**
+
+- Süreçler ve iş parçacıkları arası tek analiz kilidi (`haber_kapsam.analiz_kilidi`). Kilit alınamazsa **hiç çağrı
+  yapılmaz**; sonuçta `kilitli` döner.
+- Tekrar tıklama, Streamlit yeniden çalışması ve ikinci sekme mükerrer çağrı ya da bütçe aşımı üretemez.
+- Çökmüş süreçten kalan kilit 2 saat sonra temizlenir.
+
+**Başarısız analiz:** Haber `error` olur. Son başarılı analiz zamanı **değişmez**; gerçekleşen maliyet 0.
+
+## O3.2 Panel göstergesi (üst bantta "Haber güncelliği" bölümü; salt-okur)
+
+**Gösterilenler:**
+
+- son haber toplama zamanı (KAP listesi ya da haber sitesi; ücretsiz);
+- son başarılı yapay zekâ analizi;
+- analiz bekleyen güncel haber sayısı;
+- kapsam dışı eski haber sayısı;
+- metni alınamayan haber sayısı (güncel / eski);
+- haberli fırsat listesinin güncellik durumu;
+- bütçe (bugün ve bu ay gerçekleşen, geçerli sınır ve kalan);
+- kapsam günleri, takvim kaynağı ve uyarısı;
+- "analiz sürüyor" bilgisi.
+
+**Kurallar:**
+
+- Yeni toplanan haber analiz edilmiş **gösterilmez**.
+- Kapsamda analiz bekleyen haber yoksa durum **"güncel"** olur; son analiz zamanı eski olsa bile.
+- Toplama kapsam başlangıcından eskiyse **"toplama eski"** uyarısı çıkar.
+- Ana panelin üst gösterge sırası korunmak için tablo kullanıldı (mevcut panel testi bunu denetliyor).
+
+**Canlı veritabanı (16.11 ~20:25, salt-okunur) ile ne gösterirdi:**
+
+| Gösterge | Değer |
+|---|---|
+| Kapsam | 13.11 ve 16.11 (başlangıç 13.11 00:00) |
+| Son toplama | 16.11 19:11 |
+| Son başarılı analiz | 09.11 12:34 |
+| Analiz bekleyen güncel | **114** |
+| Kapsam dışı eski | **619** |
+| Metni alınamayan | 9 güncel / 6 eski |
+| Durum | **"114 güncel haber analiz bekliyor: haberli fırsat listesi ve haber puanı bu haberleri İÇERMİYOR"** |
+| Bütçe | ay 2,29 / 10 $, gün 0 / 0,50 $ → geçerli sınır **günlük** (0,50 $ kaldı) |
+
+- 114 sayısı **üst sınırdır**: ücretsiz Python ön elemesi (rutin konular) ve tekrar elemesi analiz sırasında
+  uygulanır. Panel salt-okur olduğu için o eleme önceden yapılmaz.
+- Bugünkü haberli fırsat listesi yok (son liste gösterilmiyor).
+
+## O3.3 Testler
+
+| Komut | Sonuç |
+|---|---|
+| `tests.test_o3_haber` (ağ engelli) | **18 test OK** |
+| `tests.test_news_budget`, `tests.test_accuracy` (mevcut, panel dahil) | OK (61 seçili test, ağ denemesi 0) |
+| Tam takım (`run_offline.py`) | **Ran 674 tests … OK**, ağ denemesi 0 (656 + 18) |
+
+`test_o3_haber` kapsamı:
+
+- **Kapsam:**
+  - pazartesi → cuma + pazartesi;
+  - hafta sonu;
+  - 29.10 tatili ve 28.10 yarım günü;
+  - Kurban Bayramı;
+  - bilinmeyen takvim uyarısı.
+- **Güncellik:**
+  - toplama analiz demek değil;
+  - bekleyen yokken eski analiz bayat sayılmaz;
+  - eski ve metinsiz haberler ayrı sayılır ve silinmez;
+  - toplama eskiyse uyarı.
+- **Bütçe:**
+  - günlük sınır kısıtlayıcıyken gün harcaması sınırın içinde kalır; gerçekleşen ve tahmin ayrı;
+  - aylık sınır kısıtlayıcı;
+  - sıfır bütçede çağrı yok.
+- **Tekrar:** ücretli çağrıdan önce elenir.
+- **Başarısız analiz:** başarılı sayılmaz.
+- **Eşzamanlılık:**
+  - üç paralel istekte tek çalışma, iki "kilitli", her haber bir kez;
+  - süreçler arası kilit dosyası ve bayat kilit temizliği.
+- **Sonradan analiz** işareti.
+- `update_all` işlem günü kapsamını kullanır.
+- **Bekçi** `ai=False`.
+
+## O3.4 Değişen dosyalar (dal `o3-haber`)
+
+- **Yeni:** `bist_haber/haber_kapsam.py`, `tests/test_o3_haber.py`.
+- **Değişen:**
+  - `bist_haber/analyzer.py`: `pending(bas_zamani)`, `within_budget(gunluk_usd)`, `analyze(gunluk_butce_usd, kilit)`;
+    kilit, günlük + aylık sınır, ilk maliyet görülene kadar tek iş, `sonradan_analiz`, tahmini / gerçekleşen.
+  - `bist_haber/pipeline.py`: `update_all` ve `estimate_next_run` işlem günü kapsamıyla.
+  - `app.py`: güncellik bölümü ve Ayarlar'da günlük sınır.
+  - `.gitignore`: `data/*.kilit`.
+  - Rapor: Ek O düzeltmeleri (O2 aşama ayrımı, "stop seviyesinde tahmini kayıp").
+
+## O3.5 Sınırlamalar ve canlıya geçiş
+
+**Sınırlamalar:**
+
+- Tahmini maliyet garanti değildir; ilk haberin tahmin hatası kadar aşım riski kalır.
+- 2027 dini bayramları takvimde yok; uyarı veriliyor.
+- Panelin "bekleyen" sayısı ön eleme öncesi üst sınırdır.
+- `sonradan_analiz` işareti etkiler tablosunda. Haber puanını geçmiş günler için kullanan araştırma okuyucuları
+  (ör. senaryo testi) bu işareti henüz süzmüyor. Canlı karar akışı tahmin anındaki puanı dondurduğu için
+  etkilenmiyor.
+
+**Canlıya geçiş (onaylanmadı):**
+
+- Ek O ortak koşulları geçerli: yedek, kopyada prova, aktif iş yokken geçiş, geri dönüş.
+- Şema değişikliği yok. Geri dönüş: önceki kod; günlük sınır ayarı yok sayılır.
+- Canlıda ilk analiz kullanıcının düğmesiyle, günlük sınır içinde yapılır.
+
+**Onay beklenen:** O3'ün canlıya geçişi. Diğer entegrasyonlar uygulanmadı.

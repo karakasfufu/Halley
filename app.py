@@ -307,6 +307,43 @@ PAGE_DASH, PAGE_FIRSAT, PAGE_HISSE, PAGE_TAKIP, PAGE_BEKCI = ("📊 Dashboard", 
 PAGE_HABER, PAGE_GUNLUK, PAGE_PERF, PAGE_AYAR = "📰 Haberler", "📒 İşlem Günlüğü", "🏁 Performans", "⚙️ Ayarlar"
 PAGES = [PAGE_DASH, PAGE_FIRSAT, PAGE_HISSE, PAGE_TAKIP, PAGE_BEKCI, PAGE_HABER, PAGE_GUNLUK, PAGE_PERF, PAGE_AYAR]
 
+def haber_guncellik_satiri() -> None:
+    """O3 (16.11.2026): haber güncellik göstergesi (salt-okur; yapay zekâ çağırmaz). Toplama ile analiz ayrı gösterilir;
+    kapsamda analiz bekleyen haber yoksa son analiz zamanı eski diye bayat denmez."""
+    from bist_haber import haber_kapsam
+    try:
+        g = haber_kapsam.guncellik(conn)
+        b = haber_kapsam.butce_durumu(conn, pipeline.news_budget())
+    except Exception as e:  # gösterge paneli düşürmesin
+        st.caption(f"Haber güncelliği hesaplanamadı: {str(e)[:100]}")
+        return
+    zaman = lambda x: (x or "—")[:16].replace("T", " ")
+    ikon = "🟢" if g["seviye"] == "tamam" else "🟠"
+    with st.expander(f"{ikon} Haber güncelliği: {g['durum'].split(':')[0]}", expanded=g["seviye"] != "tamam"):
+        # ana gösterge sırasını (üst KPI) bozmamak için metrik yerine tablo
+        st.dataframe(pd.DataFrame([
+            {"Gösterge": "Son haber toplama (ücretsiz; analiz demek değildir)", "Değer": zaman(g["son_toplama"])},
+            {"Gösterge": "Son başarılı yapay zekâ analizi", "Değer": zaman(g["son_basarili_analiz"])},
+            {"Gösterge": "Analiz bekleyen güncel haber (son iki işlem günü)", "Değer": str(g["bekleyen_kapsamda"])},
+            {"Gösterge": "Kapsam dışı eski haber (analiz edilmedi; silinmez)", "Değer": str(g["kapsam_disi_eski"])},
+            {"Gösterge": "Metni alınamayan (güncel / eski)", "Değer": f"{g['metinsiz_kapsamda']} / {g['metinsiz_eski']}"}]),
+            hide_index=True, width="stretch")
+        st.caption("Geçmişe dönük analiz yalnız 🔬 Haber analizi ekranında sizin seçiminizle yapılır; sonucu 'sonradan analiz' işaretlenir ve geçmiş tahminlere eklenmez.")
+        st.markdown(f"**Haberli fırsat listesi:** {g['durum']}" + (f" · son liste {zaman(g['son_haberli_liste'])}"
+                                                                   if g["son_haberli_liste"] else ""))
+        if g.get("not"):
+            st.caption(g["not"])
+        if b.get("kalan") is not None:
+            st.caption(f"Bütçe: bugün {b['gun_gerceklesen']:.2f} / {b['gunluk_butce']:.2f} \\$ · bu ay "
+                       f"{b['ay_gerceklesen']:.2f} / {b['aylik_butce']:.2f} \\$ (gerçekleşen) · geçerli sınır: "
+                       f"{b['sinirlayan']} ({max(b['kalan'], 0):.2f} \\$ kaldı).")
+        k = g["kapsam"]
+        st.caption(f"Kapsam: {k['is_gunleri'][0]} ve {k['is_gunleri'][1]} işlem günleri (başlangıç "
+                   f"{zaman(k['baslangic_iso'])})" + (" · yarım gün dahil" if k["yarim_gun"] else "")
+                   + f" · takvim: {k['kaynak']}" + (f" · ⚠️ {k['uyari']}" if k["uyari"] else "")
+                   + (" · 🔄 şu anda bir analiz sürüyor" if g["analiz_suruyor"] else ""))
+
+
 # ---------------- Üst bant (her ekranda) ----------------
 _today = datetime.now(config.TR_TZ)
 tb1, tb2, tb3, tb4 = st.columns([5, 1.7, 1.4, 1.2], vertical_alignment="center")
@@ -329,6 +366,8 @@ if tb2.button("🔄 Haberleri güncelle", type="primary", width="stretch"):
         flash("error", f"Güncelleme tamamlanamadı: {nice_err(e)}")
     conn.close()  # sayfa yenilenmeden önce bağlantıyı bırak (aksi hâlde açık kalıyordu)
     st.rerun()
+
+haber_guncellik_satiri()
 
 _dark_new = tb4.toggle("🌙 Koyu", value=DARK, key="dark_mode",
                       help="Koyu renkli görünüm (göz yormaz). Seçim bu bilgisayarda saklanır.")
@@ -1560,6 +1599,15 @@ def settings_panel() -> None:
                                   "sonrakiler analiz edilmez. Bu ay harcanan 📰 Haberler ekranında görünür.")
     if news_budget != saved.get("haber_butce_usd"):
         pipeline.save_settings(haber_butce_usd=news_budget)
+    # O3 (16.11.2026): günlük sınır — aylık bütçeyle birlikte uygulanır, daha kısıtlayıcı olan geçerlidir
+    from bist_haber import haber_kapsam as _hk
+    news_daily = st.number_input("Haber analizi günlük sınırı (\\$)", 0.0, 50.0,
+                                 float(saved.get("haber_gunluk_butce_usd", _hk.GUNLUK_BUTCE_VARSAYILAN)), 0.10,
+                                 format="%.2f", key="news_daily",
+                                 help="Bir günde haber analizine harcanabilecek en fazla tutar. Aylık bütçeyle birlikte "
+                                      "uygulanır; hangisi daha az kalan bırakıyorsa o geçerlidir.")
+    if news_daily != saved.get("haber_gunluk_butce_usd"):
+        pipeline.save_settings(haber_gunluk_butce_usd=news_daily)
     if quality != config.DEFAULT_QUALITY:
         st.caption("⚠️ Bu ayarda maliyet düşer ama analizler daha az ayrıntılı ve hata payı daha yüksek olabilir.")
     # 2026-11-09: Telegram bildirimi (ücretsiz, yapay zekâ yok). Anahtar .env'de; veri aktarma dosyasına girmez.

@@ -224,7 +224,8 @@ def priority(row, ctx: Dict) -> int:
     return best
 
 
-def pending(conn, limit: Optional[int] = None, max_age_days: Optional[int] = None) -> List:
+def pending(conn, limit: Optional[int] = None, max_age_days: Optional[int] = None,
+            bas_zamani: Optional[str] = None) -> List:
     # body NULL: KAP metni henüz alınamadı → metin gelene kadar bekle.
     # Sıra (2026-11-09): önce açık/bekleyen işlemi olan hisseler, sonra likit, sığ, fiyatı olmayan; her grupta en yeni
     # haber önce (2026-11-06 kullanıcı isteği: taze haber daha değerli). Neden: güncelleme başına 10 haber sınırı var ve
@@ -238,6 +239,9 @@ def pending(conn, limit: Optional[int] = None, max_age_days: Optional[int] = Non
         cutoff = (datetime.now(config.TR_TZ) - timedelta(days=max_age_days)).isoformat(timespec="seconds")
         sql += " AND published_at>=?"
         args.append(cutoff)
+    if bas_zamani is not None:     # O3 (16.11.2026): son iki BIST işlem günü kapsamı (haber_kapsam.kapsam_baslangici)
+        sql += " AND published_at>=?"
+        args.append(bas_zamani)
     rows = conn.execute(sql + " ORDER BY published_at DESC, id", args).fetchall()
     ctx = priority_context(conn)
     rows = sorted(rows, key=lambda r: priority(r, ctx))     # sıralama kararlı: grup içinde en yeni önce kalır
@@ -294,11 +298,14 @@ def estimate_cost(conn, rows, quality: Optional[str] = None) -> Dict[str, float]
     return {"adet": len(rows), "low_usd": sum(c[0] for c in costs), "high_usd": sum(c[1] for c in costs)}
 
 
-def within_budget(conn, rows, budget_usd: Optional[float], quality: Optional[str] = None):
-    """Bütçeye sığan haberler (sıra korunur; her birinin ÜST tahmini sayılır). (seçilen, bütçe dışı kalan sayısı)."""
+def within_budget(conn, rows, budget_usd: Optional[float], quality: Optional[str] = None,
+                  gunluk_usd: Optional[float] = None):
+    """Bütçeye sığan haberler (sıra korunur; her birinin ÜST tahmini sayılır). (seçilen, bütçe dışı kalan sayısı).
+    O3 (16.11.2026): aylık bütçe verildiğinde günlük sınır da uygulanır; daha kısıtlayıcı olan geçerlidir."""
     if budget_usd is None:
         return list(rows), 0
-    left = budget_usd - month_spend(conn)
+    from . import haber_kapsam
+    left = haber_kapsam.butce_durumu(conn, budget_usd, gunluk_usd)["kalan"]
     avg, hi_out = _avg_out(conn), _high_out(conn)
     keep = []
     for r in rows:
@@ -636,7 +643,8 @@ def test_one(conn, universe: Dict[str, str], llm: Optional[LLM] = None) -> Optio
 def analyze(conn, universe: Dict[str, str], limit: Optional[int] = None, llm: Optional[LLM] = None,
             progress: Optional[Callable[[int, int], None]] = None, quality: Optional[str] = None,
             rows=None, budget_usd: Optional[float] = None, max_age_days: Optional[int] = None,
-            track: bool = False, modul: str = "haber_analizi", on_eleme: bool = True) -> Dict[str, int]:
+            track: bool = False, modul: str = "haber_analizi", on_eleme: bool = True,
+            gunluk_butce_usd: Optional[float] = None, kilit: bool = True) -> Dict[str, int]:
     """Bekleyen haberleri analiz eder. LLM çağrıları paralel, veritabanı yazımı ana iş parçacığında.
 
     quality: "yuksek" | "dengeli" | "ekonomik" (panel ayarı). Boşsa yüksek doğruluk.
@@ -644,7 +652,26 @@ def analyze(conn, universe: Dict[str, str], limit: Optional[int] = None, llm: Op
     her haberin ÜST tahmini bütçeyi aşacaksa o haber ve sonrakiler analiz edilmez (2026-11-09).
     on_eleme (2026-11-14, Aşama 3, kullanıcı onayı): Python ön elemesi rutin haberleri YZ'ye göndermeden 'skipped'
     yapar. Kullanıcının panelde KENDİ seçtiği haberlerde kapalıdır (seçimine saygı).
+    O3 (16.11.2026): budget_usd verildiğinde günlük sınır (gunluk_butce_usd; None → Ayarlar, varsayılan 0,50 $) da
+    uygulanır, kısıtlayıcı olan geçerli. Aynı anda tek analiz (haber_kapsam.analiz_kilidi): kilit alınamazsa HİÇ çağrı
+    yapılmaz. Kapsam (son iki işlem günü) dışındaki haber analiz edilirse etkileri 'sonradan_analiz' işaretlenir.
+    Dönüşte tahmini (üst sınır) ve gerçekleşen maliyet ayrı.
     """
+    from . import haber_kapsam
+    if not kilit:
+        return _analyze(conn, universe, limit, llm, progress, quality, rows, budget_usd, max_age_days, track, modul,
+                        on_eleme, gunluk_butce_usd)
+    try:
+        with haber_kapsam.analiz_kilidi():
+            return _analyze(conn, universe, limit, llm, progress, quality, rows, budget_usd, max_age_days, track, modul,
+                            on_eleme, gunluk_butce_usd)
+    except haber_kapsam.AnalizSuruyor as e:
+        return {"analyzed": 0, "kilitli": str(e)}
+
+
+def _analyze(conn, universe, limit, llm, progress, quality, rows, budget_usd, max_age_days, track, modul, on_eleme,
+             gunluk_butce_usd) -> Dict[str, int]:
+    from . import haber_kapsam
     q = quality_profile(quality)
     stats = {"analyzed": 0, "filtered_out": 0, "errors": 0, "impacts": 0, "dropped_tickers": 0,
              "flagged": 0, "input_tokens": 0, "output_tokens": 0}
@@ -666,12 +693,16 @@ def analyze(conn, universe: Dict[str, str], limit: Optional[int] = None, llm: Op
     rows, dup = filter_duplicates(conn, rows)
     if dup:
         stats["tekrar"] = dup
-    rows, over = within_budget(conn, rows, budget_usd, quality)
+    rows, over = within_budget(conn, rows, budget_usd, quality, gunluk_butce_usd)
     if over:
         stats["butce_disi"] = over
-        stats["butce_kalan_usd"] = round(budget_usd - month_spend(conn), 4)
+        bd = haber_kapsam.butce_durumu(conn, budget_usd, gunluk_butce_usd)
+        stats["butce_kalan_usd"] = round(bd["kalan"], 4)
+        stats["butce_sinirlayan"] = bd["sinirlayan"]
     if not rows:
         return stats
+    kapsam_bas = haber_kapsam.kapsam_baslangici()["baslangic_iso"]
+    stats["tahmini_ust_usd"] = 0.0
     llm = llm or LLM(modul)
     spend0 = month_spend(conn)
     st_ = {"_izle": track, "tur": "haber analizi", "durum": "çalışıyor", "toplam": len(rows), "biten": 0,
@@ -689,18 +720,28 @@ def analyze(conn, universe: Dict[str, str], limit: Optional[int] = None, llm: Op
     avg_o, hi_o = _avg_out(conn), _high_out(conn)
     hi_of = {r["id"]: row_cost(r, avg_o, quality, hi_o)[1] for r in rows}
     queue = list(rows)
+    # O3 (16.11.2026, testte bulundu): üst tahmin gerçek maliyetin altında kalabilir (uzun çıktı). Bütçeli çalışmada
+    # ilk gerçek maliyet görülene kadar TEK iş yürütülür; sonra her haberin tahmini, bu çalışmada gözlenen en yüksek
+    # gerçek haber maliyetiyle büyütülür. Kalan aşım riski: ilk haberin tahmin hatası kadar (raporlandı).
+    from .pipeline import INPUT_USD_PER_TOKEN as _IN, OUTPUT_USD_PER_TOKEN as _OUT
+    gozlenen = [0.0]
+    ust = lambda r: max(hi_of[r["id"]], gozlenen[0])
     with ThreadPoolExecutor(max_workers=config.ANALYSIS_WORKERS) as ex:
         futures = {}
 
         def fill():
             while queue and len(futures) < config.ANALYSIS_WORKERS:
                 if budget_usd is not None:
-                    running = sum(hi_of[futures[f]["id"]] for f in futures)
-                    if month_spend(conn) + running + hi_of[queue[0]["id"]] > budget_usd:
+                    if futures and not gozlenen[0]:
+                        break                                   # ilk gerçek maliyet bekleniyor
+                    running = sum(ust(futures[f]) for f in futures)
+                    kalan = haber_kapsam.butce_durumu(conn, budget_usd, gunluk_butce_usd)["kalan"]
+                    if running + ust(queue[0]) > kalan:
                         stats["butce_disi"] = stats.get("butce_disi", 0) + len(queue)
                         queue.clear()
                         return
                 r = queue.pop(0)
+                stats["tahmini_ust_usd"] += ust(r)
                 futures[ex.submit(_work, llm, r, universe, cstats, q)] = r
             st_["suan"] = [_label(x) for x in futures.values()]
             _write_status(st_)
@@ -713,7 +754,14 @@ def analyze(conn, universe: Dict[str, str], limit: Optional[int] = None, llm: Op
             if progress:
                 progress(done, len(rows))
             try:
-                _store(conn, row, universe, fut.result(), stats)
+                _res = fut.result()
+                gozlenen[0] = max(gozlenen[0], _res["tokens"][0] * _IN + _res["tokens"][1] * _OUT)
+                _store(conn, row, universe, _res, stats)
+                if (row["published_at"] or "") < kapsam_bas:      # geçmişe dönük analiz: geçmişte BİLİNMİYORDU
+                    conn.execute("UPDATE impacts SET flag=CASE WHEN flag IS NULL OR flag='' THEN 'sonradan_analiz' "
+                                 "ELSE flag || ',sonradan_analiz' END WHERE news_id=?", (row["id"],))
+                    conn.commit()
+                    stats["sonradan_analiz"] = stats.get("sonradan_analiz", 0) + 1
                 st_["son"] = ([_result_label(conn, row)] + st_.get("son", []))[:8]
             except (AuthenticationError, PermissionDeniedError, RateLimitError) as e:
                 # Hesap/kota sorunu: haberleri hatalı işaretleme, kalanları iptal et.
@@ -735,7 +783,11 @@ def analyze(conn, universe: Dict[str, str], limit: Optional[int] = None, llm: Op
             _write_status(st_)
             fill()
     if stats.get("butce_disi"):
-        stats["butce_kalan_usd"] = round((budget_usd or 0) - month_spend(conn), 4)
+        bd = haber_kapsam.butce_durumu(conn, budget_usd, gunluk_butce_usd)
+        stats["butce_kalan_usd"] = round(bd["kalan"], 4) if bd["kalan"] is not None else None
+        stats["butce_sinirlayan"] = bd["sinirlayan"]
+    stats["tahmini_ust_usd"] = round(stats["tahmini_ust_usd"], 4)
+    stats["gerceklesen_usd"] = round(month_spend(conn) - spend0, 4)
     st_.update(durum="durdu" if stats.get("stopped") else "tamamlandı", suan=[],
                bitti=datetime.now(config.TR_TZ).isoformat(timespec="seconds"),
                harcanan_usd=round(month_spend(conn) - spend0, 4),

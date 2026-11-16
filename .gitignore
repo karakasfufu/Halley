@@ -33,3 +33,6 @@ dongu_*.txt
 # FAZ 6 model izleme yerel kayıtları (canlı veriden; GitHub'a yüklenmez)
 data/izleme_durumu.json
 data/izleme_kayit.jsonl
+
+# O3 haber analizi kilidi (yerel)
+data/*.kilit

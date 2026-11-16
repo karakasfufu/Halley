@@ -2010,3 +2010,9 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 ## 2026-11-16 — FAZ 7 KABUL EDİLDİ (tasarım belgesi; commit b061eff, etiket faz7-kabul) + tek entegrasyon planı (Ek O)
 - Ek N2: risk payları, tek pozisyon ve araştırma eşikleri yalnız tasarım önerisi (canlı kural değil); örtüşmeyen pencere sayısı yardımcı bağımlılık ölçüsü, kesin etkin örneklem değil (N.7/N.8 düzeltildi).
 - Ek O: Ek M'nin uygulama sırası — O1 FAZ 1 kanıtları, O2 s3 + risk gösterimi, O3 haber göstergesi + bütçeli politika, O4 fiyat_izi, O5 izleme (K1 kapalı), O6 birleştirme/paket/kurulum/yayın; ~6–7 iş günü. Yalnız plan; kod/çağrı/eğitim/canlı geçiş yok.
+
+## 2026-11-16 — O3 geliştirme/test: haber güncellik göstergesi + bütçeli politika (dal o3-haber; canlı değişmedi; ücretli çağrı yok)
+- haber_kapsam.py: son iki BIST işlem günü kapsamı (market_calendar; yarım gün dahil, 2027 dini bayram uyarısı), günlük 0,50 $ + aylık bütçe (kısıtlayıcı olan), süreçler arası analiz kilidi, güncellik göstergesi (toplama ≠ analiz; bekleyen yoksa bayat değil).
+- analyzer: kilit, günlük sınır, ilk gerçek maliyet görülene kadar tek iş (testte bulunan aşım: 0,071 > 0,05 → 0,0428), sonradan_analiz işareti, tahmini/gerçekleşen ayrı. pipeline: işlem günü kapsamı. Panel: güncellik bölümü + günlük sınır ayarı.
+- Canlı kopya: 114 güncel bekleyen, 619 eski, 9/6 metinsiz; geçerli sınır günlük. Testler: test_o3_haber 18, tam takım 674 OK, ağ 0. Not: geliştirmede iki test KAP'ın ücretsiz şirket listesine istek attı (429); düzeltildi.
+- Ek O: O2 geliştirme/test Midas doğrulamasından ayrıldı; 'stop seviyesinde tahmini kayıp' (boşluk/kayma açıklamalı).

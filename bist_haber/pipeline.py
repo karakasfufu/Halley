@@ -55,11 +55,14 @@ def update_all(conn, days: int = 1, progress: Optional[Progress] = None, analyze
     out["rutin"] = prefilter.apply(conn)["rutin"]
     if analyze and has_api_key():
         say("Yapay zekâ haberleri analiz ediyor...", 0.5)
+        # O3 (16.11.2026): kapsam son iki BIST işlem günü (takvim günü yerine); günlük + aylık bütçe; tek analiz kilidi
+        from . import haber_kapsam
+        bas = haber_kapsam.kapsam_baslangici()["baslangic_iso"]
         out["analyze"] = analyzer.analyze(
             conn, uni, limit=analysis_limit, quality=quality, budget_usd=news_budget(), track=True,
-            max_age_days=config.AUTO_ANALYSIS_MAX_AGE_DAYS,
+            rows=_kapsam_sirasi(conn, analysis_limit, bas),
             progress=lambda i, n: say(f"Yapay zekâ haberleri analiz ediyor ({i}/{n})...", 0.5 + 0.42 * i / max(n, 1)))
-        out["analyze"]["waiting"] = len(analyzer.pending(conn, max_age_days=config.AUTO_ANALYSIS_MAX_AGE_DAYS))
+        out["analyze"]["waiting"] = len(analyzer.pending(conn, bas_zamani=bas))
         out["analyze"]["eski_bekleyen"] = len(analyzer.pending(conn)) - out["analyze"]["waiting"]
     elif analyze:
         out["analyze"] = {"atlandı": "OpenAI anahtarı yok"}
@@ -79,6 +82,13 @@ INPUT_USD_PER_TOKEN = 0.25 / 1_000_000
 OUTPUT_USD_PER_TOKEN = 2.0 / 1_000_000
 
 
+def _kapsam_sirasi(conn, limit: int, bas: str):
+    """Kapsamdaki (son iki işlem günü) bekleyen haberler, öncelik sırasıyla; rutin ön eleme analyze() içinde."""
+    from . import prefilter
+    prefilter.apply(conn)
+    return analyzer.pending(conn, limit, bas_zamani=bas)
+
+
 def estimate_next_run(conn, analysis_limit: int = 10, quality: Optional[str] = None) -> Dict[str, float]:
     """Bir sonraki "Haberleri güncelle"nin yaklaşık maliyeti. Yapay zekâ çağrılmaz.
 
@@ -86,10 +96,12 @@ def estimate_next_run(conn, analysis_limit: int = 10, quality: Optional[str] = N
     (yoksa ihtiyatlı 4000) tahmin edilir. Alt sınır ikinci görüşsüz, üst sınır her habere ikinci görüş
     alınmış ve tüm haber siteleri ön elemeyi geçmiş gibi hesaplanır.
     """
-    rows = analyzer.pending(conn, analysis_limit, max_age_days=config.AUTO_ANALYSIS_MAX_AGE_DAYS)
+    from . import haber_kapsam
+    bas = haber_kapsam.kapsam_baslangici()["baslangic_iso"]
+    rows = analyzer.pending(conn, analysis_limit, bas_zamani=bas)
     rows, over = analyzer.within_budget(conn, rows, news_budget(), quality)
     est = analyzer.estimate_cost(conn, rows, quality)
-    return {"next_count": len(rows), "waiting": len(analyzer.pending(conn, max_age_days=config.AUTO_ANALYSIS_MAX_AGE_DAYS)),
+    return {"next_count": len(rows), "waiting": len(analyzer.pending(conn, bas_zamani=bas)),
             "low_usd": est["low_usd"], "high_usd": est["high_usd"], "butce_disi": over}
 
 
