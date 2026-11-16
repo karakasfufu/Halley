@@ -1995,3 +1995,9 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Yapay seri (500 tekrar, 250 gün, tohum 20261116, ~29 dk): K1 BAŞARISIZ — normal seride 250 günlük izlemde %14,4/%21,2 en az bir yanlış alarm (günlük oran değil); P2 son 60 gün ayırt kaybını %69 yakalıyor (yanlış alarm %0,4); P1 düşük güç. Eşikler değiştirilmedi; K1 canlıya alınmaz; yeniden tasarım ayrı ön kayıt + ayrı doğrulama serisi.
 - Hız: regime önbelleği — 5 çağrılık aynı-gün iş yükü 2,51 → 1,06 sn, sonuç aynı; bütün uygulama ölçülmedi. API: 09.11'den beri ücretli çağrı yok — tasarım (bekçi ai=False, sabah haber kontrolü kapalı); 733 analize uygun haber bekliyor; bu ay 2,29 $.
 - Ek M: yedi faz değerlendirmesi (zorunlu Z1–Z5, entegrasyon Ü1–Ü5, isteğe bağlı İ1–İ5; tavan olasılığı ayrı İ4). 656 test OK.
+
+## 2026-11-16 20:00 — FAZ 6 KISMEN KABUL EDİLDİ (commit 3e5c325, etiket faz6-kismi-kabul)
+- Kabul: ölçüm/test altyapısı, yapay seri belgelemesi, rejim önbelleği (5 çağrılık aynı-gün iş yükü), haber/API teşhisi. Hiçbir bileşen canlıya alınmadı.
+- Açık: K1 başarısız (uyarı üretmez); P1 düşük güç; P2 %0,4 yalnız yapay senaryo (canlı kanıtı değil); canlı eşik doğrulaması yok.
+- Öneriler (uygulanmadı, Ek L2): yanlış alarm hedefi ≤ %5 / 250 gün, %95 üst sınır < %5, ≥ 2.000 tekrar; K1 v2 planı (örtüşmeyen bloklar, Bonferroni, bağımsız blok teyidi, yeni tohum doğrulama serileri); haber politikası (son 2 iş günü, tekrar eleme, eski haber geçmişe taşınmaz, günlük ~0,50 $ sınırı).
+- Müşteri sürümü gereksinimi eklendi: son haber analizi zamanı, bekleyen sayısı, güncellik uyarısı. Depo bilerek açık (kullanıcı); zorunlu düzeltme değil.

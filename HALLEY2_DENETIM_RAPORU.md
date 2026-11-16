@@ -4442,13 +4442,13 @@ kullanıcıda (L.9).
 |---|---|---|---|---|---|---|---|
 | Z1 | 1 | **Zorunlu düzeltme** | Stopun altında açılışta yapay kâr (s3) canlıya | Canlı `journal`, hazır fırsat ve tahmin defteri s2 ile, stop altı alışta satışı stop fiyatından yazıyor; kâr görünür (Ek H4). Şu an etkilenen canlı kayıt 0; risk gelecekte. | 1–1,5 gün | FAZ 1 kabulü (önce gerçek sonuçlandırma gözlensin) | s3 varsayılan; yeni öneride açılış ≤ SL girişsiz; defterde s2 satırları değişmeden ayrı s3 değerlendirmesi; panelde "varsayımsal çıkış" etiketi; kopyada geçiş ve geri dönüş; tam takım OK |
 | Z2 | 2 | **Zorunlu düzeltme** | "%1 risk" ve "SL'de en fazla kayıp" gösterimi | Adet plan girişine göre hesaplanıyor; açılış azami girişe kadar yüksek olabildiği için işlemlerin ~%40'ında gerçek başlangıç riski %1'i aşıyor (Ek H3). Kullanıcı bu rakama güveniyor. | 0,5–1 gün | Midas emir türlerinin kullanıcı tarafından doğrulanması (azami limitli emir ya da gerçek fiyatla yeniden hesap) | Panelde adet ve azami kayıp azami giriş (en kötü durum) ya da girilen gerçek fiyatla hesaplanır; açıklama metni; testlerde başlangıç riski ≤ bütçe |
-| Z3 | — (güvenlik) | **Zorunlu düzeltme** (kullanıcı kararı) | Depo herkese açık; sızan rapor geçmişte; commit e-postası açık | Ek J2 olay notu | Kullanıcı adımı (~15 dk) | — | `faz4-rejim` silindi; depo görünürlüğü kararı verildi; gerekirse GitHub Support talebi |
+| Z3 | — (güvenlik) | **Kullanıcı kararı** (zorunlu değil; Ek L2.6) | Depo kullanıcının incelemesi için **bilerek** herkese açık; ayrı konu: sızan canlı rapor `faz4-rejim` geçmişinde; commit e-postası açık | Ek J2 olay notu | Kullanıcı adımı (~15 dk) | — | `faz4-rejim` silindi; depo görünürlüğü kararı verildi; gerekirse GitHub Support talebi |
 | Z4 | 1 | **Zorunlu** (faz içi kanıt) | FAZ 1 canlı kabulü | Sabah kontrolü ve gerçek TP/SL sonuçlandırması henüz gözlenmedi | Bekleme (takvim) | İlk işlemlerin sonuçlanması | Ek B4 ölçütleri gerçek kayıtlarla |
 | Z5 | 6 | **Zorunlu düzeltme** | K1 kalibrasyon kontrolünün yeniden tasarımı | Yapay seride 250 günde %14–21 yanlış alarm (Ek L.2) | 1 gün | Yeni ön kayıt | Ayrı tohumlu yeni doğrulama serilerinde doğru kalibrasyonda uyarı yok ve kaymada tespit; örtüşmeyen bloklar ve tekrarlı sınama denetimi |
 | Ü1 | 6 | Ürün entegrasyonu | İzlemeyi bekçiye bağlamak (K1 hariç ya da Z5 sonrası) | `izleme.kontrol_et` yalnız hazır; panel salt-okur | 0,5 gün | FAZ 6 kabulü | Akşam sonuçlandırmasından sonra günde bir kontrol; kayıt `data/`; harici bildirim yok; tam takım OK |
 | Ü2 | 3 | Ürün entegrasyonu | `fiyat_izi_v1` canlıya | İndirmeler kaynak, zaman ve eski değer kaydı olmadan geçmişi yeniden yazıyor (Ek I) | 1 gün | — | Yedekli göç (kopyada denendi); `prices.update` → `fiyat_izi.yaz`; eski kod uyumlu; geri dönüş |
 | Ü3 | 4 | Ürün entegrasyonu (küçük) | Canlı rejim tablosunda "aynı hisse tekrar payı" uyarısı | Ek J önerisi | 0,25 gün | FAZ 1 | Panelde tekrar payı; hesap değişmez |
-| Ü4 | — (sunum) | Ürün entegrasyonu | Dalları `main`'e birleştirme ve müşteri sürümü | Müşteri paketi FAZ 1 öncesinde | 1 gün (+ müşteri kurulum desteği) | Z1, Z2, Ü1'in kararı | Tek `main`; tam takım OK; paket (`paket/`) ve `Halley-guncelleme` sürümü; temiz bilgisayarda kurulum ve güncelleme denemesi; gerçek rapor ya da veritabanı pakette yok |
+| Ü4 | — (sunum) | Ürün entegrasyonu | Dalları `main`'e birleştirme ve müşteri sürümü; **panelde son haber analizi zamanı, bekleyen analiz sayısı ve haber güncellik uyarısı** (Ek L2.5) | Müşteri paketi FAZ 1 öncesinde; haber verisi 09.11'den beri eski | 1,25 gün (+ müşteri kurulum desteği) | Z1, Z2, Ü1'in kararı | Tek `main`; tam takım OK; paket (`paket/`) ve `Halley-guncelleme` sürümü; temiz bilgisayarda kurulum ve güncelleme denemesi; gerçek rapor ya da veritabanı pakette yok |
 | Ü5 | — (kullanım) | Ürün entegrasyonu (karar) | Haber kuyruğu: 733 analize uygun haber; 09.11'den beri analiz yok. **Neden tasarım:** bekçi `ai=False`, "sabah haber kontrolü" kapalı; analiz yalnız düğmeyle (Ek L.9) | Haberli fırsat listesi ve haber puanı 09.11'den beri eksik | 0 gün (karar) | Kullanıcı kararı | Kuyruğun işlenmesi ya da otomatik analiz isteniyorsa önce maliyet onayı (kaba ~11 $; bütçe kalanı ~7,7 $) |
 | İ1 | 3 | İsteğe bağlı araştırma | Sıçramalı ya da şüpheli veriyle duyarlılık analizi | Adayların %27'sinin gösterge penceresinde sıçrama var; etkisi ölçülmedi | 0,5–1 gün | — | Orijinal sonuçlar korunur; ayrı ön kayıt |
 | İ2 | 3 | İsteğe bağlı araştırma | Düzeltilmemiş fiyat edinimi (auto_adjust=False) | Geçmişte erişilebilir fiyatla farkı ölçmek | 1 gün; indirme ~0,7 GB, 0 $ | İndirme onayı | Ayrı veritabanı; FAZ 2 duyarlılık karşılaştırması |
@@ -4473,7 +4473,7 @@ değişiklik ayrı onay ister" diye açık bırakılmış kalemlerdir; yeniden a
 
 ## M.4 Müşteriye sunum için kalan işler (önerilen sıra)
 
-1. **Z3:** Kullanıcı adımları (dal silme, görünürlük kararı).
+1. **Z3 (kullanıcı kararı):** Sızan raporu içeren `faz4-rejim` dalının silinmesi; görünürlük bilerek açık.
 2. **FAZ 6 kabulü,** ardından **FAZ 7** tasarım notu (0,5 gün).
 3. **Z4:** FAZ 1 gerçek sonuçlandırma gözlemi (takvim; ilk TP/SL).
 4. **Z5** (K1 yeniden tasarımı, ~1 gün), ardından **Z1 + Z2 + Ü1** tek bir canlı geçişte (~2,5–3 gün):
@@ -4486,3 +4486,176 @@ değişiklik ayrı onay ister" diye açık bırakılmış kalemlerdir; yeniden a
 ücretli veri ayrı karar.
 
 **Onay beklenen:** FAZ 6 kabulü. Bu listedeki her ek uygulama için ayrı onay gerekir.
+
+
+---
+
+# EK L2 (16.11.2026) — FAZ 6 KISMİ KABUL KAYDI, açık maddeler ve öneriler (uygulanmadı)
+
+## L2.1 Kabul kaydı
+
+Kullanıcı FAZ 6'yı commit **`3e5c325`** kapsamında **kısmen kabul etti** (etiket `faz6-kismi-kabul`).
+
+**Kabul edilenler:**
+
+- Ölçüm ve test altyapısı: izleme modülü, yetersiz veri, sürüm ve sözleşme ayrımı, teyit ve bastırma, yerel kayıt,
+  salt-okur panel, testler.
+- Yapay seri sonuçlarının ve sınırlamaların belgelenmesi (Ek L).
+- Belirtilen iş yükünde doğrulanmış rejim önbelleği iyileştirmesi: aynı gün 5 çağrı, 2,51 → 1,06 sn.
+- Haber kuyruğu ve API kullanımının teşhisi (Ek L.9).
+
+**Bu kabul hiçbir bileşenin canlıya alınmasını onaylamaz.**
+
+**Açık kalanlar (sabitlendi):**
+
+1. **K1 kalibrasyon kontrolü başarısız.** Kullanıcıya model bozulması uyarısı **üretmemeli**. Canlıya alınırsa K1
+   yalnız "deneysel, uyarı üretmez" olarak gösterilebilir; bu da ayrı onay ister.
+2. **P1'in düşük tespit gücü** korunmalı ve gösterilmeli. P1 yalnız ters sıralamayı yakalar; ayırt etme kaybı
+   tespiti değildir.
+3. **P2 yalnız sınanan yapay senaryolar kapsamında değerlendirilir.** %0,4 yanlış alarm (%95 aralık %0,11–%1,45;
+   500 tekrar) **canlı güvenilirliğin kanıtı değildir**.
+4. **Canlı eşik doğrulaması yapılmadı.** Canlı defterde sonuçlanmış tahmin yok.
+
+## L2.2 Kabul edilebilir yanlış alarm hedefi (öneri)
+
+"Hiç yanlış alarm yok" ölçütü, sonlu sayıda yapay tekrarla kanıtlanamaz ve uzun izlemde gerçekçi değildir. Yerine
+şu öneriliyor:
+
+| Unsur | Öneri |
+|---|---|
+| Ölçüm süresi | Bir izlem dönemi = **250 iş günü** (yaklaşık 1 yıl), günlük sonuç akışıyla |
+| Yanlış alarm tanımı | Bozulma olmayan seride dönem içinde **en az bir teyitli uyarı açılması** (kontrol başına; P1, P2, K1 ayrı ayrı) |
+| Hedef | Kontrol başına **≤ %5 / 250 gün** ve **%95 Wilson üst sınırı < %5** |
+| Örnek büyüklüğü | **≥ 2.000 bağımsız yapay tekrar.** Gözlenen %2 olursa üst sınır ≈ %2,7, gözlenen %3 olursa ≈ %3,8. 500 tekrarla gözlenen %3'te üst sınır %4,9 olur; yetersiz kalabilir. |
+| Toplam | Bütün uyarı kontrolleri için birlikte (en az biri) **≤ %10 / 250 gün**, aynı belirsizlik kuralıyla |
+| Tespit hedefi (yalnız raporlanır) | Ön kayıtta tanımlı bozulma büyüklükleri için 150 gün içinde tespit oranı ve medyan gecikme, %95 aralıkla. Tespit hedefi yanlış alarm hedefini gevşetmek için kullanılmaz. |
+| Kapsam uyarısı | Hedef yalnız ön kayıtlı yapay senaryolar için geçerlidir; canlı güvenilirliği göstermez. |
+
+**Bugünkü durum bu hedefe göre:**
+
+| Kontrol | Yanlış alarm (250 gün) | %95 aralık | Hedefe göre |
+|---|---|---|---|
+| K1 birikimli | %14,4 | %11,6–17,8 | Başarısız |
+| K1 son 60 gün | %21,2 | %17,8–25,0 | Başarısız |
+| P2 | %0,4 | %0,1–1,5 | Hedef içinde, ama yalnız 500 tekrar ve yalnız bu senaryolar |
+| P1 | %0 | %0–0,8 | Hedef içinde, ama tespit gücü düşük |
+
+## L2.3 K1 için sınırlı düzeltme planı (UYGULANMADI)
+
+**Süre ve maliyet:** ~1 iş günü; 0 $; yalnız araştırma dalı.
+
+**1. Ayrı ön kayıt** (`arastirma/faz6/k1_v2_tanimi.json`, kod ve sınamadan önce commit). İçeriği:
+
+- **Tek yöntem (deneme listesi genişletilmez):**
+  - Örtüşmeyen ardışık **bloklar**: her blok 20 yeni bağımsız sonuç günü.
+  - Sınama yalnız blok sonunda yapılır; günlük bakış yok.
+  - Bloğun kalibrasyon farkı (gerçek oran − ortalama tahmin) gün kümesine dayanıklı standart hatayla
+    z-istatistiğine çevrilir.
+  - **Tekrarlı sınama denetimi:** Bir yıldaki en çok ~12 blok bakışı için bakış başına hata payı **α = 0,05 / 12**
+    (Bonferroni; muhafazakâr).
+  - **Teyit:** İlk aşım bloğundan **sonraki, örtüşmeyen** blokta aynı yönde aşım. Aynı veri ikinci kez kullanılmaz.
+  - **Asgari:** Blok başına ≥ 40 sonuç ve ≥ 20 gün; altında yetersiz.
+- **Kabul ölçütü:**
+  - L2.2 yanlış alarm hedefi;
+  - kalibrasyon kayması senaryosunda (gerçek = 0,6 × tahmin) 150 gün içinde tespit oranı raporlanır.
+
+**2. Kullanılmamış doğrulama serileri:**
+
+- Yeni tohum ailesi; bu ölçümde ve geliştirmede kullanılmamış (ör. `20270101-…`). Ön kayıtta yazılır.
+- ≥ 2.000 tekrar.
+- Senaryolar:
+  - normal;
+  - kalibrasyon kayması (0,6 × ve 1,3 ×);
+  - ayırt etme kaybı;
+  - **aynı hisse bağımlılığı** (hisse düzeyinde ortak şok, 14 gün tekrar);
+  - **rejim değişimi** (günlük şok varyansı değişir);
+  - değişken günlük sonuç sayısı.
+
+**3. Ayrım:**
+
+- Geliştirme sırasında yalnız eski tohumlu küçük seriler kullanılabilir.
+- Doğrulama serileri **bir kez** çalıştırılır. Sonuç ne çıkarsa çıksın raporlanır; sonuca göre ayar yapılmaz.
+
+**4. Başarısızlık durumu:** K1 "uyarı üretmez" olarak kalır. İkinci bir yöntem ancak yeni bir ön kayıt ve yeni
+tohumlarla, ayrı onayla denenir.
+
+**5. Etki alanı:**
+
+- Yalnız `izleme.py` içindeki K1 yolu ve yeni testler.
+- P1 ve P2 değişmez.
+- Canlıya alma ayrı onay ister.
+
+## L2.4 Haber kuyruğu politikası (öneri; ücretli çağrı başlatılmadı, kuyruk analiz edilmedi)
+
+**1. Önceliklendirme:** Mevcut `analyzer.pending` sırası korunur:
+
+1. açık ya da bekleyen işlemi olan hisseler;
+2. hazır fırsat adayları;
+3. likit hisseler.
+
+Her grupta en yeni haber önce.
+
+- **Öneri:** Otomatik ya da toplu analizde yalnız **son 2 iş günü** içinde yayımlanmış haberler. Haber ancak karar
+  anına yakınsa işe yarar.
+
+**2. Tekrarların elenmesi:**
+
+- Analizden önce `title_key` + `content_hash` (metin özeti) ile aynı içerik **bir kez** analiz edilir; diğerleri
+  ilk analize bağlanır.
+- Kuyruktaki 748 haberin `content_hash` alanı boş; özet analizden önce hesaplanmalı (ücretsiz).
+- Python ön elemesi (rutin KAP konuları) bugünkü gibi önce uygulanır.
+
+**3. Eski haber politikası:**
+
+- **Karar akışı için:** 2 iş gününden eski haber (`effective_date` < bugün − 2 iş günü) otomatik analiz edilmez;
+  "eski haber" olarak işaretlenir. Bugün 72 haber zaten bu notla atlanmış durumda.
+- **Geçmişe bilgi taşınmaz:** Eski haberler sonradan analiz edilse bile:
+  - geçmiş tahmin, hazır fırsat ya da tahmin defteri kayıtlarına **eklenmez**;
+  - geçmiş günlerin haber puanını **değiştirmez**;
+  - "sonradan analiz" işaretiyle ve analiz zamanıyla ayrı tutulur. Yalnız araştırma için, o günde **bilinmiyordu**
+    bilgisiyle kullanılabilir.
+- Mevcut tahmin defteri zaten tahmin anındaki haber puanını dondurur.
+
+**4. Bütçe sınırı:**
+
+- Mevcut aylık **10 $** haber bütçesi korunur; bu ay 2,29 $ harcandı.
+- **Öneri:** ek olarak **günlük sınır ~0,50 $**. Bu, analiz başına ~0,015 $ ile günde ~30 analiz eder.
+- Sınıra yaklaşınca analiz durur ve panelde gösterilir.
+- Toplu analiz yalnız kullanıcının açık onayı ve maliyet tahmini gösterildikten sonra yapılır. Bugünkü 733 haberin
+  tamamı ≈ 11 $; aylık kalandan (~7,7 $) fazla.
+
+**5. Otomatik analiz:** Bekçide yapay zekâ analizi bugün kapalı (10.11 kullanıcı kararı). Açılması bu politikalarla
+birlikte ayrı bir karardır.
+
+## L2.5 Müşteri sürümü gereksinimi (Ek M Ü4'e eklendi)
+
+Müşteri panelinde şunlar gösterilecek:
+
+- **son haber analizi zamanı;**
+- **bekleyen analiz sayısı** (metni hazır / metni yok);
+- **haber verisinin güncellik uyarısı.** Örnek: "son analiz 2 iş gününden eski: haberli fırsatlar ve haber puanı
+  güncel haberleri içermiyor".
+
+Kabul kriteri:
+
+- değerler veritabanıyla eşleşir;
+- uyarı eşiği ön kayıtlı olur;
+- uyarı ücretli çağrı başlatmaz.
+
+## L2.6 Depo görünürlüğü notu (Ek J2 ve Ek M Z3 güncellendi)
+
+- **Kullanıcı notu:** Depo, kullanıcının incelemesi için **bilerek herkese açık** yapıldı. Açık olması tek başına
+  **zorunlu düzeltme değildir.**
+- **Ayrı konu:** Canlı raporların Git'e gönderilmesi.
+  - Önleme kuralları `.gitignore`'da.
+  - Yanlışlıkla gönderilen rapor `faz4-rejim` dalının geçmişinde duruyor. Silinmesi kullanıcı kararıdır.
+- Bu nedenle Ek M'deki **Z3, "zorunlu düzeltme" listesinden çıkarılıp "kullanıcı kararı"na alındı.**
+
+## L2.7 FAZ 1 (ayrı)
+
+- 16.11 20:00 salt-okunur: 5 tahmin, 0 sonuç, 0 değerlendirme, 0 olay. Son çalıştırma 18:23 akşam analizi; fiyatlar
+  16.11.
+- Bekleyen: 17.11 sabah kontrolü ve gerçek sonuçlandırma. **FAZ 1 kabul edilmedi.**
+
+**Onay beklenen:** Canlıya alma, K1 düzeltme planının uygulanması, haber politikası uygulaması ve FAZ 7 için ayrı
+onay gerekir.
