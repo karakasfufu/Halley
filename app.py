@@ -2501,6 +2501,50 @@ def page_performans() -> None:
     trend_panel()
 
 
+IZLEME_AD = {"P1": "Ayırt etme (AUC)", "P2": "Sabit orana göre Brier becerisi", "K1": "Kalibrasyon",
+             "R1": "Piyasa rejimi (bilgi)", "G1": "Girdi dağılımı (bilgi)"}
+IZLEME_DURUM = {"yetersiz": "⚪ yetersiz veri", "esik_alti": "🟢 eşik aşılmadı", "esik_asildi": "🔴 eşik aşıldı",
+                "bilgi": "🔵 bilgi"}
+
+
+def model_izleme_bolumu() -> None:
+    """FAZ 6 (16.11.2026): model izleme özeti — YALNIZ OKUR (kayıt yazmaz). Uyarılar modeli değiştirmez, harici
+    bildirim yoktur. Az örnekte 'yetersiz veri' gösterilir; 'sağlıklı' sonucu çıkarılmaz."""
+    from bist_haber import izleme
+    try:
+        oz = izleme.panel_ozeti(conn, config.DATA)
+    except Exception as e:  # izleme hatası paneli düşürmesin
+        st.caption(f"Model izleme hesaplanamadı: {str(e)[:120]}")
+        return
+    acik = len(oz["acik_uyarilar"])
+    with st.expander(f"🩺 Model izleme (bilgi amaçlı) · açık uyarı: {acik}"
+                     + (f" · son kayıtlı kontrol {oz['son_kontrol']}" if oz["son_kontrol"] else " · kayıtlı kontrol yok")):
+        st.caption("Dört durum ayrı ölçülür: ayırt etme, sabit orana göre Brier becerisi, kalibrasyon (uyarı); piyasa "
+                   "rejimi ve girdi dağılımı (yalnız bilgi — tek başına model başarısızlığı değildir). Geçmiş backteste "
+                   "göre bozulma ölçülmez (uygun dönem dışı referans yok). Uyarı iki kontrolde, en az 20 yeni sonuç "
+                   "günü arayla teyit edilince açılır. Uyarılar modeli, kuralları ya da eşikleri değiştirmez.")
+        for e in oz["degerlendirme"]:
+            st.markdown(f"**{e['etiket']}**")
+            if "pencereler" not in e:
+                st.caption(e.get("neden", ""))
+                continue
+            satir = []
+            for pad, olc in e["pencereler"].items():
+                for kod in ("P1", "P2", "K1", "R1", "G1"):
+                    o_ = olc[kod]
+                    ar = o_.get("aralik_%90")
+                    satir.append({"Pencere": "birikimli" if pad == "birikimli" else "son 60 gün", "Ölçüt": IZLEME_AD[kod],
+                                  "Durum": IZLEME_DURUM.get(o_["durum"], o_["durum"]),
+                                  "Değer": o_.get("deger", o_.get("seviye", o_.get("baskin", ""))),
+                                  "%90 aralık": f"{ar[0]:.3f} … {ar[1]:.3f}" if ar else "",
+                                  "n / gün": f"{o_['orneklem']['n']} / {o_['orneklem']['gun']}",
+                                  "Dönem": f"{o_['orneklem']['ilk'] or '—'} … {o_['orneklem']['son'] or '—'}",
+                                  "Referans": o_.get("referans", ""), "Neden": o_.get("neden", "")})
+            st.dataframe(pd.DataFrame(satir).astype(str), hide_index=True, width="stretch")
+            if e.get("tekrar_%") is not None:
+                st.caption(f"Aynı hissenin 14 gün içinde tekrar eden tahmin payı: %{e['tekrar_%']} (ilişkili gözlemler).")
+
+
 def model_live_panel() -> None:
     """FAZ 1 (2026-11-16; Ek F): tahmin defterinden modelin canlı performansı. Yalnız okuma. Performans TEK bir sürüm
     grubu (model × özellik × parametre × sonuçlandırma kuralı × maliyet protokolü) için hesaplanır; gruplar yan yana
@@ -2541,6 +2585,7 @@ def model_live_panel() -> None:
                         "Güven": o_["guven"]})
         st.dataframe(pd.DataFrame(tbl).astype(str), hide_index=True, width="stretch")
     st.caption("ℹ️ Hedef tanımı uyumsuzluğu: " + defter.ETIKET_UYUMSUZLUGU)
+    model_izleme_bolumu()
     f1, f2, f3, f4, f6, f5 = st.columns([1.8, 1.0, 1.2, 1.1, 1.0, 1.2])
     gi = f1.selectbox("Sürüm grubu", list(range(len(gs))), key="ml_grup",
                       format_func=lambda i: f"{defter.grup_etiketi(gs[i]['grup'])} ({gs[i]['n']} tahmin)",

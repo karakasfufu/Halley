@@ -29,3 +29,7 @@ dongu_*.txt
 **/faz1_sabah_*.txt
 **/*canli_rapor*
 **/*bekci_rapor*
+
+# FAZ 6 model izleme yerel kayıtları (canlı veriden; GitHub'a yüklenmez)
+data/izleme_durumu.json
+data/izleme_kayit.jsonl

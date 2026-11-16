@@ -8,6 +8,7 @@ Tanımlar (kayıtlı günlük fiyatlardan, yapay zekâ yok, tahmin yok):
 Gün: verilen günde ya da öncesinde fiyatı olan son işlem günü (geriye dönük bilgi yok).
 Bekçi her çalıştırmada rejimi karar kaydının özetine yazar → ileride "hangi rejimde hangi strateji başarılı" ölçülür.
 """
+import copy
 from datetime import date
 from typing import Dict, List, Optional
 
@@ -16,6 +17,12 @@ from . import technical
 BENCH = "XU100"
 LIQ_MIN_TL = 2e6
 LOW_PCT, HIGH_PCT = 30, 70
+KOD_SURUM = "regime_v1"
+# FAZ 6 (16.11.2026): ölçülen tekrar hesabı — aynı gün için bekçi (2 kez) ve her tahmin kaydı (defter.kaydet) rejimi
+# yeniden hesaplıyordu (~0,8 sn/çağrı). Önbellek anahtarı VERİ (o güne kadarki fiyatların sayı/son gün/toplam özeti),
+# PARAMETRE ve KOD sürümünü içerir; biri değişirse yeniden hesaplanır. Sonuç kopya olarak döner (çağıran değiştiremez).
+_ONBELLEK: Dict[tuple, Dict] = {}
+ONBELLEK_AZAMI = 16
 
 
 def _bars(conn, ticker: str, upto: str, n: int) -> List[dict]:
@@ -32,8 +39,27 @@ def _atr_pct_series(bars: List[dict], n: int = 20) -> List[float]:
     return out
 
 
-def regime(conn, day: Optional[date] = None) -> Dict:
-    day = (day or date.today()).isoformat()
+def _anahtar(conn, day: str) -> tuple:
+    db = conn.execute("PRAGMA database_list").fetchone()
+    yol = db[2] if db and db[2] else f"bellek:{id(conn)}"
+    ozet = tuple(conn.execute("SELECT COUNT(*), MAX(date), TOTAL(close), TOTAL(volume), TOTAL(high), TOTAL(low) "
+                              "FROM prices WHERE date<=?", (day,)).fetchone())
+    return (yol, day, ozet, BENCH, LIQ_MIN_TL, LOW_PCT, HIGH_PCT, KOD_SURUM)
+
+
+def regime(conn, day: Optional[date] = None, onbellek: bool = True) -> Dict:
+    gun = (day or date.today()).isoformat()
+    if not onbellek:
+        return _regime(conn, gun)
+    k = _anahtar(conn, gun)
+    if k not in _ONBELLEK:
+        if len(_ONBELLEK) >= ONBELLEK_AZAMI:
+            _ONBELLEK.pop(next(iter(_ONBELLEK)))
+        _ONBELLEK[k] = _regime(conn, gun)
+    return copy.deepcopy(_ONBELLEK[k])
+
+
+def _regime(conn, day: str) -> Dict:
     xb = _bars(conn, BENCH, day, 520)
     if len(xb) < 210:
         return {"yok": "BIST 100 için yeterli fiyat geçmişi yok (en az 210 işlem günü gerekir)."}
