@@ -1934,3 +1934,7 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Bulgu: simülatör açılışa bakıp elenen adayın yerine sıradakini aynı açılıştan alıyordu (teorik). Yeni emir_modeli=onceden_limit: emir listesi açılıştan önce, dolmayan emrin yerine aday yok. Eski model varsayılan, teorik etiketli.
 - Sınıflama: doğrulanmış yok; emir altyapısına bağlı = önceden limit (Midas doğrulanmadı); teorik = açılışı görüp (T1/T2) ve bütün s2 koşuları.
 - E modeli (ortak): 12 ay −%25,2 / −%21,7 (planlanan / azami), 2024 +%22,9 / +%19,5; teorik T1 2024 +%35,1. Ek H4 24 koşu regresyonu aynı. 603 test OK. FAZ 2 simülatör olarak kabul önerildi; strateji başarısı değil.
+
+## 2026-11-16 — FAZ 2 KABUL EDİLDİ (simülatör olarak; commit 6d7f5d5, etiket faz2-kabul)
+- Kullanıcı kabulü: araştırma simülatörü; kârlılık, emir uygulaması ya da canlıya geçiş onayı değil. Canlı kural değişmedi.
+- Ana sonuç = önceden limit emir + s3 (sonuclar_faz2/kabul/, faz2_kabul_kaydi.py). Önceki s2/teorik rakamlar ana sonuç değil (rapora not). Ayrıntı: Ek H10.

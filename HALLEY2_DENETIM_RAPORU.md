@@ -1957,6 +1957,8 @@ Bu kanıtlar akşam analizi ve yarın sabahki kontrolden sonra eklenecek.
 
 # EK H (16.11.2026) — FAZ 2 tamamlama raporu: teknik plan evreninin portföy backtesti (araştırma)
 
+> **FAZ 2 kabul notu:** FAZ 2'nin geçerli ana sonucu **Ek H10**'dadır (kabul edilen sürüm `6d7f5d5`, önceden limit emir modeli, kural s3). Bu bölüm ile Ek H2–H4'teki rakamlar ya hatalı gerçekleşme varsayımı (s2: stop altı yapay kâr) ya da teorik seçim (açılışı görüp yerine aday) içerir; **ana sonuç olarak kullanılmaz**, yalnız tarihçe için korunur.
+
 **Kapsam:** Yalnız portföy bazlı backtest simülatörü, araştırma ortamında.
 
 - Canlı koda, kullanıcı verisine, etkin modele ve canlı veritabanına dokunulmadı.
@@ -3050,3 +3052,52 @@ sonra Ek H4'ün 24 koşusunun hepsi aynı metrikleri verdi (regresyon: **True**)
 - **FAZ 1 kabul edilmedi.**
 
 **Onay beklenen:** FAZ 2 kabulü (H9.5). s3 ve adet değişikliği canlıya alınmadı. Sonraki faz için kullanıcı kararı bekleniyor.
+
+
+---
+
+# Ek H10 — FAZ 2 KABUL KAYDI (16.11.2026)
+
+**Kabul:** Kullanıcı, FAZ 2'yi commit **`6d7f5d5`** kapsamındaki **araştırma amaçlı portföy simülatörü** olarak kabul etti.
+
+- **Gerekçe:**
+  - 603 başarılı test;
+  - muhasebe ve zaman sırası kontrolleri;
+  - teorik modellerin ayrılması;
+  - sınırlamaların belgelenmesi.
+- **Kabul şunları kapsamaz:**
+  - stratejinin kârlı olduğu;
+  - emir uygulamasının doğrulandığı;
+  - canlıya geçişin onaylandığı.
+- **Canlı kural değişmedi:** s3 ve adet değişikliği canlıda değil.
+
+## H10.1 Sabitlenen sürüm ve ayarlar
+
+| Öğe | Değer |
+|---|---|
+| Kod | commit `6d7f5d50d4ba95f64c8d096df5862073028684d3`, dal `faz2-portfoy`, etiket `faz2-kabul`. İzlenen dosyalarda değişiklik yok. `portfoy.py` ve `journal.py` SHA-256 değerleri `kayit.json` içinde. |
+| Plan evreni | `planlar_seviyeli.csv` (45.737 plan). SHA-256 `kayit.json` içinde. |
+| Fiyat verisi | `arastirma_5y.db` (son fiyat 2026-11-13) |
+| Dönemler | son 12 ay 2025-11-14 … 2026-11-13; 2024: 2024-01-02 … 2024-12-31 |
+| Evrenler | `canli_ortak`, `yalniz_teknik` (Ek H4) |
+| Ayarlar | 100.000 TL; %1 risk; 5 pozisyon; toplam risk %6; sektör başına 2; komisyon %0,2 + kayma %0,1 (gidiş-dönüş) |
+| Emir modeli | `onceden_limit`: emir listesi açılıştan önce, azami limitli; dolmayanın yerine aday yok. **Emir altyapısına bağlı**, doğrulanmadı. |
+| Gerçekleşme kuralı | s3. Stop altı dolan alışta çıkış **varsayımsal** (alış fiyatı); ek kayma belirsiz. İşlem dosyalarında `cikis_varsayimsal_stop_alti` sütunu ile işaretli. |
+| Adet yöntemi | iki ayrı koşu: planlanan girişe göre (canlıdaki davranış) / azami girişe göre |
+| Sonuç dosyaları | `arastirma/asama6/sonuclar_faz2/kabul/`: `kayit.json` + `<evren>_<dönem>_<adet>_{egri,islemler,atlanan,acik_son}.csv`. Üretim: `faz2_kabul_kaydi.py`. |
+
+## H10.2 Ana sonuçlar (yalnız bunlar FAZ 2 ana sonucudur)
+
+| Evren · dönem | Planlanan girişe göre adet | Azami girişe göre adet | Stop altı varsayımsal çıkış |
+|---|---|---|---|
+| canli_ortak · son 12 ay | −%25,2 (düşüş −%35,6, PF 0,67) | −%21,7 (düşüş −%31,6, PF 0,67) | 4 / 4 işlem |
+| canli_ortak · 2024 | +%22,9 (düşüş −%19,8, PF 1,20) | +%19,5 (düşüş −%16,4, PF 1,21) | 4 / 4 |
+| yalniz_teknik · son 12 ay | −%31,9 (düşüş −%39,7, PF 0,67) | −%27,3 (düşüş −%34,8, PF 0,66) | 6 / 6 |
+| yalniz_teknik · 2024 | +%10,4 (düşüş −%19,3, PF 1,07) | +%8,9 (düşüş −%16,1, PF 1,07) | 1 / 1 |
+
+- Ayrıntılı metrikler `kayit.json → sonuc` içinde.
+- Bütün değerler Ek H9 ile birebir aynı; kabul kaydı aynı kodla yeniden üretildi.
+- **Ana sonuç değildir:** Teorik modeller (açılışı görüp) ve bütün s2 rakamları.
+
+**Uyarı:** Haber şartı yoktur. Hayatta kalma yanlılığı vardır ve sektör listesi güncel listedir. Sonuçlar geriye dönük
+düzeltmelerden sonra üretildi; dönem dışı kanıt değildir.
