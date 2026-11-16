@@ -232,6 +232,28 @@ class Sonuc(Base):
         self.assertEqual((o["sayilar"]["gec_kayit"], o["sayilar"]["sonradan"], o["olculen"]), (1, 1, 0))
 
 
+class KayitZamani(Base):
+    """16.11 panel düzeltmesi: 'Planı üreten analiz' (analiz alanı) ile gerçek 'Kayıt zamanı' ayrı filtreler; kayıtlar
+    değişmez."""
+    def test_rule(self):
+        self.assertEqual(defter.kayit_zamani("2026-11-16T08:30:00+03:00", "2026-11-16"), "sabah")
+        self.assertEqual(defter.kayit_zamani("2026-11-13T18:30:00+03:00", "2026-11-16"), "aksam")
+        self.assertEqual(defter.kayit_zamani("2026-11-15T01:04:27+03:00", "2026-11-16"), "aksam")   # gece yarısı sonrası akşam analizi
+
+    def test_filter_separates_record_time_from_producing_analysis(self):
+        # akşam planı akşam kaydı (A); sabah onayında seviyeler yenilendi → aynı fırsat, analiz etiketi 'aksam', kayıt sabah (B)
+        defter.kaydet(self.conn, self.plan, 1, self.gday, "aksam", at(self.day, "18:30"))
+        defter.kaydet(self.conn, dict(self.plan, sl=self.plan["sl"] * 1.01), 1, self.gday, "aksam", at(self.gday, "08:30"))
+        defter.kaydet(self.conn, dict(self.plan, ticker="XU100"), 2, self.gday, "sabah", at(self.gday, "08:31"))
+        snap = [tuple(r) for r in self.conn.execute("SELECT * FROM tahmin ORDER BY id")]
+        say = lambda **k: defter.ozet(self.conn, "tp1_v1", **k)["sayilar"]["tahmin"]
+        self.assertEqual(say(), 3)
+        self.assertEqual((say(kayit="aksam"), say(kayit="sabah")), (1, 2))
+        self.assertEqual((say(analiz="aksam"), say(analiz="sabah")), (2, 1))       # planı üreten analiz: etiket korunur
+        self.assertEqual(say(analiz="aksam", kayit="sabah"), 1)                       # sabah onaylanan akşam planı
+        self.assertEqual([tuple(r) for r in self.conn.execute("SELECT * FROM tahmin ORDER BY id")], snap)   # kayıtlar aynı
+
+
 class Olcum(Base):
     def _ins(self, i, p, y, surum="tp1_v1", bant="orta", sonuc="tamamlandi", rejim=None, r=1.0):
         cur = self.conn.execute(

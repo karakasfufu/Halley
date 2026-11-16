@@ -1880,3 +1880,13 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
   sonrası sonuçlandırma. Müşteri güncellemesi YAYIMLANMADI (ayrı onay). FAZ 2 başlamadı.
 - Geri dönüş: önceki commit 3310a61 kodu + gerekirse DROP TABLE tahmin_sonuc, tahmin; ya da elle yedeği geri koymak
   (Halley kapalıyken).
+
+## 2026-11-16 — FAZ 1 panel düzeltmesi: "Planı üreten analiz" + "Kayıt zamanı" (dal: faz1-panel-etiket; CANLIYA ALINMADI)
+- Neden (Ek E2): sabah onaylanan akşam planı `ready.py` satır 500 gereği analiz="aksam" etiketiyle kaydediliyor; panelde
+  "Akşam / Sabah" yanıltıcıydı. Kayıt, imza, model, sonuçlandırma, seçim kuralları DEĞİŞMEDİ.
+- `defter.kayit_zamani(tahmin_zamani, giris_gunu)`: giriş günü yazıldıysa "sabah", önceki tarihte (gece yarısını geçen
+  akşam analizi dahil) "aksam"; `defter.ozet(..., kayit=)`. Panel: "Analiz" → "Planı üreten analiz" (açıklamalı),
+  yeni "Kayıt zamanı" (Tümü / Sabah / Akşam).
+- Testler: test_defter.KayitZamani (kural + filtre; kayıtlar birebir aynı), panel testine etiket/filtre kontrolü.
+  542 test OK. Prova kopyasında (08:30, etiket 'aksam', 2 tahmin): Planı üreten Akşam = 2, Kayıt Sabah = 2, Kayıt
+  Akşam = 0; tahmin kayıtları değişmedi; panel hatasız.

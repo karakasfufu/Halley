@@ -306,10 +306,20 @@ def model_surumleri(conn) -> List[Dict]:
         "GROUP BY model_surum ORDER BY son DESC")]
 
 
+def kayit_zamani(tahmin_zamani: str, giris_gunu: str) -> str:
+    """Kaydın GERÇEK yazılma zamanından (16.11.2026, panel filtresi): giriş gününün kendisinde yazıldıysa "sabah",
+    giriş gününden önceki bir tarihte yazıldıysa (gece yarısını geçen akşam analizi dahil) "aksam". Kayıtlara
+    dokunmaz; yalnız okunan alanlardan hesaplanır. Not: `analiz` alanı ise "planı üreten analiz"dir (sabah onaylanan
+    akşam planında "aksam" kalır)."""
+    return "sabah" if (tahmin_zamani or "")[:10] >= giris_gunu else "aksam"
+
+
 def ozet(conn, model_surum: str, kaynak: Optional[str] = None, tur: Optional[str] = None,
-         analiz: Optional[str] = None, bant: Optional[str] = None, belirsiz_dahil: bool = True) -> Dict:
+         analiz: Optional[str] = None, bant: Optional[str] = None, belirsiz_dahil: bool = True,
+         kayit: Optional[str] = None) -> Dict:
     """TEK model sürümü için canlı performans (sürümler asla birleştirilmez). Yalnız 'tamamlandi' sonuçlar metrik
-    hesabına girer; açık tahminler yalnız sayılır. Sonradan eklenen tahminler ana hesaba katılmaz."""
+    hesabına girer; açık tahminler yalnız sayılır. Sonradan eklenen tahminler ana hesaba katılmaz.
+    analiz = planı üreten analiz ("aksam"/"sabah"); kayit = kaydın yazıldığı zaman ("sabah"/"aksam"; kayit_zamani)."""
     if not tablo_var(conn):
         return {"tablo_yok": True}
     q = ("SELECT t.*, s.sonuc_turu, s.tp1_goruldu, s.sl_goruldu, s.net_getiri_pct, s.r, s.mae_r, s.mfe_r, "
@@ -321,6 +331,8 @@ def ozet(conn, model_surum: str, kaynak: Optional[str] = None, tur: Optional[str
             q += f" AND t.{col}=?"
             args.append(val)
     rows = [dict(r) for r in conn.execute(q, args)]
+    if kayit:
+        rows = [r for r in rows if kayit_zamani(r["tahmin_zamani"], r["giris_gunu"]) == kayit]
     say = {"tahmin": len(rows), "sonradan": sum(r["sonradan"] for r in rows)}
     main = [r for r in rows if not r["sonradan"]]
     say["acik"] = sum(r["sonuc_turu"] is None for r in main)
