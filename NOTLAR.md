@@ -1903,3 +1903,15 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - arastirma/asama6/portfoy.py: journal.evaluate/position_size, sectors, defter.belirsiz_gunler, ready sıralaması tek kaynak; gün sırası d−1 bilgisiyle giriş, d içinde çıkış, aynı gün satış nakdi kullanılmaz; maliyet alış+satış toplamı, satış bacağı giriş fiyatı üzerinden (journal ile birebir). 14 test, 573 test OK.
 - Takvim hisse mumlarının birleşimi (XU100 verisinde 25 Aralık 2023/24/25 yok; gerçek koşuda sıra koruması yakaladı).
 - Sonuç (teknik plan evreni, haber yok): canli_ortak son 12 ay −%22,7 (MDD −%34,1, PF 0,72, ort R −0,19) · 2024 +%35,9 (MDD −%15,2, PF 1,34, ort R +0,26). Evrendeki tüm planlar son 12 ay ort R +0,02 → sıralama kuralı bu dönemde ortalamanın altında seçti. Ayar değiştirilmedi. Ayrıntı: Ek H.
+
+
+## 2026-11-16 — FAZ 2 ek kontroller (dal faz2-portfoy; araştırma, canlıya dokunulmadı; ayar değiştirilmedi)
+- Simülasyonlar bu kontrollerden önce çalıştırılmıştı; aynı ayarla yeniden üretim 4/4 birebir aynı.
+- Seçim yalnız 12 karar anı alanını okur (sonuç/model sütunu yok); son 12 ay = 2025-11-14 … 2026-11-13.
+- Geleceğe bakmama: yeni GelecegeBakmama testleri (5) + gerçek veride kısıtsız 5.244 işlem tüm gelecekle journal'a
+  ayrıca verildi: 0 uyuşmazlık.
+- Sınırlar gerçek veride: en çok 5 pozisyon, sektörde 2, açık risk ≤ %5,55 (< %6). Sektör listesi güncel KAP
+  (2026-11-09), tarihsel değil.
+- Yeni tespit (değiştirilmedi): adet planlanan girişle hesaplanıyor, alış açılıştan → SL'de kayıp %1'i aşabiliyor
+  (ortak 12 ay 43/104, en çok %2,31). Ayrıca açılışta boşluk (GOLTS −3,15 R).
+- Dönem sonu pozisyonlar zorla kapatılmadı. Ayrıntı: HALLEY2_DENETIM_RAPORU Ek H2.

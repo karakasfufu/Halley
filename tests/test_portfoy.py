@@ -216,6 +216,100 @@ class Rapor(unittest.TestCase):
         self.assertEqual(m["toplam_getiri_%"], 8.0)
 
 
+class GelecegeBakmama(unittest.TestCase):
+    """Kontrol 1–2, 4–5 (16.11 ek istek)."""
+    def _rasgele(self, seed=11, n=4):
+        rng = random.Random(seed)
+        bars, ps = {}, []
+        for k in range(n):
+            tk, px, rows = f"T{k}", 100.0, []
+            for d in D:
+                o = px * (1 + rng.uniform(-0.02, 0.02))
+                c = o * (1 + rng.uniform(-0.07, 0.08))
+                rows.append(bar(d, o, max(o, c) * 1.02, min(o, c) * 0.98, c))
+                px = c
+            bars[tk] = rows
+            for gi in (0, 1, 3):
+                e = rows[gi]["close"]
+                ps.append(plan(tk, D[gi], giris=e, sl=e * 0.95, tp1=e * 1.05, tp2=e * 1.1, azami=e * 1.03, skor=5 + k))
+        return bars, ps
+
+    def test_outcome_columns_never_read(self):
+        """Plan dosyasındaki sonuç/model sütunları değişse de okunan planlar (ve seçim) aynı."""
+        import csv
+        import tempfile
+        alan = ["ticker", "tarih", "tur", "risk", "trend", "teknik_skor", "rr1", "giris", "sl", "tp1", "tp2", "azami",
+                "sonuc", "y", "r", "net", "gun", "rsi", "perf20"]
+        satir = {"ticker": "AAA", "tarih": D[0], "tur": "kirilim_teyitli", "risk": "orta", "trend": "Yükseliş",
+                 "teknik_skor": "7", "rr1": "2.0", "giris": "100", "sl": "95", "tp1": "110", "tp2": "120", "azami": "101",
+                 "sonuc": "TP2", "y": "1", "r": "2.5", "net": "15", "gun": "3", "rsi": "60", "perf20": "5"}
+        okunan = []
+        for degisik in ({}, {"sonuc": "SL", "y": "0", "r": "-1", "net": "-5", "gun": "1", "rsi": "20", "perf20": "-9"}):
+            with tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False, newline="", encoding="utf-8") as f:
+                w = csv.DictWriter(f, alan)
+                w.writeheader()
+                w.writerow(dict(satir, **degisik))
+            okunan.append(pf.plan_oku(f.name, "canli_ortak"))
+        self.assertEqual(okunan[0], okunan[1])
+        self.assertEqual(set(okunan[0][0]), {"ticker", "tarih", "tur", "risk", "trend", "teknik_skor", "rr1", "giris",
+                                             "sl", "tp1", "tp2", "azami"})
+
+    def test_truncated_future_identical_up_to_cut(self):
+        """Veri k gününde kesilse de k'ye kadarki her gün (nakit, piyasa değeri, açık risk, pozisyon) ve o güne
+        kadarki kararlar birebir aynı: journal.evaluate yalnız o güne kadarki mumlarla çağrılıyor."""
+        bars, ps = self._rasgele()
+        tam = pf.simule(ps, bars, D, D[1], D[-1], {"baslangic_sermaye": 20000, "azami_pozisyon": 2}, SEK)
+        for k in range(2, len(D)):
+            kes = {tk: [b for b in bs if b["date"] <= D[k]] for tk, bs in bars.items()}
+            r = pf.simule(ps, kes, D, D[1], D[-1], {"baslangic_sermaye": 20000, "azami_pozisyon": 2}, SEK)
+            n = k                                                 # egri[0] = D1 … egri[k−1] = D[k]
+            self.assertEqual(tam["egri"][:n], r["egri"][:n], D[k])
+            self.assertEqual([x for x in tam["atlanan"] if x["gun"] <= D[k]], [x for x in r["atlanan"] if x["gun"] <= D[k]])
+            self.assertEqual([t for t in tam["islemler"] if t["cikis_gunu"] <= D[k]],
+                             [t for t in r["islemler"] if t["cikis_gunu"] <= D[k]])
+
+    def test_slot_cash_risk_released_only_on_exit_day(self):
+        """AAA D3'te TP2'de kapanacak. D2 sinyalli BBB (giriş D3) pozisyon sınırına takılır; AAA'nın nakdi ve riski
+        D2 sonuna kadar kayıtlarda durur, D3'te serbest kalır (önceden yansımaz)."""
+        bars = {"AAA": [bar(D[0], 100, 100, 100, 100), bar(D[1], 100, 101, 99, 100), bar(D[2], 100, 105, 99, 104),
+                        bar(D[3], 121, 125, 120, 124), bar(D[4], 124, 125, 123, 124)],   # D3: TP2 üstünde açılış
+                "BBB": duz("BBB", D[:5]), "CCC": duz("CCC", D[:5])}
+        ps = [plan("AAA", D[0]), plan("BBB", D[2]), plan("CCC", D[3])]
+        r = pf.simule(ps, bars, D[:5], D[1], D[4], {"baslangic_sermaye": 10000, "azami_pozisyon": 1}, SEK)
+        e = {x["gun"]: x for x in r["egri"]}
+        self.assertEqual((e[D[2]]["acik_pozisyon"], e[D[3]]["acik_pozisyon"]), (1, 0))
+        self.assertGreater(e[D[2]]["acik_risk"], 0)
+        self.assertEqual(r["atlanan"], [{"gun": D[3], "sinyal_gunu": D[2], "ticker": "BBB", "tur": "kirilim_teyitli",
+                                         "neden": "pozisyon sınırı"}])        # AAA D3'te kapanıyor ama yer d−1 sonu dolu
+        self.assertEqual([t["ticker"] for t in r["acik_son"]], ["CCC"])        # D4'te yer açık → CCC girdi
+        self.assertLess(e[D[2]]["nakit"], e[D[3]]["nakit"])                  # nakit TP2 günü (D3) arttı, önce değil
+
+    def test_equity_identity_and_no_double_counting(self):
+        bars, ps = self._rasgele(seed=21, n=5)
+        r = pf.simule(ps, bars, D, D[1], D[-1], {"baslangic_sermaye": 30000}, SEK)
+        for x in r["egri"]:
+            self.assertAlmostEqual(x["ozsermaye"], x["nakit"] + x["piyasa_degeri"], delta=0.011)
+        c2 = 0.3 / 200
+        acik = sum(a["gerceklesen_tl"] + a["gerceklesmemis_tl"] - a["adet_bas"] * a["giris_fiyati"] * c2
+                   - (a["adet_bas"] - a["kalan"]) * a["giris_fiyati"] * c2 for a in r["acik_son"])
+        kapanan = sum(t["net_tl"] for t in r["islemler"])
+        self.assertAlmostEqual(r["egri"][-1]["ozsermaye"] - 30000, kapanan + acik, delta=0.05)
+        for t in r["islemler"]:                                   # maliyet = adet × giriş × %0,3, bir kez
+            self.assertAlmostEqual(t["maliyet_tl"], t["adet"] * t["giris_fiyati"] * 0.003, delta=0.006)
+            self.assertAlmostEqual(t["brut_tl"], sum(b["adet"] * (b["fiyat"] - t["giris_fiyati"]) for b in t["bacaklar"]),
+                                   delta=0.006)
+
+    def test_gap_stop_loss_exceeds_theoretical_risk(self):
+        """Stop boşluğu: açılış SL'nin çok altında → gerçekleşen kayıp teorik riskin (adet × risk) üstünde."""
+        bars = {"AAA": [bar(D[0], 100, 100, 100, 100), bar(D[1], 100, 101, 99, 100), bar(D[2], 85, 86, 84, 85)]}
+        r = pf.simule([plan("AAA", D[0])], bars, D[:3], D[1], D[2], {"baslangic_sermaye": 10000, "risk_pct": 1.0}, SEK)
+        t = r["islemler"][0]
+        teorik = t["adet"] * (5 + 100 * 0.003)                   # position_size azami kaybı (100 TL bütçe içinde)
+        self.assertLessEqual(teorik, 100.0)
+        self.assertLess(t["net_tl"], -teorik)                    # 18 × (85 − 100) − maliyet ≈ −272,7 < −95,4
+        self.assertLess(t["r"], -1.0)
+
+
 class Takvim(unittest.TestCase):
     def test_calendar_is_union_and_guard_catches_skipped_day(self):
         """XU100'de olmayan bir işlem günü (25 Aralık örneği) takvimden düşmemeli; düşerse sıra koruması hata verir."""

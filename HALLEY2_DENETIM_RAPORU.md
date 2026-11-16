@@ -2247,3 +2247,205 @@ basamağa yuvarlamaktan gelir:
 
 **Onay beklenen:** FAZ 2'nin kabulü. FAZ 3'e geçiş ayrı onay ister. Simülatör araştırma betiğidir; canlıya alınacak bir
 uygulama değişikliği yoktur.
+
+
+---
+
+# Ek H2 — FAZ 2 ek kontroller: teknik plan evreninin backtesti (16.11.2026)
+
+**Adı:** "teknik plan evreninin backtesti". `kayit.json` içindeki etiket "teknik plan evreninin portföy backtesti";
+aynı şeydir. Haber şartı yoktur; canlı haberli hazır fırsat listesinin geçmiş performansı **değildir**.
+
+**Dürüstlük notu:** Simülasyonlar bu kontrol isteğinden **önce** çalıştırılmıştı (Ek H5). Kontroller sonuçlar
+görüldükten sonra yapıldı. Hiçbir ayar, eşik, sıralama ya da evren tanımı değiştirilmedi. Aynı ayarlarla yeniden
+çalıştırıldığında dört simülasyonun bütün metrikleri `kayit.json` ile **birebir aynı** çıktı (`portfoy_kontrol.py`).
+
+## H2.1 Seçimde sonuç ve model bilgisi kullanılmıyor
+
+- `plan_oku` plan dosyasından yalnız 12 alanı okur: `ticker, tarih, tur, risk, trend, teknik_skor, rr1, giris, sl, tp1,
+  tp2, azami`. Bunların hepsi sinyal günü kapanışına kadarki 250 mumdan hesaplanır (`etiketle.py`).
+- Dosyadaki sonuç sütunları (`sonuc, y, r, net, gun`), ertesi gün bilgisi (`acilis_bosluk_%`, `ertesi_kilitli`) ve model
+  girdileri **okunmaz**. Dosyada model tahmini (olasılık) sütunu hiç yoktur.
+- Sıralama: `ready.RISK_ORDER`, ardından −(teknik skor + 2·haber[=0] + min(rr1, 4)), eşitlikte hisse adı ve tür.
+- **Test kanıtı:** `test_outcome_columns_never_read`. Sonuç ve model girdisi sütunları ters değerlerle (TP2 yerine
+  SL vb.) değiştirildiğinde okunan planlar birebir aynı kaldı ve yalnız bu 12 alanı içerdi. Simülatör seçimi yalnız
+  okunan planlardan yapar.
+- **Dönemler (kesin tarihler):**
+  - son 12 ay: **2025-11-14 … 2026-11-13**. Son fiyat günü 2026-11-13; başlangıç, 365 gün öncesinden (2025-11-13)
+    sonraki ilk işlem günü.
+  - 2024: **2024-01-02 … 2024-12-31**.
+
+## H2.2 Journal yalnız o güne kadarki fiyatları görüyor
+
+- Her gün d için çıkış hesabı, `journal.evaluate`'e yalnız sinyal gününden sonraki ve **d dahil** mumları verir
+  (`upto = sinyal < tarih ≤ d`).
+- Girişler d açılışında, yalnız d−1 sonu bilgisiyle yapılır: nakit, özsermaye ve açık risk.
+- d günü çıkışından gelen nakit, d günü girişlerinde kullanılmaz.
+- **Testler:**
+  - `test_truncated_future_identical_up_to_cut`: kesim gününden sonraki fiyatlar silindiğinde o güne kadarki her şey
+    aynı kaldı.
+  - `test_slot_cash_risk_released_only_on_exit_day`: pozisyon yeri, nakit ve açık risk ancak çıkış günü gün sonunda
+    serbest kalıyor; aynı gün açılışındaki alışa yaramıyor.
+  - Ek H6'daki "gelecek fiyatlar ×1,5" ve "aynı gün" senaryoları.
+- **Gerçek veri kanıtı:** Kısıtsız ve sabit 100 adet modunda canli_ortak işlemlerinin her biri, dönem sonrası dahil
+  **tüm gelecek** mumlarla ayrıca `journal.evaluate`'e verildi. Sonuç, çıkış günü ve R **hiçbir işlemde farklı
+  çıkmadı**:
+
+  | Dönem | Karşılaştırılan işlem | Uyuşmayan | En büyük net fark |
+  |---|---|---|---|
+  | son 12 ay | 2.617 | **0** | 0,005 TL (yuvarlama) |
+  | 2024 | 2.627 | **0** | 0,005 TL (yuvarlama) |
+
+  Simülatörün kesik penceresi, gelecekteki mumlar görülseydi farklı olacak hiçbir kararı erken vermedi.
+
+## H2.3 Sektör sınıflaması güncel, tarihsel değil
+
+- Kaynak `bist_haber/sektorler.json` (KAP listesi, alındığı gün **2026-11-09**). Geçmişe aynen uygulandı.
+- **Sınırlama:** Geçmişte sektör değiştiren ya da sonradan listelenen şirketler bugünkü sektörüyle sayıldı. Sektörü
+  bilinmeyen hisseler tek bir "bilinmiyor" kovasında toplandı ve onlara da en çok 2 sınırı uygulandı (`kayit.json` →
+  `sektoru_bilinmeyen_hisse`).
+
+## H2.4 Özsermaye = nakit + piyasa değeri (çift sayım yok)
+
+- Gün sonu: özsermaye = nakit + Σ(kalan adet × o günün kapanışı).
+- Satılan pay nakde geçer ve kalan adetten düşer; aynı pay iki yerde sayılmaz.
+- Maliyetler nakitten bir kez düşer: alışta (adet × dolum × c2), her satışta (satılan adet × giriş dolumu × c2).
+- **Test:** `test_equity_identity_and_no_double_counting`. Her gün özdeşlik sağlanıyor; TP1 yarı satışından sonra
+  satılan yarı piyasa değerinde yok.
+- **Gerçek veri:** Özsermaye değişimi = kapanan net + açık pozisyon katkısı. Kalan fark ≤ 0,06 TL (Ek H5).
+
+## H2.5 Açık risk formülü ve stop boşluğu
+
+**Formül:** Açık risk = Σ [kalan adet × max(0, dolum − stop) + kalan adet × dolum × c2]. Burada c2 = (komisyon +
+kayma) / 200 = %0,15, yani tek bacağın maliyeti.
+
+- **TP1'den sonra:** Yarısı satılır ve stop dolum fiyatına çekilir. Fiyat riski sıfırlanır; geriye yalnız kalan payın
+  satış maliyeti kalır. Örnek (Ek H6): 92,70 → 1,35.
+- **Giriş kontrolü:** Toplam risk sınırı (önceki gün özsermayesinin %6'sı), adayın **planlanan** girişiyle hesaplanan
+  riskiyle (adet × [(giriş − SL) + giriş × %0,3]) yapılır.
+- **Gerçek veride gün sonu açık riskin önceki gün özsermayesine oranı en çok:**
+
+  | ortak · 12 ay | ortak · 2024 | teknik · 12 ay | teknik · 2024 |
+  |---|---|---|---|
+  | %5,52 | %5,55 | %5,28 | %5,37 |
+
+  Dördü de %6 sınırının altında.
+
+**Teorik risk aşılabilir.** İki ayrı neden var:
+
+1. **Açılışta boşluk:** Fiyat stopun altında açılırsa satış açılıştan olur ve kayıp hesaplanan riskten büyük çıkar.
+   - Bu işlemlerin net toplamı: ortak · 12 ay **5 işlem, −6.174 TL**; ortak · 2024 **6 işlem, −12.426 TL**; teknik ·
+     12 ay 9 işlem, −13.051 TL; teknik · 2024 5 işlem, −7.502 TL.
+   - En kötü örnekler: GOLTS (2026-02-20) **−3,15 R**; TEZOL (2024-05-09) −2,59 R.
+   - Test: `test_gap_stop_loss_exceeds_theoretical_risk`.
+2. **Planlanan girişin üstünde dolum (yeni tespit, değiştirilmedi):**
+   - Adet, canlı paneldeki gibi **planlanan giriş** fiyatıyla `journal.position_size` üzerinden hesaplanıyor. Ama alış
+     gerçek açılıştan yapılıyor ve açılış azami girişe kadar yukarıda olabiliyor. Bu durumda stopta kayıp %1'i aşıyor.
+   - Planlanan girişin üstünde dolan işlem: ortak · 12 ay **60 / 136**; ortak · 2024 58 / 105.
+   - SL işlemlerinde kaybı önceki gün özsermayesinin %1'ini aşan:
+
+     | | SL'de %1'i aşan | En büyük kayıp |
+     |---|---|---|
+     | ortak · 12 ay | **43 / 104** | %2,31 |
+     | ortak · 2024 | 31 / 64 | %2,44 |
+     | teknik · 12 ay | 49 / 108 | %2,49 |
+     | teknik · 2024 | 33 / 70 | %1,78 |
+
+   - Journal'ın R'si de planlanan risk mesafesine (giriş − SL) göredir. Bu yüzden stopta R genelde −1'in altına iner
+     (R < −1,1 olan işlem: ortak 37 / 27).
+   - **Not:** Bu, canlı uygulamadaki adet hesabıyla aynı davranıştır. Düzeltme bir **kural değişikliği** olurdu (adedi
+     gerçek açılışla yeniden hesaplamak); bu fazda yapılmadı, ayrı karar ister.
+
+## H2.6 Sortino ve kâr faktörü varsayımları
+
+- **Getiri serisi:** Günlük özsermaye eğrisinin basit getirileri. Başlangıç sermayesi ilk nokta; açık pozisyonlar o günün
+  kapanışıyla değerlenir.
+- **Sortino:** ortalama günlük getiri / aşağı yönlü sapma × √252.
+  - Hedef getiri 0, risksiz faiz 0.
+  - Aşağı yönlü sapma = √(ortalama(min(r, 0)²)); bütün günlere bölünür, yalnız kayıplı günlere değil.
+- **Sharpe:** Örneklem standart sapması (n−1) × √252, risksiz faiz 0. TL bazında, enflasyon ya da mevduat faizi
+  düşülmedi.
+- **Kâr faktörü:** Yalnız **kapanmış** işlemler üzerinden, maliyet dahil net TL ile: Σ pozitif net / |Σ sıfır ve negatif
+  net|. Sıfır net işlem kayıp tarafında sayılır.
+- Azami düşüş ve düşüş süresi gün sonu özsermaye eğrisinden ölçülür; gün içi dip dikkate alınmaz.
+
+## H2.7 Dönem sonunda açık pozisyonlar (zorla kapatma yok)
+
+Dönem sonunda pozisyonlar **zorla kapatılmadı**. Son kapanışla değerlenip özsermayeye katıldılar; kapanan işlem
+metriklerine (kazanma oranı, kâr faktörü, R) **girmediler**.
+
+**canli_ortak · son 12 ay** (5 pozisyon, gerçekleşmemiş toplam +2.552 TL; hiçbirinde TP1 görülmedi):
+
+| Hisse | Giriş günü | Kalan adet | Gerçekleşmemiş (TL) |
+|---|---|---|---|
+| DURDO | 2026-10-19 | 1.214 | +509,88 |
+| AHGAZ | 2026-10-23 | 293 | +1.007,92 |
+| GARAN | 2026-11-05 | 100 | +1.170,00 |
+| ACSEL | 2026-11-06 | 90 | −535,50 |
+| THYAO | 2026-11-11 | 50 | +400,00 |
+
+**canli_ortak · 2024** (5 pozisyon, gerçekleşmemiş toplam +7.643 TL; hiçbirinde TP1 görülmedi):
+
+| Hisse | Giriş günü | Kalan adet | Gerçekleşmemiş (TL) |
+|---|---|---|---|
+| AKGRT | 2024-12-02 | 3.726 | +3.651,48 |
+| MAVI | 2024-12-03 | 400 | +603,50 |
+| DMSAS | 2024-12-23 | 2.828 | +2.658,32 |
+| BEYAZ | 2024-12-25 | 993 | +586,95 |
+| TRGYO | 2024-12-27 | 456 | +143,16 |
+
+yalniz_teknik için aynı liste `sonuclar_faz2/yalniz_teknik/*_acik_son.csv` içinde: 12 ay 2 pozisyon, 2024 5 pozisyon.
+
+## H2.8 İki dönemin özeti (istenen bütün kalemler)
+
+| | canli_ortak · son 12 ay | canli_ortak · 2024 | yalniz_teknik · son 12 ay | yalniz_teknik · 2024 |
+|---|---|---|---|---|
+| Dönem | 2025-11-14 … 2026-11-13 | 2024-01-02 … 2024-12-31 | aynı | aynı |
+| Başlangıç → bitiş özsermayesi (TL) | 100.000 → 77.270 | 100.000 → 135.873 | 100.000 → 75.290 | 100.000 → 125.911 |
+| Net getiri (maliyet dahil) | **−%22,7** | **+%35,9** | −%24,7 | +%25,9 |
+| Azami düşüş | −%34,1 | −%15,2 | −%39,3 | −%15,2 |
+| Sortino / kâr faktörü | −1,45 / 0,72 | 2,19 / 1,34 | −1,54 / 0,76 | 1,79 / 1,24 |
+| Açılan / kapanan / sonda açık | 141 / 136 / 5 | 110 / 105 / 5 | 143 / 141 / 2 | 115 / 110 / 5 |
+| Toplam maliyet (komisyon + kayma, TL) | 7.092 | 6.697 | 7.957 | 7.361 |
+| En çok eşzamanlı pozisyon (sınır 5) | 5 | 5 | 5 | 5 |
+| En çok aynı sektörde eşzamanlı (sınır 2) | 2 | 2 | 2 | 2 |
+| En yüksek açık risk / özsermaye (sınır %6) | %5,52 | %5,55 | %5,28 | %5,37 |
+
+- **Atlanan fırsatlar ve nedenleri:** Ek H5 tablosu (en sık neden pozisyon sınırı).
+- **Sermaye eğrisi:** Ay sonu değerleri Ek H5'te; günlük eğri `sonuclar_faz2/<evren>/<dönem>_egri.csv`.
+- **Eşzamanlılık ölçümü:** Giriş anında tutulan pozisyonlar (giriş günü ≤ d ≤ çıkış günü) sayıldı. Bu, gün sonu
+  sayısından daha sıkı bir ölçüdür.
+- **Toplam maliyet:** Kapanan işlemlerin bütün bacakları + açık pozisyonların ödenmiş alış ve TP1 satış maliyeti.
+
+**Tekil işlem mutabakatı (aynı varsayımlar: açılıştan giriş, journal çıkışları, %0,2 + %0,1):**
+
+- **Kısıtsız ve sabit 100 adet modu:** H2.2'deki tablo; 5.244 işlemde uyuşmazlık 0.
+- **Evrendeki tüm planlar ile portföyün seçtikleri:** Ek H5. Örnek: son 12 ay ort R +0,02 ile −0,19; 2024 +0,14 ile
+  +0,26.
+- Kısıtsız modda da "aynı hisse zaten açık" ve "açılış azami girişin üstünde" elemeleri geçerlidir (sırasıyla 4.723
+  ve 670 plan, son 12 ay).
+
+**Veri kapsamı, eksikler ve hayatta kalma yanlılığı:** Ek H4 ve H7 geçerli. Özetle:
+
+- Bugün işlem gören 584 / 574 hisse kullanıldı; borsadan çıkanlar yok. Sonuçlar büyük olasılıkla **iyimser**.
+- XU100'de 3 adet 25 Aralık eksik; takvim hisse mumlarından kuruldu.
+- 2024'te 21 / 14 plan giriş günü fiyatı olmadığı için atlandı.
+- Sektör sınıflaması güncel (H2.3).
+- Plan sayısında önceki dosyayla 316 fark var; nedeni doğrulanmadı.
+- Gün içi sıra bilinmiyor (aynı mumda TP/SL vakası 0).
+
+## H2.9 Değişen dosyalar (dal `faz2-portfoy`)
+
+- `tests/test_portfoy.py`: yeni `GelecegeBakmama` sınıfı, 5 test. Portföy testleri 19 / 19 OK; tam takım (ağ engelli) **578 test OK**, ağ denemesi 0.
+- `arastirma/asama6/portfoy_kontrol.py`: yeni, salt-okur gerçek veri kontrolleri. Çıktısı yerel `kontrol.json`;
+  repoya konmadı.
+- `HALLEY2_DENETIM_RAPORU.md` (bu ek) ve `NOTLAR.md`.
+- Simülatör (`portfoy.py`) ve sonuç dosyaları **değişmedi**.
+
+## H2.10 FAZ 1 canlı doğrulaması (ayrı tutuluyor)
+
+- FAZ 1 kanıtları bu raporla karıştırılmadı.
+- Bu akşamki analiz ve yarın sabahki kontrol henüz **gözlenmedi**. Gözlenmeyen durum doğrulanmış sayılmadı.
+- FAZ 1 kabul edilmedi.
+
+**Onay beklenen:** FAZ 2'nin kabulü. Canlıya alma yok; FAZ 3'e geçilmedi.
