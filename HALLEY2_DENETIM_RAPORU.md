@@ -1623,3 +1623,242 @@ kod hatası değil, ortam olayı.** Halley 09:37'de yeniden başlatıldı; kod v
 Akşam bekçisi sonucu `aksam_raporu_20261116.txt` dosyasına da yazacak.
 
 **FAZ 1 hâlâ kabul edilmedi;** akşam adımı bekleniyor.
+
+---
+
+# EK F (16.11.2026) — FAZ 1 dış inceleme bulguları: doğrulama, düzeltme ve test (test ortamı)
+
+**Kapsam:** Yalnız FAZ 1 doğrulama, düzeltme ve test.
+
+- Canlıya alınmadı.
+- Canlı veritabanında göç yapılmadı.
+- Müşteri güncellemesi yayımlanmadı.
+- FAZ 2'ye geçilmedi.
+- Model, seçim kuralları ve eşikler değişmedi; yeniden eğitim yapılmadı.
+
+## F0. İncelenen dal ve commit
+
+| | |
+|---|---|
+| Canlıdaki kod (başlangıç) | `main` @ `60ff0b2` (FAZ 1 v1, kural s1). Çalışma ağacı temizdi. |
+| Bekleyen panel düzeltmesi | `faz1-panel-etiket` @ `c7ee840` (onaylı, canlıya alınmamış) |
+| Bu çalışmanın dalı | `faz1-dogrulama`: `main`'den açıldı, `faz1-panel-etiket` birleştirildi (`71acd60`), düzeltmeler üstüne eklendi |
+| Başlangıç test sonucu | `python run_offline.py` (ağ engelli) → **Ran 540 tests … OK**, ağ denemesi 0. Log: `baslangic_testleri_main_60ff0b2.log` |
+
+## F1. Bulguların doğrulanması
+
+Kanıt yöntemi: bulgu başına önce **doğru davranışı tarif eden** test yazıldı (`tests/test_faz1_dogrulama.py`) ve
+düzeltmeden önceki kodda çalıştırıldı. Sonuç: **16 testin 15'i başarısız, 1'i geçti.** Log:
+`bulgu_kaniti_once.log`.
+
+| Bulgu | Sonuç | Kanıt (düzeltme öncesi) |
+|---|---|---|
+| **A. Doğrudan TP2 açılışında TP1 etiketi** | ✅ **Doğrulandı, beklenenden geniş.** `journal.evaluate` açılış ≥ TP2 olduğunda tamamını TP2'de kapatıyor ama `tp1_goruldu=False` bırakıyor. Etiket tanımları farklıydı: `ready.performance`, `tracker.performance` ve `tp1_model.live_check` "tp1_goruldu **veya** sonuç TP2" kullanıyor (doğru); `defter.ozet` ve **araştırma etiketleme** (`etiketle.py` satır 83, eğitim etiketi y) yalnız `tp1_goruldu` kullanıyordu (yanlış). | Test: sonuç "TP2" iken `tp1_goruldu` False. Eğitim verisinde etkilenen plan sayıları F4'te. |
+| **B. Maliyetin sonuçlandırma günündeki ayardan okunması** | ✅ **Doğrulandı.** `defter.sonuclandir` komisyon ve kaymayı her çalıştırmada `pipeline.load_settings()`'ten okuyordu. Tahmin satırında sözleşme yoktu. | Kod incelemesi; `test_costs_frozen_at_prediction_time`: alan yok (KeyError) |
+| **C. Sürüm gruplarının birleşmesi** | ✅ **Doğrulandı.** `defter.ozet(model_surum)`, aynı modelde farklı özellik veya parametre sürümünü yalnız uyarıyla aynı hesapta topluyordu. | Kod (`surum_uyarisi` sonrası tüm satırlar hesaplanıyordu); test |
+| **D. Eksik giriş günü verisi** | ✅ **Doğrulandı.** Giriş günü mumu yok, sonraki günler varken değiştirilemez "girissiz" sonucu yazılıyordu. | Test: sonuç satırı oluştu (`is not None` başarısız) |
+| **E. MAE/MFE penceresi** | ✅ **Doğrulandı.** Çıkış mumunun tamamı kullanılıyordu; çıkıştan sonraki hareketler de hesaba giriyordu. | Açılışta stop: beklenen −1,5 R, kod −3,0 R. Gün içi stop: beklenen −1,0, kod −2,0. Giriş günü SL: beklenen −1,0, kod −2,5. |
+| **F. Backtest ile canlı karşılaştırma** | ✅ **Doğrulandı.** Panel, modeldeki eğitim tablosu "benzer durum oranını" "Geçmiş ↔ canlı" başlığıyla gösteriyordu. Bu dönem dışı değil; haber şartı da yok. | Kod (`beklenti.gecmis_benzer_oran_%`); test |
+| **G. Kayıt hatalarının görünürlüğü** | ✅ **Doğrulandı.** `ready._store` `defter.kaydet` sonucunu yok sayıyordu; "hata", "veri_yok" ve "model_yok" hiçbir yerde görünmüyordu. | Kod; test (`defter_olay` ve `kapsam` yok) |
+| Kabul 3: eşzamanlı yazma | ✅ **Zaten sağlanıyordu.** 4 eşzamanlı yazıcı → tek satır (`UNIQUE` + `INSERT OR IGNORE`). | `test_concurrent_writers_single_row` düzeltmeden önce de **geçti** |
+| Kabul 9: bağımlı örnekler | ✅ **Eksikti.** Güven etiketi yalnız örnek sayısına bakıyordu. | Test |
+
+## F2. Yapılan düzeltmeler
+
+**A — TP1 olayı:**
+
+- `journal.evaluate` çıktısına `tp1_hedefi` alanı eklendi. Anlamı: TP1 hedefine SL'den önce ulaşıldı, doğrudan TP2
+  açılışı dahil.
+- `tp1_goruldu`'nun anlamı **değişmedi** ("TP1'de yarısı satıldı"); onu kullanan sanal işlem, takip ve rapor
+  davranışları aynı kaldı.
+- Defter TP1 olayını `tp1_olayi` olarak kaydeder ve ölçer.
+- `etiketle.py` artık `tp1_hedefi` kullanıyor; **yeniden çalıştırılmadı**. Mevcut `etiket3.csv` ve `tp1_v1`
+  değişmedi.
+
+**B — Değerlendirme sözleşmesi:**
+
+- Yeni tahminlere tahmin anında `kural_surum` (s2), `komisyon_pct`, `kayma_pct` ve `maliyet_protokol`
+  ("ayar_tahmin_ani_v1") yazılır.
+- Sonuçlandırma bunları kullanır. Sonradan ayar değişse de geçmiş tahminin sonucu değişmez.
+- Eski kayıtlarda bu alanlar **boş kalır** (doldurulmaz). Sonuç satırında kullanılan maliyetin kaynağı açıkça
+  yazılır:
+  - `tahmin_sozlesmesi`,
+  - `s1_sonuclandirma_ayari`,
+  - `sozlesme_eksik_sonuclandirma_ani_ayari`.
+
+**C — Sürüm grupları:**
+
+- `defter.gruplar()` gruplama anahtarı: model × özellik × parametre × kural × maliyet protokolü (ve değerleri).
+- `defter.ozet()` artık yalnız **tek grup** kabul eder; model sürümüyle çağrılırsa `TypeError` verir.
+- Panel grupları yan yana tablo hâlinde gösterir; birleşik bir rakam yoktur.
+- Sözleşmesi eksik eski kayıtlar "kural eksik · maliyet eksik" grubundadır.
+
+**D — Eksik veri:**
+
+- Giriş günü mumu yok ama sonraki günler varsa nihai sonuç **yazılmaz**.
+- Bu durum `veri_eksik` olarak sayılır; panelde ayrı kutuda görünür ve metriklere girmez.
+- Bir defter olayı yazılır (tahmin başına bir kez).
+- Veri gelince normal sonuçlandırılır.
+
+**E — MAE/MFE (yöntem "gunluk_s2"):**
+
+- **Pencere:**
+  - Giriş mumu (girişten sonra) ve aradaki mumlar **tam** alınır.
+  - Çıkış mumunda:
+    - açılışta çıkışsa yalnız açılış fiyatı,
+    - gün içi çıkışsa yalnız çıkış fiyatı,
+    - süre dolduysa (kapanışta çıkış) tam mum.
+- **R paydası:** planlanan risk (giriş − SL), `journal.evaluate`'teki R ile aynı.
+- **Yaklaşık işareti:** Gün içi çıkışlarda gerçek sıra günlük mumdan çıkarılamaz. Bu yüzden değer bir sınır ölçümüdür
+  ve `mae_mfe_yaklasik = 1` işaretlenir; panelde sayısı gösterilir.
+
+**F — Karşılaştırma:**
+
+- "Geçmişte benzer durumlar" karşılaştırması kaldırıldı.
+- Panelde yalnız model ↔ canlı **kalibrasyon** var.
+- "Dönem dışı geçmiş sınama ile karşılaştırma: **mevcut değil**" yazar. Gerekçe: araştırma evreni haber şartı
+  içermiyor; hazır fırsat seçim koşulları farklı; benzer oran eğitim tablosundan geliyor.
+
+**G — Görünürlük:**
+
+- Yeni `defter_olay` tablosu: yalnız eklenir, değiştirilemez, silinemez.
+- `kaydet` başarısızlıklarını yazar: kayıt hatası, veri yok, model yok. Anahtar (hazır fırsat, giriş günü) olduğu
+  için tekrar denemede olay çoğalmaz.
+- `defter.kapsam()` sonucu panelde "🧾 Kayıt kapsamı: x/y … eksik" bölümünde, eksik fırsatlar ve son olaylarla
+  gösterilir.
+- **Ek güvenlik düzeltmesi:** Hata yolundaki `rollback` kaldırıldı. Çağıran `_store`'un henüz kaydedilmemiş hazır
+  fırsat yazımını geri alırdı; bu, "akışı durdurma" kuralını bozardı.
+
+**Kabul 9:** Güven etiketi artık farklı giriş günü sayısına da bakar:
+
+| Koşul | Etiket |
+|---|---|
+| 30'dan az sonuç | "çok az örnek, karar verilmez" |
+| 20'den az farklı gün | "az bağımsız gün, karar verilmez" |
+| 100'den az sonuç ya da 60'tan az gün | "düşük güven" |
+| Diğer | "orta güven" |
+
+Panel, %90 aralıkların bağımsızlık varsaydığını yazar.
+
+**Eski s1 sonuçları:**
+
+- s1 ile yazılmış fiyat sonuçları değiştirilmez.
+- Bunlar için ayrı ve sürümlü `tahmin_degerlendirme` kaydı (s2) eklenir: `UNIQUE(tahmin_id, kural_surum)`, yalnız
+  eklenir.
+- Ölçüm s2 değerlendirmesini kullanır. s2 değerlendirmesi yoksa s1 sonucu metriğe girmez ("s1_bekliyor").
+- s1'in eksik veride yazdığı "girişsiz" sonucu "veri eksik" sayılır.
+
+## F3. Değiştirilen dosyalar
+
+| Dosya | Değişiklik |
+|---|---|
+| `bist_haber/journal.py` | +`tp1_hedefi` alanı (`tp2_gap`); başka davranış değişmedi |
+| `bist_haber/defter.py` | Kural s2; sözleşme; `olay()`; `mae_mfe()`; `_degerlendir()`; s1 → s2 ayrı değerlendirme; `gruplar()`, `grup_etiketi()`, `kapsam()`, `guven(n, gun)`; `ozet(grup)`. **Plan imzası değişmedi.** |
+| `bist_haber/db.py` | Sürüm 2 göçü (yalnız ekleme, yedekli, tek işlem): `V2_TAHMIN_COLS`, `V2_SONUC_COLS`, `V2_SCHEMA`, `_missing_v2()`, `migrate_tahmin()` |
+| `app.py` | Panel: sürüm grubu seçimi, grup tablosu, kayıt kapsamı ve olaylar, "Veri eksik" kutusu, s1 notu, güven (bağımsız gün), MAE/MFE notu, "dönem dışı karşılaştırma mevcut değil". `faz1-panel-etiket` değişiklikleri de dahil. |
+| `arastirma/asama6/etiketle.py` | Etiket `tp1_hedefi`; **çalıştırılmadı** |
+| `tests/test_faz1_dogrulama.py` | **YENİ**: 16 regresyon testi (A–G, kabul 3 ve 9, s1 → s2, v1 → v2 göçü) |
+| `tests/veri/tahmin_v1_semasi.sql` | **YENİ**: canlıdaki v1 şeması (göç testi fikstürü) |
+| `tests/test_defter.py` | `ozet` grup ile; D ve E'nin yeni beklentileri; fikstür s2 |
+| `tests/test_panel_flows.py` | Grup seçimi, "mevcut değil" notu; yeni test: kayıt hatası panelde görünür |
+
+## F4. Etkiler: metrikler ve araştırma etiketleri
+
+**Araştırma etiketleri** (`etiket3.csv`; yeniden etiketlenmedi, yalnız sayıldı):
+
+| Küme | Etkilenen plan | Olumlu oran |
+|---|---|---|
+| Kapanmış planlar (39.297) | **130 (%0,33)**: TP2 ile kapanıp y=0 | %28,82 → %29,15 |
+| Eğitim süzgeci (risk ≠ yüksek, stop ≥ %1; 34.665 plan) | **91 (%0,26)** | %29,31 → %29,57 |
+| Son 12 aylık sınama dönemi | 14 plan | — |
+
+- **tp1_v1 yeniden eğitilmedi**, raporlardaki ölçüler (AUC 0,605 / 0,612 vb.) eski etiketlerle hesaplanmış olarak
+  kalır.
+- Etkinin küçük olması beklenir, ama ölçülmedi.
+- Bir sonraki aylık yeniden eğitim (`yeniden_egit.py --etiket`) düzeltilmiş etiketle çalışır. O aday model de kapıdan
+  geçmek ve onay almak zorundadır.
+- Aşama 7 Kronos betiği (`kronos_yol.py`, biten araştırma) yalnız `tp1_goruldu` sayıyordu; sonuç (katkı yok)
+  değişmez, yeniden çalıştırılmadı.
+
+**Canlı metrikler:** Canlıda henüz sonuçlanmış tahmin **yok** (2 açık). Bu yüzden canlı metriklerde değişen bir
+değer yok.
+
+## F5. Şema değişikliği, yedek ve geri dönüş kanıtı
+
+**Canlı veritabanının kopyasında** sınandı. Canlı salt-okunur açıldı; kopya 36,7 MB, 22 tablo, 169.089 satır.
+
+| Adım | Sonuç |
+|---|---|
+| Göç | `guncellendi_v2`. Yedek `bist_haber_20261116_102656_tahmin_defteri_v2_oncesi.db`: integrity **ok**; yedek v1 hâlinde; yedek = göç öncesi |
+| Kayıtların korunması | **22/22 tablo birebir aynı.** tahmin ve tahmin_sonuc için eski sütunlar karşılaştırıldı; BAHKM ve ENERY tahminleri dahil. |
+| Eski kayıtların yeni alanları | (1, BAHKM, None, None, None, None), (2, ENERY, None, None, None, None). **Doldurulmadı.** |
+| Değiştirilemezlik | `UPDATE tahmin …`, `DELETE FROM tahmin`, `UPDATE tahmin SET kural_surum` reddedildi. `defter_olay` için ekleme kabul, güncelleme ve silme reddedildi. |
+| Gruplar ve kapsam | "tp1_v1 · özellik 97b3f4 · parametre 22b983 · kural eksik · maliyet eksik" (2). Kapsam 2/2. |
+| Sonuçlandırma | 2 incelendi, 0 yazıldı. 16.11 mumu kopyada henüz yok → açık. Eski alanlar yine aynı. |
+| Eski kodla açılış (main 60ff0b2) | `db.connect` "var"; hazır fırsat listesi, eski özet ve eski sonuçlandırma v2 şemasında çalıştı. Eski panelde Performans, Fırsatlar ve Dashboard **hatasız**. |
+| Geri dönüş 2. seviye | v2 tabloları (`defter_olay`, `tahmin_degerlendirme`) silindi; diğer tablolar aynı. Eklenen boş sütunlar zararsız kalır. |
+| Geri dönüş 3. seviye | Yedek geri kondu: integrity **ok**, göç öncesiyle **birebir aynı**, yapı v1 |
+| Canlı kontrol (sınama sonrası) | Canlı DB'de v2 sütunu ya da tablosu yok; tahmin 2, sonuç 0; v2 yedeği yok; canlı klasördeki kod s1 |
+
+Birim testinde de sınandı (`GocV2`): v1 şemalı, kullanıcı verili DB → yedek, v2 sütunları, eski satır aynı,
+tetikleyici korunuyor, ikinci açılışta tekrar yok.
+
+## F6. Testler
+
+| Komut | Sonuç |
+|---|---|
+| `python run_offline.py` (başlangıç, main 60ff0b2) | **540 test OK**, ağ 0 |
+| `python -m unittest tests.test_faz1_dogrulama` (düzeltme öncesi) | 16 test: **15 başarısız/hata, 1 geçti** (eşzamanlılık) |
+| `python -m unittest tests.test_faz1_dogrulama tests.test_defter` (düzeltme sonrası) | **35 test OK** |
+| `python -m unittest tests.test_panel_flows…test_faz1_ledger_panel_and_reruns_do_not_duplicate` | OK |
+| `python -m unittest tests.test_panel_flows…test_faz1_ledger_failure_visible_in_panel` | OK |
+| `python run_offline.py` (son, `faz1-dogrulama`) | **559 test OK**, ağ 0. Log: `tum_testler_faz1_dogrulama.log` |
+
+Yeni ve korunan kabul kriterleri testlerle:
+
+1. **Ayrı kavramlar:** `test_own_frozen_levels…`, hazır fırsat ve sanal işlem tablolarına dokunulmuyor.
+2. **Değiştirilemezlik:** tahmin, sonuç, değerlendirme ve olay tabloları.
+3. **Tekrar ve eşzamanlılık:** rerun, yeniden analiz ve eşzamanlı yazma → tek satır.
+4. **Yeni plan → yeni sürüm.**
+5. **Dondurulmuş seviyeler.**
+6. **Açık tahmin metrik dışı;** veri eksik metrik dışı.
+7. **Yalnız tahmin anındaki bilgi:** geç kayıt ve sonradan eklenen hariç.
+8. **Aynı mumda belirsizlik:** SL önce sayılır ve işaretlenir.
+9. **Bağımsız gün:** 40 sonuç / 1 gün → "karar verilmez".
+10. **Model, kural ve eşikler:** dokunulmadı. Diff'te `ready.py` seçim kodu, `tradeplan.py`, `tp1_v1.json` ve
+    `analyzer.py` yok.
+
+## F7. Canlıda henüz doğrulanmayanlar
+
+- **Bu düzeltmeler (s2, v2 şeması) canlıda değil.** Canlı hâlâ s1 kuralıyla çalışıyor. Bu akşamki analiz BAHKM ve
+  ENERY için s1 sonuç yazabilir; örneğin giriş günü SL gerçekleşirse MAE s1 yöntemiyle yazılır. s2 canlıya
+  alınınca bu satırlar **değiştirilmez**; ayrı s2 değerlendirmesi eklenir ve ölçüm onu kullanır.
+- **Gerçek sonuçlanma döngüsü canlıda henüz görülmedi:** girişsiz ya da açık pozisyon, TP, SL, süre dolması.
+- **Canlı veritabanında v2 göçü yapılmadı.** Onayla ve elle yedekle yapılacak.
+
+## F8. FAZ 1 kabulü için kalan işler
+
+1. **Kullanıcı onayı:** `faz1-dogrulama` dalının canlıya alınması. Adımlar:
+   - Halley'i kapat,
+   - elle yedek al,
+   - göçü tek süreçte kontrollü çalıştır,
+   - önce/sonra özetleri karşılaştır,
+   - Halley'i başlat.
+2. **Canlıda gerçek döngü:**
+   - akşam analizi → sonuçlandırma: girişsiz ya da açık,
+   - eski (s1) sonuç varsa s2 değerlendirmesinin eklenmesi,
+   - yeni tahminlerin sözleşmeli (s2) yazılması,
+   - panel ile veritabanının eşleşmesi.
+3. Bu kanıtlarla FAZ 1 kabul raporu. **Karar kullanıcıda.**
+4. **Ortam notu:** Gece uyku modu Halley'i ve bekçileri durdurdu (Ek E4). Kabul döngüsü için bilgisayarın açık kalması
+   gerekiyor.
+
+Faz sırası korunuyor:
+
+1. Defter ve kabul (sürüyor)
+2. Portföy simülatörü
+3. Metrikler, MAE/MFE ve veri
+4. Strateji × rejim
+5. 5/10 günlük hedefler
+6. Bozulma uyarıları ve hız
+7. Vadeler

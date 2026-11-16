@@ -1890,3 +1890,8 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Testler: test_defter.KayitZamani (kural + filtre; kayıtlar birebir aynı), panel testine etiket/filtre kontrolü.
   542 test OK. Prova kopyasında (08:30, etiket 'aksam', 2 tahmin): Planı üreten Akşam = 2, Kayıt Sabah = 2, Kayıt
   Akşam = 0; tahmin kayıtları değişmedi; panel hatasız.
+
+## 2026-11-16 — FAZ 1 dış inceleme bulguları A–G (dal: faz1-dogrulama; CANLIYA ALINMADI)
+- Başlangıç main 60ff0b2: 540 test OK. Bulgu testleri düzeltme öncesi 15/16 başarısız (eşzamanlılık zaten sağlanıyordu).
+- Düzeltmeler: journal.tp1_hedefi (+etiketle; yeniden çalıştırılmadı; 34.665 eğitim planının 91i etkilenir), değerlendirme sözleşmesi (kural s2, komisyon, kayma, protokol), sürüm grupları (ozet tek grup), veri_eksik (nihai yazılmaz), MAE/MFE gunluk_s2 penceresi, dönem dışı karşılaştırma yok notu, defter_olay + kapsam, güven = örnek + bağımsız gün, s1 sonuçları için ayrı tahmin_degerlendirme (s1 değişmez). Hata yolundaki rollback kaldırıldı (hazır fırsatı geri alırdı).
+- Şema v2 (yalnız ekleme, yedekli, tek işlem). Canlı kopyada: 22/22 tablo aynı, eski alanlar boş kaldı, eski kod (60ff0b2) hatasız açtı, geri dönüş 2-3 birebir. Canlı DB v1, dokunulmadı. 559 test OK. Ayrıntı: HALLEY2_DENETIM_RAPORU Ek F.

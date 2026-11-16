@@ -297,7 +297,8 @@ class PanelFlowTests(unittest.TestCase):
         self.assertEqual(len(at.exception), 0, str(at.exception))
         md_ = " ".join(m.value for m in at.markdown)
         self.assertIn("Model canlı performansı", md_)
-        self.assertEqual(at.selectbox(key="ml_model").value, "tp1_v1")
+        self.assertEqual(at.selectbox(key="ml_grup").value, 0)        # Ek F-C: sürüm grubu seçimi (model × özellik × …)
+        self.assertIn("mevcut değil", " ".join(c_.value for c_ in at.caption))   # Ek F-F: dönem dışı referans yok
         # 16.11: "Planı üreten analiz" etiketi ve ayrı "Kayıt zamanı" filtresi (Sabah / Akşam / Tümü)
         self.assertEqual(at.selectbox(key="ml_ana").label, "Planı üreten analiz")
         self.assertEqual((at.selectbox(key="ml_kayit").label, at.selectbox(key="ml_kayit").options),
@@ -312,8 +313,30 @@ class PanelFlowTests(unittest.TestCase):
         c = db.connect()
         self.assertEqual(c.execute("SELECT COUNT(*) FROM tahmin").fetchone()[0], 1)
         self.assertIsNotNone(c.execute("SELECT model_json FROM hazir_firsat").fetchone()[0])   # gösterim alanı doldu
-        self.assertEqual(defter.ozet(c, "tp1_v1")["sayilar"]["acik"], 1)
+        self.assertEqual(defter.ozet(c, defter.gruplar(c)[0]["grup"])["sayilar"]["acik"], 1)
         c.close()
+
+    def test_faz1_ledger_failure_visible_in_panel(self):
+        """Ek F-G: tahmin kaydı başarısız olursa hazır fırsat yine yazılır, hata panelde görünür (kayıt kapsamı eksik)."""
+        from bist_haber import tp1_model
+        c = db.connect()
+        sd = c.execute("SELECT MAX(date) FROM prices WHERE ticker='POS'").fetchone()[0]
+        e = c.execute("SELECT close FROM prices WHERE ticker='POS' AND date=?", (sd,)).fetchone()[0]
+        p = {"ticker": "POS", "signal_day": sd, "tur": "geri_cekilme", "kapanis": e, "giris": e, "giris_alt": e * 0.99,
+             "azami_giris": e * 1.01, "sl": e * 0.95, "tp1": e * 1.1, "tp2": e * 1.15, "rr1": 2.0, "vade_lo": 3,
+             "vade_hi": 8, "haber_skoru": 3.0, "teknik_skor": 6, "risk": "orta", "neden": "deneme", "kaynak": "haber",
+             "genel_puan": 55}
+        with patch.object(tp1_model, "plan_context", side_effect=RuntimeError("bozuk girdi")):
+            ready._store(c, p, "aksam", (date.today() + timedelta(days=1)).isoformat(), "aday", datetime.now(config.TR_TZ))
+        c.commit()
+        self.assertEqual(c.execute("SELECT COUNT(*) FROM hazir_firsat").fetchone()[0], 1)   # akış durmadı
+        self.assertEqual(c.execute("SELECT COUNT(*) FROM tahmin").fetchone()[0], 0)
+        c.close()
+        at = self.app("🏁 Performans")
+        self.assertEqual(len(at.exception), 0, str(at.exception))
+        labels = [x.label for x in at.expander]
+        self.assertTrue(any("Kayıt kapsamı: 0/1" in l and "1 eksik" in l for l in labels), labels)
+        self.assertTrue(any("tahmin kaydedilemedi" in w.value for w in at.warning))
 
     def test_stage5_chart_and_cone_on_stock_page(self):
         """2026-11-15 Aşama 5: Hisse Analizi'nde grafik çizilir, koni açıklaması ve dönem/koni seçimi çalışır."""

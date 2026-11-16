@@ -80,7 +80,10 @@ def work(tk):
         if res.get("durum") != "kapandı":
             row.update(sonuc="acik", y="", r="", net="", gun="")
         else:
-            row.update(sonuc=res["sonuc"], y=int(bool(res["tp1_goruldu"])), r=res["r"], net=res["net_getiri_pct"],
+            # 16.11 (Ek F-A): etiket = TP1 hedefine SL'den önce ulaşıldı (doğrudan TP2 açılışı dahil). Önceki
+            # etiketler (etiket3.csv, tp1_v1) yalnız tp1_goruldu kullanıyordu: 34.665 eğitim planının 91'i (%0,26) y=0 idi.
+            row.update(sonuc=res["sonuc"], y=int(bool(res.get("tp1_hedefi", res["tp1_goruldu"]))), r=res["r"],
+                       net=res["net_getiri_pct"],
                        gun=res["islem_gunu"])
         out.append(row)
     return out

@@ -2502,22 +2502,49 @@ def page_performans() -> None:
 
 
 def model_live_panel() -> None:
-    """FAZ 1 (2026-11-16): tahmin defterinden modelin canlı performansı. Yalnız okuma; tek model sürümü seçilir
-    (sürümler karıştırılmaz); yalnız sonuçlanmış tahminler metriklere girer."""
+    """FAZ 1 (2026-11-16; Ek F): tahmin defterinden modelin canlı performansı. Yalnız okuma. Performans TEK bir sürüm
+    grubu (model × özellik × parametre × sonuçlandırma kuralı × maliyet protokolü) için hesaplanır; gruplar yan yana
+    gösterilir, tek rakamda birleştirilmez. Yalnız sonuçlanmış tahminler metriklere girer."""
     from bist_haber import defter
     section_title("🎯", "Model canlı performansı (tahmin defteri)",
                   note="öneri anında değiştirilemez biçimde kaydedilen tahminler")
     if not defter.tablo_var(conn):
         st.caption("Tahmin defteri henüz etkin değil (veritabanı göçü yapılmadı ya da yedek alınamadı).")
         return
-    vers = defter.model_surumleri(conn)
-    if not vers:
+    kp = defter.kapsam(conn)
+    if kp["eksik"] or kp["olaylar"]:
+        with st.expander(f"🧾 Kayıt kapsamı: {kp['tahminli']}/{kp['hazir_firsat']} hazır fırsatın tahmini var"
+                         + (f" · {kp['eksik']} eksik" if kp["eksik"] else "")):
+            if kp["eksik"]:
+                st.warning("Bazı hazır fırsatlar için tahmin kaydedilemedi; performans kaydı bu fırsatları içermez. "
+                           "Bir sonraki analizde yeniden denenir (aynı tahmin iki kez yazılmaz).")
+                st.dataframe(pd.DataFrame([{"Hisse": h["ticker"], "Giriş günü": h["giris_gunu"], "Durum": h["durum"]}
+                                           for h in kp["eksikler"]]), hide_index=True, width="stretch")
+            if kp["olaylar"]:
+                st.markdown("**Son defter olayları**")
+                st.dataframe(pd.DataFrame([{"Zaman": o_["zaman"][:16].replace("T", " "), "Olay": o_["olay"],
+                                            "Hisse": o_["ticker"] or "", "Açıklama": o_["mesaj"] or ""}
+                                           for o_ in kp["olaylar"]]), hide_index=True, width="stretch")
+    gs = defter.gruplar(conn)
+    if not gs:
         st.caption("Henüz kaydedilmiş tahmin yok. İlk tahminler bir sonraki akşam analizinde ya da sabah kontrolünde "
                    "hazır fırsatlarla birlikte kaydedilir.")
         return
-    f1, f2, f3, f4, f6, f5 = st.columns([1.4, 1.1, 1.3, 1.2, 1.1, 1.3])
-    ms = f1.selectbox("Model sürümü", [v["model_surum"] for v in vers], key="ml_model",
-                      format_func=lambda m: f"{m} ({next(v['n'] for v in vers if v['model_surum'] == m)} tahmin)")
+    if len(gs) > 1:
+        st.info(f"{len(gs)} ayrı sürüm grubu var (model / özellik / parametre / sonuçlandırma kuralı / maliyet). "
+                "Performans her grup için ayrı hesaplanır; aşağıdaki tablo yan yana karşılaştırmadır, birleşik rakam yoktur.")
+        tbl = []
+        for g in gs:
+            o_ = defter.ozet(conn, g["grup"])
+            tbl.append({"Grup": defter.grup_etiketi(g["grup"]), "Tahmin": g["n"], "Sonuçlanan": o_["olculen"],
+                        "TP1 %": (o_["metrik"] or {}).get("tp1_%"), "Brier": (o_["metrik"] or {}).get("brier"),
+                        "Güven": o_["guven"]})
+        st.dataframe(pd.DataFrame(tbl).astype(str), hide_index=True, width="stretch")
+    f1, f2, f3, f4, f6, f5 = st.columns([1.8, 1.0, 1.2, 1.1, 1.0, 1.2])
+    gi = f1.selectbox("Sürüm grubu", list(range(len(gs))), key="ml_grup",
+                      format_func=lambda i: f"{defter.grup_etiketi(gs[i]['grup'])} ({gs[i]['n']} tahmin)",
+                      help="Model × özellik × parametre × sonuçlandırma kuralı × maliyet protokolü. Sözleşmesi eksik "
+                           "eski kayıtlar ayrı ('maliyet eksik', 'kural eksik') gruptadır.")
     kay = {"Hepsi": None, "📰 Haberli": "haber", "📐 Yalnız teknik": "teknik"}[
         f2.selectbox("Kaynak", ["Hepsi", "📰 Haberli", "📐 Yalnız teknik"], key="ml_kay")]
     tur_s = f3.selectbox("Senaryo türü", ["Hepsi"] + list(ready.TYPE_NAMES), key="ml_tur",
@@ -2531,24 +2558,29 @@ def model_live_panel() -> None:
              "'Sabah', giriş gününden önce (akşam analizi, gece yarısını geçse bile) ise 'Akşam'.")]
     bel = f5.toggle("Aynı mumda TP/SL olanları dahil et", value=True, key="ml_bel",
                     help="Günlük mumda hem TP1 hem SL görüldüyse gerçekleşme sırası bilinmez; kural SL'yi önce sayar.")
-    o = defter.ozet(conn, ms, kaynak=kay, tur=None if tur_s == "Hepsi" else tur_s, analiz=ana, belirsiz_dahil=bel,
-                    kayit=kyt)
+    o = defter.ozet(conn, gs[gi]["grup"], kaynak=kay, tur=None if tur_s == "Hepsi" else tur_s, analiz=ana,
+                    belirsiz_dahil=bel, kayit=kyt)
     sy = o["sayilar"]
-    k = st.columns(6)
+    k = st.columns(7)
     k[0].metric("Tahmin", sy["tahmin"])
     k[1].metric("Sonuçlanan", sy["tamamlandi"])
     k[2].metric("Açık", sy["acik"], help="Henüz sonuçlanmadı; metriklere girmez.")
-    k[3].metric("Giriş olmadı", sy["girissiz"])
-    k[4].metric("İptal / yerini aldı", sy["iptal"] + sy["yerini_aldi"])
-    k[5].metric("Aynı mumda TP/SL", sy["belirsiz"])
-    if o["surum_uyarisi"]:
-        st.warning(o["surum_uyarisi"])
+    k[3].metric("Veri eksik", sy["veri_eksik"], help="Giriş günü fiyat mumu yok ama sonraki günler var: veri "
+                "doğrulanmadan nihai sonuç yazılmaz; metriklere girmez.")
+    k[4].metric("Giriş olmadı", sy["girissiz"])
+    k[5].metric("İptal / yerini aldı", sy["iptal"] + sy["yerini_aldi"])
+    k[6].metric("Aynı mumda TP/SL", sy["belirsiz"])
+    if sy.get("s1_bekliyor"):
+        st.caption(f"{sy['s1_bekliyor']} tahminin sonucu eski kuralla (s1) yazılmış; güncel kuralla ayrı "
+                   "değerlendirmesi oluşana kadar metriklere girmez (eski kayıt değiştirilmez).")
     if sy["sonradan"] or sy["gec_kayit"]:
         st.caption(f"Ana hesaba katılmayan: sonradan eklenen {sy['sonradan']}, açılıştan sonra kaydedilen {sy['gec_kayit']} "
                    "tahmin (tahmin zamanından sonraki bilgi kullanılmasın diye).")
-    st.caption(f"Güven: **{o['guven']}** ({o['olculen']} sonuçlanmış tahmin; 30'dan azken karar verilmez, 100 ve üstü "
-               "orta güven).")
+    st.caption(f"Güven: **{o['guven']}** ({o['olculen']} sonuçlanmış tahmin, {o['bagimsiz_gun']} farklı giriş günü; "
+               "karar için en az 30 sonuç ve 20 farklı gün gerekir — aynı günün tahminleri birbirine bağlıdır). "
+               + o["aralik_notu"])
     if not o["metrik"]:
+        st.caption("Dönem dışı geçmiş sınama ile karşılaştırma: **mevcut değil.** " + defter.DONEM_DISI_GEREKCE)
         return
     m_ = o["metrik"]
     rng = lambda v: f"%{v[0]:g}–%{v[1]:g}" if v else "—"
@@ -2557,6 +2589,9 @@ def model_live_panel() -> None:
         "Ort. tahmin %": m_["ort_tahmin_%"], "Beklenen R": m_["beklenen_R"], "Ort. net %": m_["ort_net_%"],
         "Brier": m_["brier"], "Log loss": m_["log_loss"], "Ort. MAE (R)": m_["ort_mae_r"], "Ort. MFE (R)": m_["ort_mfe_r"],
         "Ort. işlem günü": m_["ort_islem_gunu"]}]).astype(str), hide_index=True, width="stretch")
+    st.caption("TP1 = TP1 hedefine SL'den önce ulaşıldı (doğrudan TP2 açılışı dahil). MAE/MFE günlük mumlardan, yalnız "
+               "pozisyon süresince; gün içi çıkışlarda sıra bilinmediği için yaklaşık "
+               f"({m_['mae_mfe_yaklasik']} tahminde). R paydası: planlanan risk (giriş − SL).")
     if o["kalibrasyon"]:
         st.markdown("**Kalibrasyon** (modelin söylediği ↔ gerçekleşen, bantlara göre)")
         st.dataframe(pd.DataFrame([{"Bant": c["bant"], "Tahmin": c["n"], "Ort. tahmin %": c["ort_tahmin_%"],
@@ -2568,9 +2603,9 @@ def model_live_panel() -> None:
         st.dataframe(pd.DataFrame([{"Rejim": r["rejim"], "Tahmin": r["n"], "TP1 %": r["tp1_%"], "Ort. R": r["ort_R"],
                                     "Güven": r["guven"]} for r in o["rejim"]]).astype(str), hide_index=True, width="stretch")
     b_ = o["beklenti"]
-    st.caption(f"Geçmiş ↔ canlı: model ortalama %{b_['model_ort_tahmin_%']:g} dedi"
-               + (f", geçmişte benzer durumlarda gerçekleşen %{b_['gecmis_benzer_oran_%']:g}" if b_["gecmis_benzer_oran_%"] is not None else "")
-               + f"; canlıda gerçekleşen %{b_['canli_tp1_%']:g} ({rng(b_['canli_tp1_%90'])}). {b_['not']}")
+    st.caption(f"Model ↔ canlı (kalibrasyon): model ortalama %{b_['model_ort_tahmin_%']:g} dedi; canlıda gerçekleşen "
+               f"%{b_['canli_tp1_%']:g} ({rng(b_['canli_tp1_%90'])}). {b_['not']}")
+    st.caption("Dönem dışı geçmiş sınama ile karşılaştırma: **mevcut değil.** " + b_["donem_disi_gerekce"])
 
 
 def ai_usage_panel() -> None:

@@ -124,6 +124,7 @@ def evaluate(rec: Dict, bars: List[Dict], commission_pct: float = DEFAULT_COMMIS
             return {"durum": "bekliyor", "olaylar": []}
         limit_day = kind != "kirilim"
     stop, half_done, legs = sl, False, []   # legs: (pay, çıkış fiyatı, neden)
+    tp2_gap = False                          # 16.11 (Ek F-A): TP1'e hiç dokunmadan doğrudan TP2 üstünde açılış
     held = bars[fill_i:fill_i + MAX_HOLD]
     exit_idx = None
     for j, b in enumerate(held):
@@ -141,6 +142,7 @@ def evaluate(rec: Dict, bars: List[Dict], commission_pct: float = DEFAULT_COMMIS
         if not half_done and o >= tp1:
             if o >= tp2:
                 legs.append((1.0, o, "TP2 (açılışta)"))
+                tp2_gap = True
                 break
             legs.append((0.5, o, "TP1 (açılışta, yarısı)"))
             half_done, stop = True, fill
@@ -161,8 +163,10 @@ def evaluate(rec: Dict, bars: List[Dict], commission_pct: float = DEFAULT_COMMIS
             legs.append((0.5, tp2, "TP2"))
             break
     exited = sum(p for p, _, _ in legs)
+    # tp1_goruldu: TP1'de yarısı satıldı (anlamı DEĞİŞMEDİ). tp1_hedefi: TP1 hedefine SL'den önce ulaşıldı —
+    # doğrudan TP2 açılışında yarı satış olmasa da hedef geçilmiştir (canlı ölçüm ve eğitim etiketi bunu kullanır).
     out = {"giris_gunu": bars[fill_i]["date"], "giris_fiyati": round(fill, 4), "olaylar": log,
-           "tp1_goruldu": half_done, "stop": round(stop, 4)}
+           "tp1_goruldu": half_done, "tp1_hedefi": half_done or tp2_gap, "stop": round(stop, 4)}
     if exited < 0.999:
         if len(held) >= MAX_HOLD:
             last = held[-1]

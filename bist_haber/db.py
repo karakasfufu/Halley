@@ -408,6 +408,62 @@ BEGIN SELECT RAISE(ABORT, 'tahmin sonucu değiştirilemez'); END;
 CREATE TRIGGER IF NOT EXISTS tahmin_sonuc_no_delete BEFORE DELETE ON tahmin_sonuc
 BEGIN SELECT RAISE(ABORT, 'tahmin sonucu silinemez'); END;
 """
+# Sürüm 2 (16.11.2026, Ek F): YALNIZ EKLEME. Mevcut satırlar değiştirilmez; yeni sütunlar eski satırlarda boş (NULL)
+# kalır (geçmiş bilgi uydurulmaz). Tetikleyiciler korunur (ALTER TABLE ADD COLUMN tetikleyici çalıştırmaz).
+V2_TAHMIN_COLS = (("kural_surum", "TEXT"), ("komisyon_pct", "REAL"), ("kayma_pct", "REAL"), ("maliyet_protokol", "TEXT"))
+V2_SONUC_COLS = (("tp1_olayi", "INTEGER"), ("komisyon_pct", "REAL"), ("kayma_pct", "REAL"), ("maliyet_kaynagi", "TEXT"),
+                 ("mae_mfe_yontem", "TEXT"), ("mae_mfe_yaklasik", "INTEGER"))
+V2_SCHEMA = """
+CREATE TABLE IF NOT EXISTS tahmin_degerlendirme (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    tahmin_id          INTEGER NOT NULL REFERENCES tahmin(id),
+    kural_surum        TEXT NOT NULL,
+    sonuc_turu         TEXT NOT NULL,
+    neden              TEXT,
+    giris_gunu_gercek  TEXT,
+    giris_fiyati       REAL,
+    tp1_goruldu        INTEGER,
+    tp1_olayi          INTEGER,
+    sl_goruldu         INTEGER,
+    cikis_nedeni       TEXT,
+    cikis_gunu         TEXT,
+    islem_gunu         INTEGER,
+    net_getiri_pct     REAL,
+    r                  REAL,
+    mae_r              REAL,
+    mfe_r              REAL,
+    mae_mfe_yontem     TEXT,
+    mae_mfe_yaklasik   INTEGER,
+    ayni_gun_belirsiz  INTEGER NOT NULL DEFAULT 0,
+    belirsiz_gunler    TEXT,
+    komisyon_pct       REAL,
+    kayma_pct          REAL,
+    maliyet_kaynagi    TEXT,
+    ayrinti_json       TEXT,
+    gerekce            TEXT,
+    degerlendirme_zamani TEXT NOT NULL,
+    UNIQUE (tahmin_id, kural_surum)
+);
+CREATE TRIGGER IF NOT EXISTS tahmin_degerlendirme_no_update BEFORE UPDATE ON tahmin_degerlendirme
+BEGIN SELECT RAISE(ABORT, 'tahmin değerlendirmesi değiştirilemez'); END;
+CREATE TRIGGER IF NOT EXISTS tahmin_degerlendirme_no_delete BEFORE DELETE ON tahmin_degerlendirme
+BEGIN SELECT RAISE(ABORT, 'tahmin değerlendirmesi silinemez'); END;
+CREATE TABLE IF NOT EXISTS defter_olay (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    zaman            TEXT NOT NULL,
+    olay             TEXT NOT NULL,
+    anahtar          TEXT NOT NULL UNIQUE,
+    tahmin_id        INTEGER,
+    hazir_firsat_id  INTEGER,
+    ticker           TEXT,
+    giris_gunu       TEXT,
+    mesaj            TEXT
+);
+CREATE TRIGGER IF NOT EXISTS defter_olay_no_update BEFORE UPDATE ON defter_olay
+BEGIN SELECT RAISE(ABORT, 'defter olayı değiştirilemez'); END;
+CREATE TRIGGER IF NOT EXISTS defter_olay_no_delete BEFORE DELETE ON defter_olay
+BEGIN SELECT RAISE(ABORT, 'defter olayı silinemez'); END;
+"""
 USER_TABLES = ("news", "hazir_firsat", "trade_journal", "watchlist")
 TAHMIN_GOC = {"durum": None, "yedek": None, "hata": None}   # son göç denemesi (panel ve testler okur)
 
@@ -422,21 +478,43 @@ def _has_user_data(conn) -> bool:
     return False
 
 
+def _tables(conn) -> set:
+    return {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+
+
+def _missing_v2(conn) -> List[str]:
+    """Sürüm 2 için eksik parçalar (boşsa tahmin defteri günceldir)."""
+    tabs = _tables(conn)
+    if "tahmin" not in tabs:
+        return ["tahmin"]
+    out = []
+    tc = {r[1] for r in conn.execute("PRAGMA table_info(tahmin)")}
+    sc = {r[1] for r in conn.execute("PRAGMA table_info(tahmin_sonuc)")} if "tahmin_sonuc" in tabs else set()
+    out += [f"tahmin.{c}" for c, _ in V2_TAHMIN_COLS if c not in tc]
+    out += [f"tahmin_sonuc.{c}" for c, _ in V2_SONUC_COLS if c not in sc]
+    out += [t for t in ("tahmin_degerlendirme", "defter_olay") if t not in tabs]
+    return out
+
+
 def migrate_tahmin(conn, path) -> Dict:
-    """Tahmin defteri tablolarını ekler (yalnız EKLEME; mevcut tablolara dokunmaz). Tablo zaten varsa hiçbir şey
-    yapmaz. Kullanıcı verisi varsa ÖNCE tutarlı yedek alınır ve doğrulanır (PRAGMA integrity_check); yedek
-    alınamazsa ya da bozuksa göç YAPILMAZ (Halley bugünkü gibi çalışır, defter kapalı kalır)."""
+    """Tahmin defteri tablolarını ekler ya da sürüm 2'ye günceller (yalnız EKLEME; mevcut tablo/satırlara dokunmaz).
+    Güncelse hiçbir şey yapmaz. Kullanıcı verisi varsa ÖNCE tutarlı yedek alınır ve doğrulanır (PRAGMA
+    integrity_check); yedek alınamazsa ya da bozuksa göç YAPILMAZ (Halley bugünkü gibi çalışır). Tek işlemde yapılır;
+    hata olursa tamamı geri alınır."""
     from datetime import datetime as _dt
-    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='tahmin'").fetchone():
+    eksik = _missing_v2(conn)
+    if not eksik:
         TAHMIN_GOC.update(durum="var", yedek=None, hata=None)
         return dict(TAHMIN_GOC)
+    yeni = eksik == ["tahmin"]
+    etiket = "tahmin_defteri_oncesi" if yeni else "tahmin_defteri_v2_oncesi"
     yedek = None
     try:
         if path is not None and str(path) != ":memory:" and _has_user_data(conn):
             p = Path(path)
             ydir = p.parent / "yedek"
             ydir.mkdir(parents=True, exist_ok=True)
-            yedek = ydir / f"{p.stem}_{_dt.now():%Y%m%d_%H%M%S}_tahmin_defteri_oncesi.db"
+            yedek = ydir / f"{p.stem}_{_dt.now():%Y%m%d_%H%M%S}_{etiket}.db"
             conn.commit()
             dst = sqlite3.connect(yedek)
             try:
@@ -453,7 +531,15 @@ def migrate_tahmin(conn, path) -> Dict:
     try:
         conn.commit()
         conn.execute("BEGIN")
-        for stmt in _split_sql(TAHMIN_SCHEMA):
+        if yeni:
+            for stmt in _split_sql(TAHMIN_SCHEMA):
+                conn.execute(stmt)
+        for tbl, cols in (("tahmin", V2_TAHMIN_COLS), ("tahmin_sonuc", V2_SONUC_COLS)):
+            have = {r[1] for r in conn.execute(f"PRAGMA table_info({tbl})")}
+            for c, typ in cols:
+                if c not in have:
+                    conn.execute(f"ALTER TABLE {tbl} ADD COLUMN {c} {typ}")
+        for stmt in _split_sql(V2_SCHEMA):
             conn.execute(stmt)
         conn.execute("COMMIT")
     except Exception as e:
@@ -463,7 +549,7 @@ def migrate_tahmin(conn, path) -> Dict:
             pass
         TAHMIN_GOC.update(durum="goc_hatasi", yedek=str(yedek) if yedek else None, hata=str(e)[:200])
         return dict(TAHMIN_GOC)
-    TAHMIN_GOC.update(durum="olusturuldu", yedek=str(yedek) if yedek else None, hata=None)
+    TAHMIN_GOC.update(durum="olusturuldu" if yeni else "guncellendi_v2", yedek=str(yedek) if yedek else None, hata=None)
     return dict(TAHMIN_GOC)
 
 

@@ -15,6 +15,13 @@ from tests.test_tp1_model import bars
 TR = config.TR_TZ
 
 
+def oz(conn, model="tp1_v1", **k):
+    """Tek sürüm grubu için özet (model sürümüyle birleşik hesap artık yok; Ek F-C)."""
+    gs = [x["grup"] for x in defter.gruplar(conn) if x["grup"]["model_surum"] == model]
+    assert len(gs) == 1, gs
+    return defter.ozet(conn, gs[0], **k)
+
+
 def at(day: str, hm: str) -> datetime:
     return datetime.fromisoformat(f"{day}T{hm}:00").replace(tzinfo=TR)
 
@@ -145,7 +152,10 @@ class Sonuc(Base):
                          ("tamamlandi", 1, 0, "TP2", 3))
         self.assertGreater(s["r"], 0)
         self.assertAlmostEqual(s["mae_r"], -0.5, places=3)               # en düşük e − a; risk 2a
-        self.assertAlmostEqual(s["mfe_r"], 3.25, places=3)               # en yüksek e + 6,5a
+        # s2 (Ek F-E): TP2 gün içinde gerçekleşti → çıkış mumunda yalnız çıkış fiyatı (e + 6a); mumun zirvesi
+        # (e + 6,5a) çıkıştan sonradır. Gün içi çıkış olduğu için "yaklaşık" işaretli.
+        self.assertAlmostEqual(s["mfe_r"], 3.0, places=3)
+        self.assertEqual((s["mae_mfe_yaklasik"], s["tp1_olayi"], s["maliyet_kaynagi"]), (1, 1, "tahmin_sozlesmesi"))
         self.assertEqual(s["ayni_gun_belirsiz"], 0)
         self.assertEqual(self.run_()["yazilan"], 0)                      # tek sonuç; tekrar yazılmaz
         with self.assertRaises(sqlite3.DatabaseError):
@@ -162,9 +172,9 @@ class Sonuc(Base):
         s = self.sonuc(self.tahminler()[0]["id"])
         self.assertEqual((s["cikis_nedeni"], s["tp1_goruldu"], s["sl_goruldu"], s["ayni_gun_belirsiz"]), ("SL", 0, 1, 1))
         self.assertEqual(json.loads(s["belirsiz_gunler"]), [g2])
-        o = defter.ozet(self.conn, "tp1_v1")
+        o = oz(self.conn)
         self.assertEqual((o["sayilar"]["belirsiz"], o["olculen"]), (1, 1))
-        self.assertEqual(defter.ozet(self.conn, "tp1_v1", belirsiz_dahil=False)["olculen"], 0)
+        self.assertEqual(oz(self.conn, belirsiz_dahil=False)["olculen"], 0)
 
     def test_entry_day_both_touched_is_sl_and_flagged(self):
         self.store()
@@ -182,17 +192,19 @@ class Sonuc(Base):
         self.assertEqual((s["sonuc_turu"], s["neden"]), ("girissiz", "açılış azami girişin üstünde"))
 
     def test_no_entry_day_bar_but_later_bars(self):
+        """s2 (Ek F-D): giriş günü mumu eksik, sonraki günler var → nihai 'girişsiz' YAZILMAZ; 'veri eksik' sayılır."""
         self.store()
         self.add_bars([(next_wd(self.gday), self.e, self.e, self.e, self.e)])
-        self.run_()
-        self.assertEqual(self.sonuc(self.tahminler()[0]["id"])["neden"], "giriş günü işlem verisi yok")
+        self.assertEqual(self.run_()["veri_eksik"], 1)
+        self.assertIsNone(self.sonuc(self.tahminler()[0]["id"]))
+        self.assertEqual(oz(self.conn)["sayilar"]["veri_eksik"], 1)
 
     def test_open_prediction_not_in_metrics(self):
         self.store()
         self.add_bars([(self.gday, self.e, self.e * 1.005, self.e * 0.995, self.e)])   # pozisyon sürüyor
         self.run_()
         self.assertIsNone(self.sonuc(self.tahminler()[0]["id"]))
-        o = defter.ozet(self.conn, "tp1_v1")
+        o = oz(self.conn)
         self.assertEqual((o["sayilar"]["acik"], o["olculen"], o["metrik"]), (1, 0, None))
         self.assertEqual(o["guven"], "çok az örnek, karar verilmez")
 
@@ -218,7 +230,7 @@ class Sonuc(Base):
         self.run_()
         s = self.sonuc(tid)
         self.assertEqual((s["sonuc_turu"], s["neden"]), ("iptal", "olumsuz haber"))
-        o = defter.ozet(self.conn, "tp1_v1")
+        o = oz(self.conn)
         self.assertEqual((o["sayilar"]["yerini_aldi"], o["sayilar"]["iptal"], o["olculen"]), (1, 1, 1))
 
     def test_late_and_backfilled_are_excluded(self):
@@ -228,7 +240,7 @@ class Sonuc(Base):
         self.run_()
         t = self.tahminler()
         self.assertEqual(self.sonuc(t[0]["id"])["sonuc_turu"], "gec_kayit")
-        o = defter.ozet(self.conn, "tp1_v1")
+        o = oz(self.conn)
         self.assertEqual((o["sayilar"]["gec_kayit"], o["sayilar"]["sonradan"], o["olculen"]), (1, 1, 0))
 
 
@@ -246,7 +258,7 @@ class KayitZamani(Base):
         defter.kaydet(self.conn, dict(self.plan, sl=self.plan["sl"] * 1.01), 1, self.gday, "aksam", at(self.gday, "08:30"))
         defter.kaydet(self.conn, dict(self.plan, ticker="XU100"), 2, self.gday, "sabah", at(self.gday, "08:31"))
         snap = [tuple(r) for r in self.conn.execute("SELECT * FROM tahmin ORDER BY id")]
-        say = lambda **k: defter.ozet(self.conn, "tp1_v1", **k)["sayilar"]["tahmin"]
+        say = lambda **k: oz(self.conn, **k)["sayilar"]["tahmin"]
         self.assertEqual(say(), 3)
         self.assertEqual((say(kayit="aksam"), say(kayit="sabah")), (1, 2))
         self.assertEqual((say(analiz="aksam"), say(analiz="sabah")), (2, 1))       # planı üreten analiz: etiket korunur
@@ -262,9 +274,9 @@ class Olcum(Base):
             "VALUES(?,?,?,?,?,?,'f','p',?,?,'geri_cekilme',10,10.3,9,12,13,1,'haber',?)",
             (f"x{i}{surum}", f"T{i}", "2026-01-01", "2026-01-02", "2026-01-01T18:30:00+03:00", surum, p, bant,
              json.dumps(rejim or {"trend": "yükseliş", "oynaklik": "normal"})))
-        self.conn.execute("INSERT INTO tahmin_sonuc(tahmin_id,sonuc_turu,tp1_goruldu,net_getiri_pct,r,mae_r,mfe_r,islem_gunu,"
-                          "degerlendirme_zamani,kural_surum) VALUES(?,?,?,?,?,-0.5,1.0,5,'z','s1')",
-                          (cur.lastrowid, sonuc, y, 2.0 if y else -2.0, r if y else -1.0))
+        self.conn.execute("INSERT INTO tahmin_sonuc(tahmin_id,sonuc_turu,tp1_goruldu,tp1_olayi,net_getiri_pct,r,mae_r,mfe_r,"
+                          "islem_gunu,degerlendirme_zamani,kural_surum) VALUES(?,?,?,?,?,?,-0.5,1.0,5,'z',?)",
+                          (cur.lastrowid, sonuc, y, y, 2.0 if y else -2.0, r if y else -1.0, defter.KURAL_SURUM))
 
     def test_known_metrics_and_versions_not_mixed(self):
         ps = [0.1, 0.2, 0.3, 0.3, 0.4, 0.5, 0.25, 0.35, 0.45, 0.15]
@@ -274,7 +286,7 @@ class Olcum(Base):
         self._ins(100, 0.9, 1, surum="tp1_v2")                          # başka sürüm: karışmamalı
         self._ins(101, 0.3, 0, sonuc="girissiz")
         self.conn.commit()
-        o = defter.ozet(self.conn, "tp1_v1")
+        o = oz(self.conn)
         self.assertEqual((o["sayilar"]["tahmin"], o["olculen"], o["sayilar"]["girissiz"]), (11, 10, 1))
         brier = sum((p - y) ** 2 for p, y in zip(ps, ys)) / 10
         ll = -sum(y * math.log(p) + (1 - y) * math.log(1 - p) for p, y in zip(ps, ys)) / 10
@@ -287,7 +299,7 @@ class Olcum(Base):
         self.assertGreater(hi, 40)
         cal = {c["bant"]: c for c in o["kalibrasyon"]}
         self.assertEqual((cal["yüksek"]["n"], cal["yüksek"]["gercek_%"]), (4, 75.0))   # 0.4,0.5,0.35,0.45 → 1,1,0,1
-        self.assertEqual(defter.ozet(self.conn, "tp1_v2")["olculen"], 1)
+        self.assertEqual(oz(self.conn, "tp1_v2")["olculen"], 1)
         self.assertEqual([v["model_surum"] for v in defter.model_surumleri(self.conn)][0] in ("tp1_v1", "tp1_v2"), True)
         self.assertEqual(defter.guven(29), "çok az örnek, karar verilmez")
         self.assertEqual(defter.guven(100), "orta güven")
