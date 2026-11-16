@@ -1,0 +1,28 @@
+{
+ "canli_dosya": "C:/Users/fkara/Documents/ChatGPT/Bulutların Üstü/work/Halley/data/bist_haber.db",
+ "kopya": "C:\\Users\\fkara\\AppData\\Local\\Temp\\claude\\806f7c764d89a846\\b5139424-d82b-42ea-909e-806db59966fe\\scratchpad\\faz3\\goc_prova\\bist_haber.db",
+ "kopya_butunluk": "ok",
+ "tablo_sayisi": 24,
+ "goc": {
+  "durum": "kuruldu",
+  "yedek": "C:\\Users\\fkara\\AppData\\Local\\Temp\\claude\\806f7c764d89a846\\b5139424-d82b-42ea-909e-806db59966fe\\scratchpad\\faz3\\goc_prova\\yedek\\bist_haber_20261116_143918_fiyat_izi_oncesi.db",
+  "sema": "fiyat_izi_v1"
+ },
+ "goc_sonrasi_butunluk": "ok",
+ "eski_tablolar_ayni": true,
+ "fiyat_ozeti_ayni": true,
+ "indirme_id_dolu_satir": 0,
+ "db_connect_acti": true,
+ "sahte_indirme": {
+  "id": 1,
+  "satir": 4,
+  "degisen": 3,
+  "fiyat_eski_satir": 3
+ },
+ "onceki_durum_birebir": true,
+ "eski_yazma_ifadesi_calisti": true,
+ "geri_donus_butunluk": "ok",
+ "geri_donus_tablolar_once_ile_ayni": true,
+ "geri_donusta_yeni_tablo_yok": true,
+ "tamam": true
+}
