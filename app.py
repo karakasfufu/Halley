@@ -2583,6 +2583,8 @@ def page_performans() -> None:
             "Analiz": r["analiz"], "Önerilen giriş": r["giris"],
             "Azami": r["azami_giris"], "Açılış (gerçek giriş)": r.get("acilis"), "Durum": ready.STATE_TR.get(r["durum"], r["durum"]),
             "Sonuç": r["sonuc"].get("sonuc") or (r.get("iptal_nedeni") or "")[:60], "Net %": r["sonuc"].get("net_getiri_pct"),
+            "Kural": ready.hazir_kurali(conn, r) if r["durum"] in ("aday", "onaylandi", "giris")
+            else (r["sonuc"].get("kural") or "s2"),
             "İşlem günü": str(r["sonuc"].get("islem_gunu") or "")} for r in hist]),
             ["Önerilen giriş", "Azami", "Açılış (gerçek giriş)", "Net %"]), hide_index=True, width="stretch")
     else:

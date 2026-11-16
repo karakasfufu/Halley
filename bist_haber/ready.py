@@ -523,6 +523,20 @@ def morning(conn, ctx, rows: List[Dict], now: Optional[datetime] = None, ai: boo
             "liste": rows_for(conn, gday)}
 
 
+def hazir_kurali(conn, r: Dict) -> str:
+    """O2: hazır fırsatın gerçekleşme kuralı. Bağlı bir tahmin varsa ONUN sözleşmesi (aynı olay iki ayrı kuralla
+    sessizce sonuçlanmasın: tahmin s2 ise öneri de s2); yoksa journal.kural_sec (girilmiş öneri s2'de sabit)."""
+    try:
+        t = conn.execute("SELECT kural_surum FROM tahmin WHERE hazir_firsat_id=? ORDER BY id DESC LIMIT 1",
+                         (r["id"],)).fetchone()
+    except Exception:
+        t = None
+    if t is not None:
+        from . import defter
+        return defter.sozlesme_kurali({"kural_surum": t[0]})
+    return journal.kural_sec(dict(r), girilmis=("giris",))
+
+
 def opening_check(conn, quotes: Dict[str, Dict], now: Optional[datetime] = None) -> Dict:
     """Açılıştan sonra (~15 dk gecikmeli Yahoo): açılış azami girişin üstündeyse fırsat iptal (eski fiyattan alım yok)."""
     now = now or _now()
@@ -533,7 +547,7 @@ def opening_check(conn, quotes: Dict[str, Dict], now: Optional[datetime] = None)
             out["veri_yok"].append(r["ticker"])
             continue
         conn.execute("UPDATE hazir_firsat SET acilis=?, guncellendi=? WHERE id=?", (q["acilis"], _iso(now), r["id"]))
-        if q["acilis"] <= r["sl"] + 1e-9 and journal.yeni_kural() == "s3":
+        if q["acilis"] <= r["sl"] + 1e-9 and hazir_kurali(conn, r) == "s3":
             # O2 (kural s3, Ek H4): açılış stopun altında ya da eşit → plan geçersiz, alım önerilmez (yapay kâr yok)
             conn.execute("UPDATE hazir_firsat SET durum='girissiz', iptal_nedeni=?, sonuc_json=?, guncellendi=? WHERE id=?",
                          (f"açılış {q['acilis']:.2f} TL, zarar durdurun ({r['sl']:.2f}) altında ya da eşit — plan "
@@ -573,7 +587,7 @@ def evaluate_all(conn) -> Dict:
             pass   # o gün işlem yoksa (veri eksikse) ilk işlem gününün açılışı kullanılır
         # O2: henüz girilmemiş öneri s3 ile (açılış ≤ SL → girişsiz); s3'ten önce girilmiş ('giris') öneri kendi
         # kuralıyla sürer (sonuçta saklı kural yoksa s2) — geçmişe dönük değişmez.
-        kural = journal.kural_sec(dict(r), girilmis=("giris",))
+        kural = hazir_kurali(conn, r)
         neden = (journal.giris_kosulu(first["open"], r["azami_giris"], r["sl"]) if kural == "s3" and r["durum"] != "giris"
                  else ("açılış azami girişin üstünde" if first["open"] > r["azami_giris"] + 1e-9 else None))
         if neden:

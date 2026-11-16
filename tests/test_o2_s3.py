@@ -307,3 +307,70 @@ class GuvenliGeriDonus(TahminDefteriSurum):
 
     test_versions_separate_and_old_rows_unchanged = None
     test_immutable_rows_still_protected = None
+
+
+from tests import test_defter as _td  # noqa: E402
+
+
+class BagliOneri(TahminDefteriSurum):
+    """Aynı olay (hazır fırsat + bağlı tahmin) iki ayrı kuralla SESSİZCE sonuçlanmaz: öneri tahminin sözleşmesini izler."""
+
+    def bagli(self, tk, kural):
+        i = self.hazir(tk)
+        t = self.tahmin(tk, kural)
+        # tahmin satırı değiştirilemez: bağı kurmak için aynı satırı hazir_firsat_id ile yeniden yaz (yeni kopya)
+        self.conn.execute("INSERT INTO tahmin(plan_imzasi,hazir_firsat_id,ticker,signal_day,giris_gunu,tahmin_zamani,"
+                          "model_surum,ozellik_surum,parametre_surum,olasilik,bant,tur,giris,azami_giris,sl,tp1,tp2,"
+                          "gecerlilik_gun,kural_surum,komisyon_pct,kayma_pct,maliyet_protokol) SELECT plan_imzasi||'b',?,"
+                          "ticker,signal_day,giris_gunu,tahmin_zamani,model_surum,ozellik_surum,parametre_surum,olasilik,"
+                          "bant,tur,giris,azami_giris,sl,tp1,tp2,gecerlilik_gun,kural_surum,komisyon_pct,kayma_pct,"
+                          "maliyet_protokol FROM tahmin WHERE id=?", (i, t))
+        self.conn.commit()
+        return i
+
+    def test_ready_follows_linked_prediction_contract(self):
+        for tk in ("K2", "K3"):
+            bar(self.conn, tk, GUN, 8.5, 9.6, 8.4, 9.5)            # açılış SL'nin altında
+            bar(self.conn, tk, GUN2, 9.5, 9.7, 9.3, 9.6)
+        i2, i3 = self.bagli("K2", "s2"), self.bagli("K3", "s3")
+        self.assertEqual((ready.hazir_kurali(self.conn, self.hz(i2)), ready.hazir_kurali(self.conn, self.hz(i3))),
+                         ("s2", "s3"))
+        ready.evaluate_all(self.conn)
+        defter.sonuclandir(self.conn, datetime(2026, 1, 9, 18, 30, tzinfo=config.TR_TZ))
+        h2, h3 = self.hz(i2), self.hz(i3)
+        self.assertNotEqual(h2["durum"], "girissiz")              # s2 sözleşmesi: öneri de s2 (tahminle aynı)
+        self.assertNotIn("kural", h2["sonuc"])
+        self.assertEqual((h3["durum"], h3["sonuc"]["kural"]), ("girissiz", "s3"))
+        son = {r[0]: (r[1], r[2]) for r in self.conn.execute(
+            "SELECT t.ticker, s.kural_surum, s.sonuc_turu FROM tahmin t JOIN tahmin_sonuc s ON s.tahmin_id=t.id "
+            "WHERE t.hazir_firsat_id IS NOT NULL")}
+        self.assertEqual(son["K2"][0], "s2")
+        self.assertEqual(son["K3"], ("s3", "girissiz"))           # öneri ve tahmin aynı sonucu söylüyor
+
+    test_versions_separate_and_old_rows_unchanged = None
+    test_immutable_rows_still_protected = None
+
+
+class YenidenAnaliz(_td.Base):
+    """Kural s3'e geçtikten sonra aynı plan yeniden analiz edilir / kaydedilirse s2 tahmini ÜZERİNE YAZILMAZ."""
+
+    def test_same_plan_is_repeat_changed_plan_is_new_s3(self):
+        from unittest.mock import patch
+        with patch.object(journal, "yeni_kural", return_value="s2"):      # geçişten önce yazılmış s2 tahmini
+            self.store()
+        t = self.tahminler()
+        self.assertEqual([x["kural_surum"] for x in t], ["s2"])
+        once = [tuple(r) for r in self.conn.execute("SELECT * FROM tahmin ORDER BY id")]
+        self.store()                                              # aynı plan, s3 kodu → tekrar (yeni satır yok)
+        self.assertEqual([tuple(r) for r in self.conn.execute("SELECT * FROM tahmin ORDER BY id")], once)
+        p2 = dict(self.plan, tp2=self.plan["tp2"] + self.atr)     # plan değişti → yeni tahmin s3 sözleşmesiyle
+        self.store(p2, now=_td.at(self.day, "19:30"))
+        t = self.tahminler()
+        self.assertEqual([x["kural_surum"] for x in t], ["s2", "s3"])
+        self.assertEqual(tuple(self.conn.execute("SELECT * FROM tahmin WHERE id=?", (t[0]["id"],)).fetchone()), once[0])
+        self.assertEqual(t[1]["onceki_tahmin_id"], t[0]["id"])
+        defter.sonuclandir(self.conn, _td.at(_td.next_wd(self.gday, 2), "18:30"))
+        self.assertEqual(self.sonuc(t[0]["id"])["sonuc_turu"], "yerini_aldi")    # eski s2 kendi kuralıyla kapandı
+        self.assertEqual(self.sonuc(t[0]["id"])["kural_surum"], "s2")
+        self.assertEqual(ready.hazir_kurali(self.conn, dict(self.conn.execute(
+            "SELECT * FROM hazir_firsat").fetchone())), "s3")    # öneri en güncel tahminin sözleşmesini izler
