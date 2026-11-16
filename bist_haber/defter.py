@@ -23,7 +23,7 @@ import json
 import math
 import sqlite3
 from datetime import date, datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from . import config
 
@@ -574,16 +574,11 @@ def kapsam(conn) -> Dict:
             "olaylar": ol, "baslangic": start}
 
 
-def ozet(conn, grup: Dict, kaynak: Optional[str] = None, tur: Optional[str] = None,
-         analiz: Optional[str] = None, bant: Optional[str] = None, belirsiz_dahil: bool = True,
-         kayit: Optional[str] = None) -> Dict:
-    """TEK bir sürüm grubu için canlı performans (model × özellik × parametre × kural × maliyet; gruplar asla
-    birleştirilmez). Yalnız 'tamamlandi' sonuçlar metrik hesabına girer; açık ve veri eksik tahminler yalnız sayılır;
-    sonradan eklenenler ana hesaba katılmaz. analiz = planı üreten analiz; kayit = kaydın yazıldığı zaman."""
-    if not isinstance(grup, dict):
-        raise TypeError("ozet() bir sürüm grubu (gruplar() öğesi) ister; yalnız model sürümüyle birleşik hesap yapılmaz")
-    if not tablo_var(conn):
-        return {"tablo_yok": True}
+def olculen_kayitlar(conn, grup: Dict, kaynak: Optional[str] = None, tur: Optional[str] = None,
+                     analiz: Optional[str] = None, bant: Optional[str] = None,
+                     kayit: Optional[str] = None) -> Tuple[Dict, List[Dict]]:
+    """ozet() ile AYNI seçim (FAZ 6: izleme de bunu kullanır; kural iki kez kodlanmaz): tek sürüm grubu, sonradan
+    eklenenler hariç, yalnız 'tamamlandi' sonuçlar ölçülür. Dönüş: (sayılar, ölçülen kayıtlar)."""
     rows = [dict(r) for r in conn.execute("SELECT * FROM tahmin")]
     rows = [r for r in rows if _grup_of(r) == {k: grup.get(k) for k in GRUP_ALANLARI}]
     for col, val in (("kaynak", kaynak), ("tur", tur), ("analiz", analiz), ("bant", bant)):
@@ -614,6 +609,20 @@ def ozet(conn, grup: Dict, kaynak: Optional[str] = None, tur: Optional[str] = No
         say[tur_] = say.get(tur_, 0) + 1
         if tur_ == "tamamlandi":
             done.append(dict(r, **{f"s_{a}": s.get(a) for a in s}))
+    return say, done
+
+
+def ozet(conn, grup: Dict, kaynak: Optional[str] = None, tur: Optional[str] = None,
+         analiz: Optional[str] = None, bant: Optional[str] = None, belirsiz_dahil: bool = True,
+         kayit: Optional[str] = None) -> Dict:
+    """TEK bir sürüm grubu için canlı performans (model × özellik × parametre × kural × maliyet; gruplar asla
+    birleştirilmez). Yalnız 'tamamlandi' sonuçlar metrik hesabına girer; açık ve veri eksik tahminler yalnız sayılır;
+    sonradan eklenenler ana hesaba katılmaz. analiz = planı üreten analiz; kayit = kaydın yazıldığı zaman."""
+    if not isinstance(grup, dict):
+        raise TypeError("ozet() bir sürüm grubu (gruplar() öğesi) ister; yalnız model sürümüyle birleşik hesap yapılmaz")
+    if not tablo_var(conn):
+        return {"tablo_yok": True}
+    say, done = olculen_kayitlar(conn, grup, kaynak, tur, analiz, bant, kayit)
     say["belirsiz"] = sum(bool(r["s_ayni_gun_belirsiz"]) for r in done)
     if not belirsiz_dahil:
         done = [r for r in done if not r["s_ayni_gun_belirsiz"]]

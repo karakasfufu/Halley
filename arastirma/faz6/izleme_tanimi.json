@@ -3,7 +3,10 @@
  "kayit": "2026-11-16; bu dosyanın commit'i izleme kodundan, yapay seri ölçümlerinden ve canlı defter üzerindeki ilk çalıştırmadan önce gelir. Eşikler sonuçlara göre DEĞİŞTİRİLMEZ.",
  "kapsam": "Tahmin defteri (tahmin / tahmin_sonuc / tahmin_degerlendirme). Ölçüm YALNIZ sonuçlanmış ('tamamlandi'), güncel değerlendirme sözleşmesine sahip (kural s2, maliyet protokolü dolu) tahminlerden; defter.ozet ile AYNI seçim (ortak yardımcı). Sürüm grupları (model × özellik × parametre × kural × maliyet) birleştirilmez. Sözleşmesi eksik eski grup ölçülmez ('sözleşme eksik').",
  "kontrol_sikligi": "Günde en çok bir kontrol (akşam sonuçlandırmasından sonra çağrılmak üzere; bu fazda bekçiye BAĞLANMAZ). Panel yalnız okur, kayıt yazmaz.",
- "pencereler": {"birikimli": "grubun başından bugüne bütün ölçülen tahminler", "son": "son 60 bağımsız sonuç günü (giriş günü)"},
+ "pencereler": {
+  "birikimli": "grubun başından bugüne bütün ölçülen tahminler",
+  "son": "son 60 bağımsız sonuç günü (giriş günü)"
+ },
  "referans": {
   "performans": "Geçmiş backteste göre BOZULMA ÖLÇÜLMEZ: tp1_v1 bütün veriyle eğitildi; dönem dışı sınama sonuçları kat modellerine aittir. Performans yalnız canlı (dönem dışı) veriyle mutlak ölçütlere göre değerlendirilir.",
   "kalibrasyon": "modelin kendi ortalama tahmini",
@@ -11,9 +14,9 @@
   "girdi": "tp1_v1 eğitim örnekleri (FAZ 3 arşivi etiket2.csv, egit.load_df süzgeci, 34.579) — her girdi için eğitimden 10 eşit yüzdelikli dilim sınırı ve oranları"
  },
  "olcutler_ve_esikler": {
-  "P1_ayirt_etme": "AUC; %90 aralık gün kümesi bootstrap (1000 tekrar, tohum 20261116). Aralığın ÜST sınırı < 0,50 → durum 'esik_asildi' (ayırt etme yok ya da ters).",
-  "P2_taban_oranina_gore": "Brier becerisi = 1 − Brier(model) / Brier(sabit eğitim oranı %29,27). Aralığın ÜST sınırı < 0 → 'esik_asildi' (sabit orandan kötü).",
-  "K1_kalibrasyon": "gerçek TP1 oranının %90 gün kümesi aralığı modelin ortalama tahminini İÇERMİYORSA → 'esik_asildi' (yön: fazla/az tahmin). Bant düzeyi (düşük/orta/yüksek) yalnız bilgi.",
+  "P1_ayirt_etme": "AUC; %90 aralık kümeli DeLong (gün). Aralığın ÜST sınırı < 0,50 → 'esik_asildi'.",
+  "P2_taban_oranina_gore": "Brier becerisi = 1 − Brier(model)/Brier(sabit eğitim oranı %29,27). Kayıp farkı ortalamasının %90 gün kümesi aralığının ALT sınırı > 0 (yani beceri aralığının üstü < 0) → 'esik_asildi'.",
+  "K1_kalibrasyon": "Gerçek TP1 oranının %90 gün kümesi aralığı modelin ortalama tahminini İÇERMİYORSA → 'esik_asildi'. Bant düzeyi yalnız bilgi.",
   "R1_rejim": "BİLGİ (uyarı değil): pencerenin baskın rejiminin eğitimdeki gün payı < %5 → 'eğitimde nadir rejim'; ayrıca pencere ile eğitim rejim dağılımı arası toplam değişim uzaklığı raporlanır.",
   "G1_girdi": "BİLGİ (uyarı değil): her girdi için PSI (eğitim dilimleriyle; 0 oranlar 1e-4 ile sınırlanır). PSI ≥ 0,25 'belirgin kayma', 0,10–0,25 'orta kayma'. Rejim ve girdi kayması tek başına 'model başarısız' DEMEK DEĞİLDİR."
  },
@@ -31,5 +34,16 @@
   "ilgili_gozlem": "Aynı günün sonuçları gün kümesi bootstrap ile birlikte örneklenir; aynı hissenin 10 gün içindeki tekrar payı raporlanır."
  },
  "davranis": "Uyarılar yalnız yerel kayda (data/izleme_kayit.jsonl, ekle-yalnız; durum data/izleme_durumu.json) ve panele yazılır. Harici bildirim YOK. Modeli yeniden eğitmez, kapatmaz, etkin modeli ya da işlem kurallarını değiştirmez. Her kayıtta: neden, örneklem (n, gün, hisse, tekrar %), dönem, referans, ölçüm ve aralık.",
- "yasaklar": ["eşikleri sonuçlara göre değiştirmek", "eğitim içi sonucu dönem dışı referans gibi kullanmak", "sürüm gruplarını birleştirmek", "harici bildirim", "model/kural değişikliği"]
+ "yasaklar": [
+  "eşikleri sonuçlara göre değiştirmek",
+  "eğitim içi sonucu dönem dışı referans gibi kullanmak",
+  "sürüm gruplarını birleştirmek",
+  "harici bildirim",
+  "model/kural değişikliği"
+ ],
+ "degisiklik_1": {
+  "zaman": "2026-11-16, izleme kodu, yapay seri ölçümü ve canlı çalıştırmadan ÖNCE (hiçbir sonuç görülmedi)",
+  "ne": "Güven aralıkları gün kümesi bootstrap (1000 tekrar) yerine GÜN KÜMESİNE DAYANIKLI analitik aralıklarla hesaplanır: AUC için kümeli DeLong (Obuchowski 1997) varyansı; kalibrasyon için gün kümesi standart hatalı oran; Brier becerisi için modelin ve sabit oranın gözlem başına kayıp farkının gün kümesi standart hatalı ortalaması (beceri < 0 ⇔ fark > 0). Düzey %90 (z = 1,645), K/(K−1) küçük örnek düzeltmesi.",
+  "neden": "Yapay seri ölçümü (500 tekrar × 250 günlük kontrol × 3 ölçüt) bootstrap ile işlem açısından uygulanamaz; canlıda ve yapay seride AYNI yöntem kullanılmalı. Eşikler ve asgari örnek DEĞİŞMEDİ."
+ }
 }
