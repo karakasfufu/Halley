@@ -1938,3 +1938,9 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 ## 2026-11-16 — FAZ 2 KABUL EDİLDİ (simülatör olarak; commit 6d7f5d5, etiket faz2-kabul)
 - Kullanıcı kabulü: araştırma simülatörü; kârlılık, emir uygulaması ya da canlıya geçiş onayı değil. Canlı kural değişmedi.
 - Ana sonuç = önceden limit emir + s3 (sonuclar_faz2/kabul/, faz2_kabul_kaydi.py). Önceki s2/teorik rakamlar ana sonuç değil (rapora not). Ayrıntı: Ek H10.
+
+## 2026-11-16 — FAZ 3 başladı (dal faz3-metrik; ARA KAYIT, tamamlanmadı; canlı kod/DB değişmedi)
+- Veri taraması (arastirma_5y.db, salt-okunur; arastirma/faz3/veri_guvenilirlik.py): 674.958 mum, 631 hisse; eksik gün 348, sıfır hacim 4.296, bayat (OHLC aynı + hacim 0) 3.762, OHLC tutarsız 25, >%10,5 sıçrama 605 (106'sı KAP kurumsal işlem bildirimine ±5 gün yakın; >%25: 83; ör. TRHOL +%10.124 / −%99 veri hatası). Son güne gelmeyen 1 hisse (ISKUR 2026-08-12).
+- FAZ 2 kabul işlemlerine etkisi: tutma süresinde bayraklı mum 0; 22 günlük sinyal penceresinde 0–1; 250 günlük gösterge penceresinde sıçrama/tutarsızlık ortak 12 ay 2, 2024 15, teknik 12 ay 5, 2024 14 işlem. Sonuçlar değiştirilmedi.
+- Yeniden düzeltme (yeniden_duzeltme.py): prices.update auto_adjust=True + INSERT OR REPLACE, kaynak/zaman kaydı yok. Araştırma ve canlı DB ortak 156.441 günde %0,1 üstü fark 927 gün / 4 hisse (MGROS −%1,32, FLAP −%1,07).
+- KALAN: metrik doğrulama ve ek metrikler, dağılımlar, MAE/MFE tanımı, fiyat kaynağı şeması ve kopyada göç testi, delist/tarihsel sektör kaynak araştırması, model metrik kaynağı, testler ve FAZ 3 raporu.

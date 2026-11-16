@@ -1,0 +1,337 @@
+{
+ "veritabani": "C:/Users/fkara/Documents/ChatGPT/Bulutların Üstü/work/Halley/data/backtest/arastirma_5y.db",
+ "hisse": 631,
+ "takvim_gunu": 1254,
+ "fiyat_son_gun": "2026-11-13",
+ "kap_liste_ilk_gun": "2022-10-17",
+ "ozet": {
+  "mum": 674958,
+  "eksik_gun": 348,
+  "sifir_hacim": 4296,
+  "sicrama_10": 605,
+  "sicrama_10_kap_kapsami_disinda": 33,
+  "sicrama_25": 83,
+  "ohlc_tutarsiz": 25,
+  "sicrama_10_kurumsal_yakin": 106,
+  "bayat": 3762
+ },
+ "sicrama_10_sayisi": 605,
+ "sicrama_ornekleri_en_buyuk": [
+  {
+   "ticker": "TRHOL",
+   "gun": "2025-01-10",
+   "getiri_%": 10124.19,
+   "kurumsal_yakin": false,
+   "uzun_bosluk_sonrasi": false
+  },
+  {
+   "ticker": "ISATR",
+   "gun": "2022-09-05",
+   "getiri_%": 8780.98,
+   "kurumsal_yakin": false,
+   "uzun_bosluk_sonrasi": false
+  },
+  {
+   "ticker": "KSTUR",
+   "gun": "2023-03-24",
+   "getiri_%": 2524.89,
+   "kurumsal_yakin": true,
+   "uzun_bosluk_sonrasi": false
+  },
+  {
+   "ticker": "KGYO",
+   "gun": "2025-07-01",
+   "getiri_%": 952.32,
+   "kurumsal_yakin": false,
+   "uzun_bosluk_sonrasi": false
+  },
+  {
+   "ticker": "ISBTR",
+   "gun": "2022-06-15",
+   "getiri_%": 446.93,
+   "kurumsal_yakin": false,
+   "uzun_bosluk_sonrasi": false
+  },
+  {
+   "ticker": "POLHO",
+   "gun": "2025-09-16",
+   "getiri_%": 319.33,
+   "kurumsal_yakin": true,
+   "uzun_bosluk_sonrasi": false
+  },
+  {
+   "ticker": "UMPAS",
+   "gun": "2022-12-19",
+   "getiri_%": 300.78,
+   "kurumsal_yakin": false,
+   "uzun_bosluk_sonrasi": false
+  },
+  {
+   "ticker": "TRHOL",
+   "gun": "2025-01-13",
+   "getiri_%": -99.05,
+   "kurumsal_yakin": false,
+   "uzun_bosluk_sonrasi": false
+  },
+  {
+   "ticker": "TSPOR",
+   "gun": "2025-06-19",
+   "getiri_%": 94.59,
+   "kurumsal_yakin": true,
+   "uzun_bosluk_sonrasi": false
+  },
+  {
+   "ticker": "OSMEN",
+   "gun": "2024-08-01",
+   "getiri_%": -94.24,
+   "kurumsal_yakin": true,
+   "uzun_bosluk_sonrasi": false
+  },
+  {
+   "ticker": "ADEL",
+   "gun": "2024-01-02",
+   "getiri_%": -90.83,
+   "kurumsal_yakin": false,
+   "uzun_bosluk_sonrasi": false
+  },
+  {
+   "ticker": "CCOLA",
+   "gun": "2024-08-01",
+   "getiri_%": -90.75,
+   "kurumsal_yakin": false,
+   "uzun_bosluk_sonrasi": false
+  },
+  {
+   "ticker": "MERKO",
+   "gun": "2026-05-04",
+   "getiri_%": -86.46,
+   "kurumsal_yakin": true,
+   "uzun_bosluk_sonrasi": false
+  },
+  {
+   "ticker": "KBORU",
+   "gun": "2025-01-02",
+   "getiri_%": -83.07,
+   "kurumsal_yakin": false,
+   "uzun_bosluk_sonrasi": false
+  },
+  {
+   "ticker": "FENER",
+   "gun": "2025-06-23",
+   "getiri_%": -78.63,
+   "kurumsal_yakin": true,
+   "uzun_bosluk_sonrasi": false
+  }
+ ],
+ "sicrama_kurumsal_yakin_olmayan_ornek": [
+  {
+   "ticker": "TRHOL",
+   "gun": "2025-01-10",
+   "getiri_%": 10124.19,
+   "kurumsal_yakin": false,
+   "uzun_bosluk_sonrasi": false
+  },
+  {
+   "ticker": "ISATR",
+   "gun": "2022-09-05",
+   "getiri_%": 8780.98,
+   "kurumsal_yakin": false,
+   "uzun_bosluk_sonrasi": false
+  },
+  {
+   "ticker": "KGYO",
+   "gun": "2025-07-01",
+   "getiri_%": 952.32,
+   "kurumsal_yakin": false,
+   "uzun_bosluk_sonrasi": false
+  },
+  {
+   "ticker": "ISBTR",
+   "gun": "2022-06-15",
+   "getiri_%": 446.93,
+   "kurumsal_yakin": false,
+   "uzun_bosluk_sonrasi": false
+  },
+  {
+   "ticker": "UMPAS",
+   "gun": "2022-12-19",
+   "getiri_%": 300.78,
+   "kurumsal_yakin": false,
+   "uzun_bosluk_sonrasi": false
+  },
+  {
+   "ticker": "TRHOL",
+   "gun": "2025-01-13",
+   "getiri_%": -99.05,
+   "kurumsal_yakin": false,
+   "uzun_bosluk_sonrasi": false
+  },
+  {
+   "ticker": "ADEL",
+   "gun": "2024-01-02",
+   "getiri_%": -90.83,
+   "kurumsal_yakin": false,
+   "uzun_bosluk_sonrasi": false
+  },
+  {
+   "ticker": "CCOLA",
+   "gun": "2024-08-01",
+   "getiri_%": -90.75,
+   "kurumsal_yakin": false,
+   "uzun_bosluk_sonrasi": false
+  },
+  {
+   "ticker": "KBORU",
+   "gun": "2025-01-02",
+   "getiri_%": -83.07,
+   "kurumsal_yakin": false,
+   "uzun_bosluk_sonrasi": false
+  },
+  {
+   "ticker": "AYGAZ",
+   "gun": "2022-09-01",
+   "getiri_%": 72.53,
+   "kurumsal_yakin": false,
+   "uzun_bosluk_sonrasi": false
+  }
+ ],
+ "son_gune_kadar_gelmeyen_hisse": 1,
+ "son_gune_kadar_gelmeyen_ornek": [
+  [
+   "ISKUR",
+   "2026-08-12"
+  ]
+ ],
+ "eksik_gunu_en_cok": [
+  [
+   "KZGYO",
+   6
+  ],
+  [
+   "OTKAR",
+   3
+  ],
+  [
+   "CASA",
+   2
+  ],
+  [
+   "GWIND",
+   2
+  ],
+  [
+   "UNLU",
+   2
+  ],
+  [
+   "ACSEL",
+   1
+  ],
+  [
+   "ADGYO",
+   1
+  ],
+  [
+   "AFYON",
+   1
+  ],
+  [
+   "AGESA",
+   1
+  ],
+  [
+   "AGYO",
+   1
+  ]
+ ],
+ "faz2_kabul_islemlerine_etki": {
+  "o_12a_azami_islemler.csv": {
+   "islem": 130,
+   "tutma_suresinde_bayrak": 0,
+   "sinyal_penceresinde_bayrak": 0,
+   "bayrakli_islem_net_tl": 0.0,
+   "tum_net_tl": -23781.39,
+   "gosterge_penceresi_250_sicrama_veya_tutarsiz": 2,
+   "bu_islemlerin_net_tl": -835.43,
+   "bayrak_turleri": {}
+  },
+  "o_12a_plan_islemler.csv": {
+   "islem": 130,
+   "tutma_suresinde_bayrak": 0,
+   "sinyal_penceresinde_bayrak": 0,
+   "bayrakli_islem_net_tl": 0.0,
+   "tum_net_tl": -27551.11,
+   "gosterge_penceresi_250_sicrama_veya_tutarsiz": 2,
+   "bu_islemlerin_net_tl": -1002.66,
+   "bayrak_turleri": {}
+  },
+  "o_2024_azami_islemler.csv": {
+   "islem": 123,
+   "tutma_suresinde_bayrak": 0,
+   "sinyal_penceresinde_bayrak": 0,
+   "bayrakli_islem_net_tl": 0.0,
+   "tum_net_tl": 16797.41,
+   "gosterge_penceresi_250_sicrama_veya_tutarsiz": 15,
+   "bu_islemlerin_net_tl": 3525.96,
+   "bayrak_turleri": {}
+  },
+  "o_2024_plan_islemler.csv": {
+   "islem": 123,
+   "tutma_suresinde_bayrak": 0,
+   "sinyal_penceresinde_bayrak": 0,
+   "bayrakli_islem_net_tl": 0.0,
+   "tum_net_tl": 19588.7,
+   "gosterge_penceresi_250_sicrama_veya_tutarsiz": 15,
+   "bu_islemlerin_net_tl": 2252.48,
+   "bayrak_turleri": {}
+  },
+  "t_12a_azami_islemler.csv": {
+   "islem": 144,
+   "tutma_suresinde_bayrak": 0,
+   "sinyal_penceresinde_bayrak": 1,
+   "bayrakli_islem_net_tl": -868.74,
+   "tum_net_tl": -27840.91,
+   "gosterge_penceresi_250_sicrama_veya_tutarsiz": 5,
+   "bu_islemlerin_net_tl": -3478.28,
+   "bayrak_turleri": {
+    "sicrama_10": 1
+   }
+  },
+  "t_12a_plan_islemler.csv": {
+   "islem": 144,
+   "tutma_suresinde_bayrak": 0,
+   "sinyal_penceresinde_bayrak": 1,
+   "bayrakli_islem_net_tl": -1110.67,
+   "tum_net_tl": -32499.79,
+   "gosterge_penceresi_250_sicrama_veya_tutarsiz": 5,
+   "bu_islemlerin_net_tl": -4220.55,
+   "bayrak_turleri": {
+    "sicrama_10": 1
+   }
+  },
+  "t_2024_azami_islemler.csv": {
+   "islem": 115,
+   "tutma_suresinde_bayrak": 0,
+   "sinyal_penceresinde_bayrak": 1,
+   "bayrakli_islem_net_tl": -895.32,
+   "tum_net_tl": 5224.85,
+   "gosterge_penceresi_250_sicrama_veya_tutarsiz": 14,
+   "bu_islemlerin_net_tl": 2689.74,
+   "bayrak_turleri": {
+    "sicrama_10": 1
+   }
+  },
+  "t_2024_plan_islemler.csv": {
+   "islem": 115,
+   "tutma_suresinde_bayrak": 0,
+   "sinyal_penceresinde_bayrak": 1,
+   "bayrakli_islem_net_tl": -1083.88,
+   "tum_net_tl": 5920.14,
+   "gosterge_penceresi_250_sicrama_veya_tutarsiz": 14,
+   "bu_islemlerin_net_tl": 2256.75,
+   "bayrak_turleri": {
+    "sicrama_10": 1
+   }
+  }
+ }
+}
