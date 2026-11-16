@@ -1,0 +1,95 @@
+{
+ "not": "R_plan birimi; MAE işaretli negatif (aleyhte), MFE pozitif. 'kesin' = pozisyon açıkken gerçekleştiği kesin bilinen; 'olasi' = çıkış mumunda çıkıştan önce olmuş olabilecek en uç değer.",
+ "o_12a_azami_islemler.csv": {
+  "islem": 130,
+  "durum": {
+   "mfe_aralik": 91,
+   "mae_aralik": 14,
+   "kesin": 21,
+   "varsayimsal": 4
+  },
+  "mae_belirsizlik_genisligi_R": {
+   "medyan": 0.0,
+   "p95": 0.0,
+   "en_cok": 0.0
+  },
+  "mfe_belirsizlik_genisligi_R": {
+   "medyan": 0.0,
+   "p95": 0.392,
+   "en_cok": 1.535
+  },
+  "mae_kesin_medyan": -0.965,
+  "mae_en_kotu_olasi_medyan": -0.965,
+  "mfe_kesin_medyan": 0.833,
+  "mfe_en_iyi_olasi_medyan": 0.917
+ },
+ "o_12a_plan_islemler.csv": {
+  "islem": 130,
+  "durum": {
+   "mfe_aralik": 91,
+   "mae_aralik": 14,
+   "kesin": 21,
+   "varsayimsal": 4
+  },
+  "mae_belirsizlik_genisligi_R": {
+   "medyan": 0.0,
+   "p95": 0.0,
+   "en_cok": 0.0
+  },
+  "mfe_belirsizlik_genisligi_R": {
+   "medyan": 0.0,
+   "p95": 0.392,
+   "en_cok": 1.535
+  },
+  "mae_kesin_medyan": -0.965,
+  "mae_en_kotu_olasi_medyan": -0.965,
+  "mfe_kesin_medyan": 0.833,
+  "mfe_en_iyi_olasi_medyan": 0.917
+ },
+ "o_2024_azami_islemler.csv": {
+  "islem": 123,
+  "durum": {
+   "mfe_aralik": 72,
+   "mae_aralik": 21,
+   "kesin": 26,
+   "varsayimsal": 4
+  },
+  "mae_belirsizlik_genisligi_R": {
+   "medyan": 0.0,
+   "p95": 0.0,
+   "en_cok": 0.0
+  },
+  "mfe_belirsizlik_genisligi_R": {
+   "medyan": 0.0,
+   "p95": 0.217,
+   "en_cok": 0.568
+  },
+  "mae_kesin_medyan": -0.978,
+  "mae_en_kotu_olasi_medyan": -0.978,
+  "mfe_kesin_medyan": 0.849,
+  "mfe_en_iyi_olasi_medyan": 0.849
+ },
+ "o_2024_plan_islemler.csv": {
+  "islem": 123,
+  "durum": {
+   "mfe_aralik": 72,
+   "mae_aralik": 21,
+   "kesin": 26,
+   "varsayimsal": 4
+  },
+  "mae_belirsizlik_genisligi_R": {
+   "medyan": 0.0,
+   "p95": 0.0,
+   "en_cok": 0.0
+  },
+  "mfe_belirsizlik_genisligi_R": {
+   "medyan": 0.0,
+   "p95": 0.217,
+   "en_cok": 0.568
+  },
+  "mae_kesin_medyan": -0.978,
+  "mae_en_kotu_olasi_medyan": -0.978,
+  "mfe_kesin_medyan": 0.849,
+  "mfe_en_iyi_olasi_medyan": 0.849
+ }
+}

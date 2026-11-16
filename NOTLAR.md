@@ -1951,3 +1951,9 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Veri: 348 eksik günün 329'u tek piyasa geneli gün (2024-04-09), 19 olası veri eksikliği; 605 sıçramanın 106'sı KAP bildirimine yakın (kanıt değil); iki DB farkı 4 hissede 2025-11-10…2026-10-12 sabit oran (neden kesinleşmedi; araştırma DB'sinde blok sınırı taban kayması olası); adayların %27'sinin gösterge penceresinde sıçrama; düzeltilmemiş fiyat yok → etki ölçülmedi.
 - fiyat_izi_v1 (hazırlık): fiyat_indirme/fiyat_eski/veri_anlik + prices.indirme_id; kopyada göç/geri kurma/geri dönüş provası tamam; testte bulunan 'değişmeyen satırı yeniden yazma' hatası düzeltildi.
 - Delist/sektör: BIST kalıcı çıkarılanlar listesi ve DataStore (ücretli) var; tarihsel sektör arşivi bulunamadı. Model kökeni: tp1_v1 ← etiket2.csv (en olası), e90d0ab. 618 test OK. Ayrıntı: HALLEY2_DENETIM_RAPORU Ek I.
+
+## 2026-11-16 — FAZ 3 son düzeltmeler (Ek I2; dal faz3-metrik; canlı değişmedi; KABUL BEKLİYOR)
+- MAE/MFE: işaret (MAE ≤ 0, MFE ≥ 0) ve sınır yönü: stopta çıkışta MAE kesin/MFE alt sınır, hedefte MFE kesin/MAE işaretli üst sınır; sinirlar() + 3 elle doğrulanabilir test. Ek I.3 ifadesi düzeltildi.
+- Yeniden değerlendirme (eğitim yok, EĞİTİM İÇİ): tp1_v1 sabit, 34.579 örnek; AUC 0,6361 → 0,6347 (tp1_hedefi, 91 değişen) → 0,6350 (+s3, 250 çıkan). Dönem dışı: kat modelleri saklanmadığı için yapılamadı.
+- Köken: tp1_v1 ← etiket2.csv, oturum günlüğü komut+çıktısıyla bağlandı (kriptografik değil); 86 fark = x_trend süzgeci. Kanıtlar data/backtest/arsiv/faz3_koken_20261116/ (435 MB, Git dışı, manifest Git'te).
+- 621 test OK. FAZ 3 kabul önerisi: metrik/izlenebilirlik altyapısı + veri envanteri olarak; duyarlılık analizi yapılmadı.

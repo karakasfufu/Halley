@@ -3364,3 +3364,201 @@ Etki yalnız sayı olarak raporlandı.
 - Geçişten sonra akşam analizi henüz yok. **FAZ 1 kabul edilmedi.**
 
 **Onay beklenen:** FAZ 3 kabulü, canlıya alma (`fiyat_izi`) ve FAZ 4. Hiçbiri yapılmadı.
+
+
+---
+
+# Ek I2 (16.11.2026) — FAZ 3 son düzeltmeler ve kabul önerisi
+
+Canlı kod ve veritabanı değişmedi. Model eğitilmedi. Yeni kapsam açılmadı.
+
+## I2.1 MAE/MFE: işaret, sınır yönü, kesin ve olası hareket
+
+**İşaret** (R_plan birimi; 1 R = plan girişi − SL):
+
+- **MAE = (pozisyon açıkken en düşük fiyat − dolum) / R.** Negatif ya da 0 olarak tutulur; aleyhte hareketin işaretli
+  değeridir, pozitif kayıp büyüklüğü değildir.
+- **MFE = (pozisyon açıkken en yüksek fiyat − dolum) / R.** Pozitif ya da 0'dır.
+
+**Kesin bilinen hareket:**
+
+- Giriş mumu (giriş açılışta olduğundan mumun tamamı girişten sonradır).
+- Ara mumlar.
+- Çıkış fiyatı.
+
+**Olabilecek hareket:** Gün içi çıkış mumunda çıkıştan önceki kısım. O mumun en yüksek ya da en düşük değeri
+çıkıştan önce de sonra da olmuş olabilir.
+
+**Kural kısıtıyla sınırlar** (`arastirma/faz3/mae_mfe.py → sinirlar`):
+
+| Çıkış türü | MAE | MFE |
+|---|---|---|
+| Stopta gün içi (SL, başabaş) | **Kesin.** Stop ilk dokunuşta satar; çıkıştan önce fiyat stopun üstündeydi. | Aralık: [kesin, mumun en yükseği]. Hesaplanan değer **alt sınır**. |
+| Hedefte gün içi (TP2) | Aralık: [mumun en düşüğü, kesin]. Hesaplanan değer işaretli olarak **üst sınır**, büyüklük olarak alt sınır. | **Kesin.** Çıkıştan önce fiyat hedefin altındaydı. |
+| Açılışta çıkış ya da süre doldu (kapanış) | Kesin | Kesin |
+| Alış stopun altında (s3) | **Varsayımsal**: çıkış bir varsayım | Varsayımsal |
+
+- **Varsayım:** Stop ve hedef emri tam seviyesinden dolar. Boşluk varsa çıkış açılıştandır (ayrı satır).
+- **Ek I.3'ün düzeltilmesi:** I.3'teki "gün içi çıkışta değer bir alt sınırdır" ifadesi **eksikti**. Doğrusu:
+  - stopta çıkışta MAE kesin, MFE alt sınır;
+  - hedefte çıkışta MFE kesin, MAE işaretli üst sınır.
+- **Canlı kod:** `defter.mae_mfe` ve `yaklasik` bayrağı aynı değeri hesaplar, ama bütün gün içi çıkışları "yaklaşık"
+  sayar. Bu daha kaba bir etikettir; canlı kod değiştirilmedi.
+
+**Elle doğrulanabilir örnekler** (dolum 100, SL 95, 1 R = 5 TL; `tests.test_faz3_metrik.MaeMfeSinirlari`, 3 test):
+
+1. **Stopta çıkış.** 1. gün mum en yüksek 104, en düşük 98. 2. gün en yüksek 106, en düşük 94; 95'ten SL.
+   - MAE = (95 − 100) / 5 = **−1,0, kesin**. 94 stoptan sonradır; o anda pozisyon yoktu.
+   - MFE kesin = (104 − 100) / 5 = **0,8**. Olası en iyi = (106 − 100) / 5 = **1,2**, çünkü 106 çıkıştan önce olmuş
+     olabilir.
+2. **Hedefte çıkış.** 2. gün en yüksek 121, en düşük 96; 120'den TP2.
+   - MFE = (120 − 100) / 5 = **4,0, kesin**. 121 hedeften sonradır.
+   - MAE kesin = (98 − 100) / 5 = **−0,4**. Olası en kötü = (96 − 100) / 5 = **−0,8**.
+3. **Süre doldu** (2. gün açılış 90, en yüksek 99, en düşük 89, kapanış 97): MAE −2,2 ve MFE 0,8, ikisi de kesin.
+   **Açılışta boşlukla SL (90):** MAE −2,0, kesin. **Stop altı alış:** "varsayımsal".
+
+**FAZ 2 kabul işlemlerinde** (canli_ortak; `sonuclar/mae_mfe_sinirlari.json`):
+
+| Dönem | MAE kesin, MFE aralık | MAE aralık, MFE kesin | Kesin | Varsayımsal |
+|---|---|---|---|---|
+| 12 ay (130 işlem) | 91 | 14 | 21 | 4 |
+| 2024 (123 işlem) | 72 | 21 | 26 | 4 |
+
+- MAE belirsizlik genişliği bütün işlemlerde **0**. Hedef gününden önceki en kötü fiyat daha önceki bir günde
+  görülmüş.
+- MFE belirsizlik genişliği: medyan 0, p95 0,39 R (12 ay) ve 0,22 R (2024), en çok 1,54 R.
+- MFE medyanı 12 ayda 0,83 (kesin) ile 0,92 (olası) arasında.
+
+## I2.2 Yeniden değerlendirme ile yeniden eğitimin ayrımı
+
+**Önceki ifadenin düzeltilmesi:** "Düzeltilmiş etiketlerle yeniden sınama model eğitmeyi gerektirir" ifadesi **yalnız
+dönem dışı sınama için** doğrudur. Etkin model sabit tutularak aynı örnekler ve girdiler üzerinde metrik **yeniden
+hesaplanabilir** ve hesaplandı (`yeniden_degerlendirme.py`; model eğitilmedi).
+
+- **Bu hesap EĞİTİM İÇİDİR.** `tp1_v1`, kapanmış bütün verilerle (2022-11-09 … 2026-11-12) uydurulmuştur; bu
+  örneklerin hepsini görmüştür. Sonuç **dönem dışı doğrulama değildir**.
+- **Dönem dışı karşılaştırma neden yapılamıyor:** `tp1_v1.json`'daki dönem dışı sonuçlar (son 12 ay AUC 0,605),
+  test döneminden önceki verilerle ayrı uydurulan kat modellerinden geliyor. O kat modelleri ve dönem dışı tahminleri
+  **saklanmamış**. Yeniden hesaplamak kat modellerini yeniden uydurmayı, yani eğitimi gerektirir; yapılmadı.
+
+**Eşleşme:** etiket2'nin 34.579 eğitim örneğinin 34.579'u FAZ 2 plan dosyasıyla `(hisse, tarih)` anahtarıyla
+eşleşti. Girdileri farklı olan 0.
+
+| `tp1_v1` sabit, eğitim içi | n | AUC | Brier | TP1 % |
+|---|---|---|---|---|
+| A: eski etiket (`tp1_goruldu`) | 34.579 | 0,6361 | 0,19807 | %29,27 |
+| B: düzeltilmiş etiket (`tp1_hedefi`; 91 örnekte 0 → 1) | 34.579 | 0,6347 | 0,19922 | %29,54 |
+| C: B + s3 stop altı girişsiz çıkarılmış (250 örnek) | 34.329 | 0,6350 | 0,20002 | %29,75 |
+
+- **Önce ve sonra etkisi:** AUC −0,001, Brier +0,002. Eski rakamlar ilgili etiket sürümüne ait olarak korunur.
+- Bu fark dönem dışı performans için bir tahmin **değildir**.
+
+## I2.3 Geçici kanıtlar arşive alındı
+
+**Arşiv:** `data/backtest/arsiv/faz3_koken_20261116/` (435 MB; Git dışı, `.gitignore: data/backtest/`).
+
+- **İçerik:** 21 dosya.
+  - Eski çalışma klasöründen: etiket, etiket2 ve etiket3 dosyaları ile logları, eski `etiketle.py`, `model.py`,
+    `sonuc.json`, `egit_sonuc.json`, indirme betiği ve logu, deneme dosyaları, KAP logları, 15.11'e ait iki
+    araştırma veritabanı yedeği.
+  - FAZ 2'den: `planlar_seviyeli.csv` ve `etiketle.log`.
+- Her dosyanın SHA-256 değeri, boyutu, satır sayısı ve değiştirilme zamanı kaydedildi. Kopyalar kaynakla doğrulandı
+  (21 / 21 aynı). Manifest: `arastirma/faz3/sonuclar/arsiv_manifest.json` (Git'te) ve arşivde.
+- `gunluk_model_kaydi.txt`: eski oturum günlüğünden model kaydı komutunun ve çıktısının değiştirilmemiş alıntısı.
+- Kaynak dosyalar silinmedi.
+
+**Model–etiket bağlantısı:** `tp1_v1` ← **etiket2.csv**, kanıtla bağlandı (kriptografik değil).
+
+- **Kanıtlar:**
+  - Oturum günlüğü, 15.11 08:55:19Z komutu: `egit.py … a6/etiket2.csv … --kaydet`.
+  - Komutun 08:59:20Z çıktısı: "kaydedildi: …tp1_v1.json λ 1000 bantlar [0.229, 0.34] grup 45 boyut 8692". Repodaki
+    dosya 8.692 bayt, bantlar 0,2289 / 0,3402, 45 grup; hepsi tutuyor.
+  - Bu çıktıyla commit `e90d0ab` (09:03:32Z) arasında modele yazan başka komut görülmedi.
+  - Eğitim süzgeciyle etiket2'nin 45 grup sayısı birebir aynı.
+- **Kalan belirsizlik:**
+  - O anda dosya parmak izi alınmadı.
+  - etiket3.csv de aynı grup sayılarını veriyor; yani **sayım tek başına ayırt etmez**. Ayırt eden kanıt günlük
+    komutudur.
+  - Dosya zamanları yalnız destekleyici bilgidir.
+- **Çözülen:** 34.579 ile 34.665 arasındaki 86 plan farkı, eğitimdeki "x_trend dolu" süzgecinden geliyor.
+- **Veri sürümü:** Eğitim anındaki fiyat verisinin parmak izi yok. Arşivdeki 12:18 ve 12:59 yedekleri eğitimden
+  sonra alınmış; aynı veri olduğu **doğrulanamaz**.
+
+## I2.4 FAZ 3 özeti
+
+**A. Metrik ve izlenebilirlik altyapısında tamamlananlar:**
+
+- Bağımsız metrik doğrulaması: 8 kabul koşusunda 10 metrik birebir; 50 rastgele çapraz sınama; metrik hatası yok.
+- Ek metrikler: CAGR, oynaklık, Calmar, Ulcer, ödeme oranı, piyasada kalma, aylık getiri. Getiri, R ve süre
+  dağılımları; ardışık kayıp serileri.
+- MAE/MFE: iki R paydası, kesin ve olası sınırlar, çıkış sonrası hareketin ayrı tutulması.
+- `fiyat_izi_v1` şeması (hazırlık): indirme kaydı, eski satır günlüğü, `indirme_id`, anlık görüntü ve parmak izi.
+  Kopyada göç, geri kurma ve geri dönüş provası tamam.
+- Araştırma veritabanının bugünkü parmak izi; model kökeni kaydı; köken arşivi.
+
+**B. Doğrulanmış veri sorunları** (gözlem olarak kesin; nedenleri ayrı):
+
+- 2024-04-09'da piyasa geneli düşük kapsama (329 eksik).
+- 19 tekil eksik gün.
+- 25 OHLC tutarsızlığı.
+- 605 tek gün > %10,5 sıçrama; aralarında açık veri hataları var (TRHOL +%10.124 / −%99).
+- 4.296 sıfır hacim; 3.762 bayat mum.
+- İki veritabanında aynı gün için farklı fiyat: 4 hisse, 927 gün. Geçmiş veri değişmiş.
+- Fiyatlar kaynak, zaman ve ayar kaydı olmadan yeniden yazılıyor (`INSERT OR REPLACE` + `auto_adjust`).
+
+**C. Nedeni ya da etkisi ölçülmemiş sorunlar:**
+
+- Sıçramaların nedeni. KAP'a yakınlık (106) kanıt değildir.
+- İki veritabanı farkının nedeni. Geriye dönük düzeltmeyle uyumlu, ama kesinleşmedi.
+- Araştırma veritabanında blok sınırı taban kaymasının etkisi.
+- Düzeltilmiş ile o gün erişilebilir fiyat farkının sonuçlara etkisi (düzeltilmemiş fiyat yok).
+- 191 geç başlayan hissede halka arz ile veri başlangıcı ayrımı.
+- Bayat ya da sıfır hacimli mumların işlem görmeme mi veri taşıma mı olduğu.
+- **Adayların %27,1'inin** gösterge penceresinde sıçrama var.
+  - Bu, **%27'sinin hatalı olduğu anlamına gelmez**; sonuçların etkilenmediğini de göstermez.
+  - Bu konuda **duyarlılık analizi yapılmadı**.
+
+**D. Tarihsel performans iddialarına sınırlamalar:**
+
+- FAZ 2 rakamları, kaynağı ve zamanı kayıtlı olmayan, sonradan yeniden düzeltilebilen bir veri sürümüne dayanır. Aynı
+  veri kümesiyle yeniden üretilebilirlik ancak bugünkü parmak iziyle mümkündür.
+- Seçim ve sıralama, şüpheli mum içeren pencerelerden etkilenmiş olabilir; ölçülmedi.
+- Hayatta kalma yanlılığı ve güncel sektör listesi sürüyor. Borsadan çıkan hisseler ve tarihsel sektör verisi
+  ücretli ya da elle kurulacak kaynaklara bağlı.
+- MAE/MFE gün sonu verisiyle hesaplanıyor. Stop çıkışlarında MFE, hedef çıkışlarında MAE yalnız sınır olarak
+  verilir.
+- Model metrikleri belirli bir etiket ve veri sürümüne aittir; dönem dışı yeniden doğrulama eğitim gerektirdiği için
+  yapılmadı.
+- Bütün bunlar sonuçlar görüldükten sonra yapılan incelemedir; dönem dışı kanıt değildir.
+
+## I2.5 FAZ 3 kabul önerisi
+
+**Öneri:** FAZ 3, **metrik ve izlenebilirlik altyapısı ile veri güvenilirliği envanteri** olarak kabul edilebilir.
+
+- **Gerekçe:**
+  - metrikler bağımsız kodla doğrulandı;
+  - MAE/MFE tanımları ve sınırları elle doğrulanabilir testlerle belirlendi;
+  - veri sorunları gözlem ve neden olarak ayrıldı;
+  - izlenebilirlik şeması kopyada göç ve geri dönüşle sınandı;
+  - geçici kanıtlar arşivlendi ve model kökeni kanıtla bağlandı.
+- **Kabul şunları kapsamaz:** tarihsel performansın güvenilir olduğu; veri sorunlarının etkisiz olduğu;
+  `fiyat_izi`'nin canlıya alınması.
+- **Açık kalanlar** (her biri ayrı onay ister):
+  - duyarlılık analizi;
+  - düzeltilmemiş fiyat edinimi;
+  - borsadan çıkan hisse ve tarihsel sektör verisi;
+  - `fiyat_izi` canlı geçişi;
+  - FAZ 4.
+
+**Testler:**
+
+- `tests.test_faz3_metrik`: 11 / 11 (3 yeni sınır testi).
+- `tests.test_fiyat_izi`: 7 / 7.
+- Tam takım (ağ engelli): **Ran 621 tests … OK**, ağ denemesi 0 (618 + 3).
+
+## I2.6 FAZ 1 (ayrı)
+
+- 16.11 14:32'de canlı veritabanı salt-okunur okundu: 2 tahmin, 0 sonuç, 0 değerlendirme, 0 olay. Son çalıştırma
+  09:42 sabah kontrolü. Fiyatlar 13.11'e kadar.
+- Bu ekten önce yeni bir okuma: **16.11 17:23**, durum aynı (2 tahmin, 0 sonuç, 0 değerlendirme, 0 olay, son çalıştırma 09:42 sabah kontrolü). Bu akşamki analiz henüz çalışmadı.
+- **FAZ 1 kabul edilmedi.**

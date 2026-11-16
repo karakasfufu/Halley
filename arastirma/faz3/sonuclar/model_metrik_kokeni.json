@@ -13,25 +13,33 @@
  },
  "sinama_metrikleri_model_dosyasindan": "tp1_v1.json → sinama (son 12 ay ana sınama: E2 AUC 0,605, %90 aralık 0,567–0,646, Brier becerisi %2,81)",
  "etiket_surumu": {
-  "dosya": "etiket2.csv (EN OLASI; kesin değil)",
-  "gerekce": "Model commit'i 12:03; etiket3.csv 12:45'te oluştu → etiket3 olamaz. etiket.csv (04:33, 38 sütun) ve etiket2.csv (11:50, 53 sütun, tp1_model.features girdileri) aynı kapanmış plan sayısını (34.665, risk≠yüksek, stop≥%1) ve TP1 oranını (%29,3) veriyor; model girdileri etiket2'deki sütunlarla eşleşiyor.",
+  "dosya": "etiket2.csv",
+  "baglanti_durumu": "KANITLA BAĞLANDI (kriptografik değil)",
+  "kanitlar": [
+   "Oturum günlüğü (ec374004…jsonl) 2026-11-15T08:55:19Z komutu: egit.py <repo> a6/etiket2.csv a6/egit_sonuc.json --kaydet; çıktısı 08:59:20Z: 'kaydedildi: …/modeller/tp1_v1.json λ 1000 bantlar [0.229, 0.34] grup 45 boyut 8692' — repodaki tp1_v1.json 8.692 bayt, bantlar 0.2289/0.3402, 45 grup.",
+   "08:59–09:03 arasında tp1_v1.json'a yazan başka komut günlükte yok; commit e90d0ab 09:03:32Z.",
+   "egit.load_df süzgeciyle etiket2.csv 34.579 plan ve 45 grubun eğitim sayıları birebir (yeniden_degerlendirme.json)."
+  ],
+  "kalan_belirsizlik": "O anda dosya parmak izi alınmadı; etiket2.csv'nin 11:50'deki içeriğinin bugünkü kopyayla aynı olduğu yalnız dosya zamanıyla (11:50, sonradan değişmemiş) destekleniyor. etiket3.csv de aynı grup sayılarını veriyor → sayım tek başına ayırt etmez; ayırt eden kanıt günlük komutudur.",
+  "86_fark": "Çözüldü: egit.load_df x_trend dolu süzgeci (34.665 → 34.579).",
   "sha256": {
    "etiket.csv": "5aa52bbac2e4303b7cb94225a1b58e919b63ee875a8c3eb7588e0009e5d554b8",
    "etiket2.csv": "13f8ed31c3a03de3f60f6e2842cc44e9556db0c6f0b7e2e232118685176b48b2",
    "etiket3.csv": "ed0e96aa3523063bc8877800c7a88a1a7981bf356d662123c6ff58dc56810e51"
   },
-  "konum": "eski oturum çalışma klasörü (a6/); repoda DEĞİL, geçici klasör temizlenirse kaybolur",
-  "dogrulanmayan": "model dosyasındaki 34.579 ile filtrelenmiş 34.665 arasındaki 86 plan farkı",
+  "arsiv": "data/backtest/arsiv/faz3_koken_20261116/ (Git dışı; manifest: sonuclar/arsiv_manifest.json)",
   "etiket_tanimi": "y = tp1_goruldu (TP1'de yarı satış, SL'den önce); journal kuralı s2; giriş ertesi açılış (azami üstü girişsiz); maliyet %0,2+%0,1"
  },
  "veri_surumu": {
   "arastirma_db": "arastirma_5y.db; etiketleme anındaki parmak izi KAYITLI DEĞİL (o tarihte izleme yoktu). Bugünkü parmak izi arastirma_db_parmak_izi.json'da; etiketleme anıyla aynı olduğu DOĞRULANAMAZ.",
-  "fiyat_ayari": "yfinance auto_adjust=True; indirme zamanları kayıtlı değil"
+  "fiyat_ayari": "yfinance auto_adjust=True; indirme zamanları kayıtlı değil",
+  "egitim_aninda_yakin_yedekler": "a6/arastirma_5y_yedek.db (12:18) ve arastirma_5y_yedek2.db (12:59) arşivde; eğitim (11:55) SONRASI alınmış; eğitim anındaki veriyle aynı olduğu doğrulanamaz."
  },
  "bilinen_etiket_sorunlari_sonraki_duzeltmeler": {
   "tp1_hedefi (Ek F-A)": "34.665 kapanmış planın 91'inde (%0,26) y=0 → yeni tanımla 1 olurdu",
   "s3 stop altı girişsiz (Ek H4)": "girilen planların ~293'ü (%0,75) girişsiz olurdu (hepsi y=0; etiket değişmez, örnek çıkar)",
   "fiyat yeniden düzeltme (FAZ 3)": "araştırma DB'sinde iki indirme bloğu arasında %0,2–1,3 taban kayması olası (4 hisse); etiketlere etkisi ölçülmedi"
  },
- "kural": "Eski metrikler bu etiket/veri/kod sürümüne aittir; düzeltilmiş etiketlerle yeniden sınama YAPILMADI (model eğitme/etkin model değişikliği yok)."
+ "kural": "Eski metrikler bu etiket/veri/kod sürümüne aittir; düzeltilmiş etiketlerle yeniden sınama YAPILMADI (model eğitme/etkin model değişikliği yok).",
+ "kod_surumu_egitim": "egit.py, 08:55:19Z komutunda yeniden yazıldı ve e90d0ab'de commit'lendi (aynı içerik olduğu varsayımı: arada egit.py'yi değiştiren komut görülmedi)."
 }

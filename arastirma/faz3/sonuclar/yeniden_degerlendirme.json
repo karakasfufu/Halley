@@ -1,0 +1,54 @@
+{
+ "not": "ÖNEMLİ: tp1_v1, egit.py export() ile kapanmış TÜM veriyle (2022-11-09 … 2026-11-12) uydurulmuştur. Bu yüzden bu veride tp1_v1 ile hesaplanan her metrik EĞİTİM İÇİDİR (dönem dışı DEĞİLDİR). tp1_v1.json'daki dönem dışı sınama sonuçları, test döneminden önceki verilerle ayrı uydurulan kat modellerinden gelir; o kat modelleri ve tahminleri SAKLANMAMIŞTIR → dönem dışı metriği düzeltilmiş etiketle yeniden hesaplamak, kat modellerini yeniden uydurmayı (eğitimi) gerektirir; YAPILMADI.",
+ "model": "tp1_v1.json (sabit)",
+ "etiket_kontrolu": {
+  "etiket.csv": {
+   "suzulmus": 0,
+   "tablo_karsilastirma": "girdi sütunları yok (tablo anahtarı kurulamaz)"
+  },
+  "etiket2.csv": {
+   "suzulmus": 34579,
+   "model_plan_sayisi": 34579,
+   "grup_sayilari_birebir": true,
+   "grup_tp1_orani_en_buyuk_fark": 4.705882352941393e-05,
+   "tp1_%": 29.27
+  },
+  "etiket3.csv": {
+   "suzulmus": 34579,
+   "model_plan_sayisi": 34579,
+   "grup_sayilari_birebir": true,
+   "grup_tp1_orani_en_buyuk_fark": 4.705882352941393e-05,
+   "tp1_%": 29.27
+  }
+ },
+ "yeniden_degerlendirme_EGITIM_ICI": {
+  "etiket2_suzulmus": 34579,
+  "yeni_etiketle_eslesen": 34579,
+  "eslesmeyen": 0,
+  "girdisi_farkli_eslesen": 0,
+  "yeni_etikette_kapanmamis": 0,
+  "etiketi_degisen": 91,
+  "degisim_yonu": {
+   "0→1": 91
+  },
+  "A_eski_etiket": {
+   "n": 34579,
+   "AUC": 0.6361,
+   "Brier": 0.19807,
+   "tp1_%": 29.27
+  },
+  "B_duzeltilmis_etiket_tp1_hedefi": {
+   "n": 34579,
+   "AUC": 0.6347,
+   "Brier": 0.19922,
+   "tp1_%": 29.54
+  },
+  "C_duzeltilmis_ve_s3_stop_alti_girissiz_cikarilmis": {
+   "n": 34329,
+   "AUC": 0.635,
+   "Brier": 0.20002,
+   "tp1_%": 29.75
+  },
+  "s3_ile_cikan": 250
+ }
+}

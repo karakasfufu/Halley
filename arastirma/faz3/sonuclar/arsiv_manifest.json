@@ -1,0 +1,202 @@
+{
+ "olusturuldu": "2026-11-16T17:18:43+03:00",
+ "arsiv": "C:\\Users\\fkara\\Documents\\ChatGPT\\Bulutların Üstü\\work\\Halley\\data\\backtest\\arsiv\\faz3_koken_20261116",
+ "not": "Dosya zamanı tek başına hangi etiketle eğitildiğinin kanıtı değildir. Kanıt: oturum günlüğü komut kaydı (gunluk_model_kaydi.txt) + tp1_v1 tablo grup sayılarının etiket dosyasıyla birebirliği.",
+ "dosyalar": [
+  {
+   "dosya": "a6_15kasim/etiket.csv",
+   "kaynak": "C:\\Users\\fkara\\AppData\\Local\\Temp\\claude\\806f7c764d89a846\\ec374004-73c1-4f2b-91a1-2860d9931ec7\\scratchpad\\a6\\etiket.csv",
+   "boyut": 18086549,
+   "satir": 46054,
+   "degistirilme": "2026-11-15T04:33:50+03:00",
+   "sha256": "5aa52bbac2e4303b7cb94225a1b58e919b63ee875a8c3eb7588e0009e5d554b8",
+   "kopya_ayni": true
+  },
+  {
+   "dosya": "a6_15kasim/etiket.log",
+   "kaynak": "C:\\Users\\fkara\\AppData\\Local\\Temp\\claude\\806f7c764d89a846\\ec374004-73c1-4f2b-91a1-2860d9931ec7\\scratchpad\\a6\\etiket.log",
+   "boyut": 144,
+   "satir": 13,
+   "degistirilme": "2026-11-15T04:33:50+03:00",
+   "sha256": "5ea3cc34b086e9be050c4f2a8bbfcee6919a7bde00175dc428741d5e26cbcb7c",
+   "kopya_ayni": true
+  },
+  {
+   "dosya": "a6_15kasim/etiket2.csv",
+   "kaynak": "C:\\Users\\fkara\\AppData\\Local\\Temp\\claude\\806f7c764d89a846\\ec374004-73c1-4f2b-91a1-2860d9931ec7\\scratchpad\\a6\\etiket2.csv",
+   "boyut": 17532462,
+   "satir": 46054,
+   "degistirilme": "2026-11-15T11:50:20+03:00",
+   "sha256": "13f8ed31c3a03de3f60f6e2842cc44e9556db0c6f0b7e2e232118685176b48b2",
+   "kopya_ayni": true
+  },
+  {
+   "dosya": "a6_15kasim/etiket2.log",
+   "kaynak": "C:\\Users\\fkara\\AppData\\Local\\Temp\\claude\\806f7c764d89a846\\ec374004-73c1-4f2b-91a1-2860d9931ec7\\scratchpad\\a6\\etiket2.log",
+   "boyut": 144,
+   "satir": 13,
+   "degistirilme": "2026-11-15T11:50:20+03:00",
+   "sha256": "54a2ccd7927f645e65a2b477899fda03f2e5b6dad35a59e522bc247f306a54c3",
+   "kopya_ayni": true
+  },
+  {
+   "dosya": "a6_15kasim/etiket3.csv",
+   "kaynak": "C:\\Users\\fkara\\AppData\\Local\\Temp\\claude\\806f7c764d89a846\\ec374004-73c1-4f2b-91a1-2860d9931ec7\\scratchpad\\a6\\etiket3.csv",
+   "boyut": 21281077,
+   "satir": 46054,
+   "degistirilme": "2026-11-15T12:45:06+03:00",
+   "sha256": "ed0e96aa3523063bc8877800c7a88a1a7981bf356d662123c6ff58dc56810e51",
+   "kopya_ayni": true
+  },
+  {
+   "dosya": "a6_15kasim/etiketle.py",
+   "kaynak": "C:\\Users\\fkara\\AppData\\Local\\Temp\\claude\\806f7c764d89a846\\ec374004-73c1-4f2b-91a1-2860d9931ec7\\scratchpad\\a6\\etiketle.py",
+   "boyut": 5902,
+   "satir": 120,
+   "degistirilme": "2026-11-15T04:15:48+03:00",
+   "sha256": "2b5e24da5ddb53427a85756cc8841b25d7bbf33c8c3cd29e3d3de4afaed57cec",
+   "kopya_ayni": true
+  },
+  {
+   "dosya": "a6_15kasim/model.py",
+   "kaynak": "C:\\Users\\fkara\\AppData\\Local\\Temp\\claude\\806f7c764d89a846\\ec374004-73c1-4f2b-91a1-2860d9931ec7\\scratchpad\\a6\\model.py",
+   "boyut": 13136,
+   "satir": 261,
+   "degistirilme": "2026-11-15T04:35:04+03:00",
+   "sha256": "036df8d3c9f50f0bfbbb14b6bf7f8df496d128f25580bba06bf7102a9e30f40a",
+   "kopya_ayni": true
+  },
+  {
+   "dosya": "a6_15kasim/sonuc.json",
+   "kaynak": "C:\\Users\\fkara\\AppData\\Local\\Temp\\claude\\806f7c764d89a846\\ec374004-73c1-4f2b-91a1-2860d9931ec7\\scratchpad\\a6\\sonuc.json",
+   "boyut": 17105,
+   "satir": 883,
+   "degistirilme": "2026-11-15T04:35:25+03:00",
+   "sha256": "684abc886267cf718506f8f546881615b99eae491cce498b9545ada72a01f738",
+   "kopya_ayni": true
+  },
+  {
+   "dosya": "a6_15kasim/egit_sonuc.json",
+   "kaynak": "C:\\Users\\fkara\\AppData\\Local\\Temp\\claude\\806f7c764d89a846\\ec374004-73c1-4f2b-91a1-2860d9931ec7\\scratchpad\\a6\\egit_sonuc.json",
+   "boyut": 21166,
+   "satir": 1086,
+   "degistirilme": "2026-11-15T11:59:17+03:00",
+   "sha256": "19c1d3b1c937b71a1ff76a2014876b755ae5c2ec6fcb1afc0aa0307148c9f90c",
+   "kopya_ayni": true
+  },
+  {
+   "dosya": "a6_15kasim/indir.py",
+   "kaynak": "C:\\Users\\fkara\\AppData\\Local\\Temp\\claude\\806f7c764d89a846\\ec374004-73c1-4f2b-91a1-2860d9931ec7\\scratchpad\\a6\\indir.py",
+   "boyut": 1115,
+   "satir": 23,
+   "degistirilme": "2026-11-15T04:13:25+03:00",
+   "sha256": "e01a312166544e134bc67b158d3758002944b57fce6419d5a5aad51f76c55542",
+   "kopya_ayni": true
+  },
+  {
+   "dosya": "a6_15kasim/indir.log",
+   "kaynak": "C:\\Users\\fkara\\AppData\\Local\\Temp\\claude\\806f7c764d89a846\\ec374004-73c1-4f2b-91a1-2860d9931ec7\\scratchpad\\a6\\indir.log",
+   "boyut": 382,
+   "satir": 15,
+   "degistirilme": "2026-11-15T04:17:10+03:00",
+   "sha256": "4365a8ab8d1baf45889eaadd01c813194bd86bfcee943af99ccdfe8f336caf11",
+   "kopya_ayni": true
+  },
+  {
+   "dosya": "a6_15kasim/deneme.csv",
+   "kaynak": "C:\\Users\\fkara\\AppData\\Local\\Temp\\claude\\806f7c764d89a846\\ec374004-73c1-4f2b-91a1-2860d9931ec7\\scratchpad\\a6\\deneme.csv",
+   "boyut": 260672,
+   "satir": 665,
+   "degistirilme": "2026-11-15T04:19:25+03:00",
+   "sha256": "e2d2d10a6b828af1736d098ca889f0477b31191f171e2fafad5eeb3494fccd0a",
+   "kopya_ayni": true
+  },
+  {
+   "dosya": "a6_15kasim/deneme.json",
+   "kaynak": "C:\\Users\\fkara\\AppData\\Local\\Temp\\claude\\806f7c764d89a846\\ec374004-73c1-4f2b-91a1-2860d9931ec7\\scratchpad\\a6\\deneme.json",
+   "boyut": 12125,
+   "satir": 666,
+   "degistirilme": "2026-11-15T04:19:32+03:00",
+   "sha256": "06a2cdda10ef4a29d1eb27b099ee32628b353dd410f737bcad560ef2c76acbf6",
+   "kopya_ayni": true
+  },
+  {
+   "dosya": "a6_15kasim/deneme2.csv",
+   "kaynak": "C:\\Users\\fkara\\AppData\\Local\\Temp\\claude\\806f7c764d89a846\\ec374004-73c1-4f2b-91a1-2860d9931ec7\\scratchpad\\a6\\deneme2.csv",
+   "boyut": 92054,
+   "satir": 242,
+   "degistirilme": "2026-11-15T11:35:16+03:00",
+   "sha256": "c39315248b781ecdc39b785abaac8f5c7402cbee3584bfedbdf26c6a59e33cfd",
+   "kopya_ayni": true
+  },
+  {
+   "dosya": "a6_15kasim/kap.log",
+   "kaynak": "C:\\Users\\fkara\\AppData\\Local\\Temp\\claude\\806f7c764d89a846\\ec374004-73c1-4f2b-91a1-2860d9931ec7\\scratchpad\\a6\\kap.log",
+   "boyut": 2557,
+   "satir": 87,
+   "degistirilme": "2026-11-15T12:26:15+03:00",
+   "sha256": "59dcbe86865fd4b25aaaf3836e522875542b8bd4ce1643cf145b3abd2a00f483",
+   "kopya_ayni": true
+  },
+  {
+   "dosya": "a6_15kasim/kap2.log",
+   "kaynak": "C:\\Users\\fkara\\AppData\\Local\\Temp\\claude\\806f7c764d89a846\\ec374004-73c1-4f2b-91a1-2860d9931ec7\\scratchpad\\a6\\kap2.log",
+   "boyut": 2560,
+   "satir": 87,
+   "degistirilme": "2026-11-15T12:36:14+03:00",
+   "sha256": "239da58d2713ecfcdac3187bc57213843f9a9631be18dba3f2c0a8c09ca65d76",
+   "kopya_ayni": true
+  },
+  {
+   "dosya": "a6_15kasim/kap3.log",
+   "kaynak": "C:\\Users\\fkara\\AppData\\Local\\Temp\\claude\\806f7c764d89a846\\ec374004-73c1-4f2b-91a1-2860d9931ec7\\scratchpad\\a6\\kap3.log",
+   "boyut": 1522,
+   "satir": 52,
+   "degistirilme": "2026-11-15T12:44:32+03:00",
+   "sha256": "66555e9c67f2d82a88eb0845635f34790a96dd2a6b00187972cb3807fbed1998",
+   "kopya_ayni": true
+  },
+  {
+   "dosya": "a6_15kasim/arastirma_5y_yedek.db",
+   "kaynak": "C:\\Users\\fkara\\AppData\\Local\\Temp\\claude\\806f7c764d89a846\\ec374004-73c1-4f2b-91a1-2860d9931ec7\\scratchpad\\a6\\arastirma_5y_yedek.db",
+   "boyut": 62533632,
+   "satir": null,
+   "degistirilme": "2026-11-15T12:18:28+03:00",
+   "sha256": "eb27e49835d63667b205e3cfe2eb44b6e03e78bb980ddd88430ff7d5006c5287",
+   "kopya_ayni": true
+  },
+  {
+   "dosya": "a6_15kasim/arastirma_5y_yedek2.db",
+   "kaynak": "C:\\Users\\fkara\\AppData\\Local\\Temp\\claude\\806f7c764d89a846\\ec374004-73c1-4f2b-91a1-2860d9931ec7\\scratchpad\\a6\\arastirma_5y_yedek2.db",
+   "boyut": 312946688,
+   "satir": null,
+   "degistirilme": "2026-11-15T12:59:49+03:00",
+   "sha256": "cc15841b2bcf1d20fcbe0f637785b19b4bc35ca37474029b2620c46614ce870b",
+   "kopya_ayni": true
+  },
+  {
+   "dosya": "faz2_16kasim/planlar_seviyeli.csv",
+   "kaynak": "C:\\Users\\fkara\\AppData\\Local\\Temp\\claude\\806f7c764d89a846\\b5139424-d82b-42ea-909e-806db59966fe\\scratchpad\\faz2\\planlar_seviyeli.csv",
+   "boyut": 22381286,
+   "satir": 45738,
+   "degistirilme": "2026-11-16T11:15:49+03:00",
+   "sha256": "2413d1dfecca4994202797e0a156096953010a7e689ab237070a7b5aaa5a12de",
+   "kopya_ayni": true
+  },
+  {
+   "dosya": "faz2_16kasim/etiketle.log",
+   "kaynak": "C:\\Users\\fkara\\AppData\\Local\\Temp\\claude\\806f7c764d89a846\\b5139424-d82b-42ea-909e-806db59966fe\\scratchpad\\faz2\\etiketle.log",
+   "boyut": 145,
+   "satir": 13,
+   "degistirilme": "2026-11-16T11:15:49+03:00",
+   "sha256": "5b880032febd23e55e630701a348aab8f118d7f2a77a0d4ec43c780de1f87460",
+   "kopya_ayni": true
+  }
+ ],
+ "gunluk_alintisi": {
+  "dosya": "gunluk_model_kaydi.txt",
+  "sha256": "ed158d7b653ab9285b983a5962908d0976d5e9a665b5e81c9093bc8eac61ccf3",
+  "kaynak_gunluk": "C:\\Users\\fkara\\.claude\\projects\\C--Users-fkara-AppData-Local-Claude-Data-claude-pzs8sxrjxfjjc-scratch-workspaces-e042b6f2-f478-4964-b014-4d79cec9a2c8-b9c99ae6-7f9d-4cee-a6fc-13771316a60d-scratch-2026-11-06-d073b3\\ec374004-73c1-4f2b-91a1-2860d9931ec7.jsonl"
+ },
+ "hepsi_dogru_kopyalandi": true
+}

@@ -48,5 +48,66 @@ def hesapla(t: Dict, bars: List[Dict], defter_mod) -> Optional[Dict]:
     return out
 
 
+def sinirlar(t: Dict, bars: List[Dict]) -> Optional[Dict]:
+    """Ek I2: İŞARET ve SINIR tanımı (R_plan biriminde).
+      MAE = (pozisyon açıkken en düşük fiyat − dolum) / (plan girişi − SL)  → NEGATİF ya da 0 (aleyhte hareket)
+      MFE = (pozisyon açıkken en yüksek fiyat − dolum) / (plan girişi − SL) → POZİTİF ya da 0 (lehte hareket)
+    KESİN BİLİNEN hareket: giriş mumu (giriş açılışta → mumun tamamı girişten sonra), ara mumlar ve çıkış fiyatı.
+    OLABİLECEK hareket: gün içi çıkış mumunda çıkıştan ÖNCEKİ kısım bilinmez; o mumun en yüksek/en düşüğü çıkıştan önce
+    ya da sonra olmuş olabilir. Kural kısıtları:
+      - stopta gün içi çıkış (SL / başabaş): çıkıştan önce fiyat stopun ÜSTÜNDEYDİ (stop ilk dokunuşta satar) →
+        MAE KESİN (= çıkış fiyatı dahil); MFE ∈ [kesin, mumun en yükseği] (en yüksek çıkıştan önce olmuş olabilir).
+      - hedefte gün içi çıkış (TP2): çıkıştan önce fiyat hedefin ALTINDAYDI → MFE KESİN; MAE ∈ [mumun en düşüğü, kesin].
+      - açılışta çıkış ya da süre doldu (kapanış): bilinmeyen kısım yok → ikisi de KESİN.
+      - alış fiyatı stopun altında (s3 varsayımsal çıkış): çıkış varsayım olduğundan değerler VARSAYIMSAL.
+    Böylece MAE için hesaplanan değer işaretli olarak bir ÜST sınırdır (gerçek MAE ondan küçük ya da eşit, yani daha
+    kötü olabilir); büyüklük olarak ALT sınırdır. MFE için hesaplanan değer ALT sınırdır. Varsayım: stop ve hedef emri
+    tam seviyesinden dolar (boşluk dışında; boşlukta açılıştan çıkış ayrı durumdur)."""
+    i0 = next((i for i, b in enumerate(bars) if b["date"] == t["giris_gunu"]), None)
+    if i0 is None:
+        return None
+    n, fill, risk = t["islem_gunu"], t["giris_fiyati"], t["planlanan_giris"] - t["sl"]
+    if risk <= 0:
+        return None
+    held = bars[i0:i0 + n]
+    son = t["bacaklar"][-1]
+    neden, cikis = son.get("neden") or "", son.get("fiyat")
+    lows, highs = [fill], [fill]
+    for b in held[:-1]:
+        h, l, _ = _hl(b)
+        lows.append(l)
+        highs.append(h)
+    h, l, o = _hl(held[-1])
+    if neden.startswith("SL varsayımı"):
+        durum, l_olasi, h_olasi = "varsayimsal", None, None
+        lows.append(cikis)
+        highs.append(cikis)
+    elif neden == "süre doldu" or ("açılış" in neden and n > 1):
+        if neden == "süre doldu":
+            lows.append(l)
+            highs.append(h)
+        else:
+            lows.append(o)
+            highs.append(o)
+        durum, l_olasi, h_olasi = "kesin", None, None
+    elif neden.startswith("SL") or neden.startswith("başabaş"):
+        lows.append(cikis)
+        highs.append(cikis)
+        durum, l_olasi, h_olasi = "mfe_aralik", None, h
+    elif neden.startswith("TP2"):
+        lows.append(cikis)
+        highs.append(cikis)
+        durum, l_olasi, h_olasi = "mae_aralik", l, None
+    else:
+        lows.append(cikis)
+        highs.append(cikis)
+        durum, l_olasi, h_olasi = "yaklasik", l, h
+    R = lambda x: round((x - fill) / risk, 3)
+    mae_k, mfe_k = R(min(lows)), R(max(highs))
+    return {"durum": durum, "mae_kesin": mae_k, "mfe_kesin": mfe_k,
+            "mae_en_kotu_olasi": R(min(min(lows), l_olasi)) if l_olasi is not None else mae_k,
+            "mfe_en_iyi_olasi": R(max(max(highs), h_olasi)) if h_olasi is not None else mfe_k}
+
+
 if __name__ == "__main__":
     sys.exit("modül; faz3_hesap.py tarafından kullanılır")

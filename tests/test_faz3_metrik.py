@@ -134,5 +134,41 @@ class MaeMfe(unittest.TestCase):
         self.assertIsNone(y["mae_R_dolum"])
 
 
+class MaeMfeSinirlari(unittest.TestCase):
+    """Ek I2: işaret (MAE ≤ 0, MFE ≥ 0) ve çıkış mumundaki bilinmeyen sıranın yönü — elle doğrulanabilir örnekler.
+    Dolum 100, SL 95, plan girişi 100 → 1 R = 5 TL."""
+
+    def t(self, n, neden, fiyat, fill=100.0):
+        return {"giris_gunu": "D1", "islem_gunu": n, "bacaklar": [{"neden": neden, "fiyat": fiyat}],
+                "giris_fiyati": fill, "sl": 95.0, "planlanan_giris": 100.0}
+
+    def test_stop_exit_mae_exact_mfe_interval(self):
+        bars = [{"date": "D1", "open": 100, "high": 104, "low": 98, "close": 101},
+                {"date": "D2", "open": 101, "high": 106, "low": 94, "close": 95}]
+        x = mm.sinirlar(self.t(2, "SL", 95.0), bars)
+        self.assertEqual(x["durum"], "mfe_aralik")
+        self.assertEqual((x["mae_kesin"], x["mae_en_kotu_olasi"]), (-1.0, -1.0))   # 94 stoptan SONRA (pozisyon yok)
+        self.assertEqual((x["mfe_kesin"], x["mfe_en_iyi_olasi"]), (0.8, 1.2))      # 106 çıkıştan önce olmuş olabilir
+
+    def test_target_exit_mfe_exact_mae_interval(self):
+        bars = [{"date": "D1", "open": 100, "high": 104, "low": 98, "close": 101},
+                {"date": "D2", "open": 101, "high": 121, "low": 96, "close": 110}]
+        x = mm.sinirlar(self.t(2, "TP2", 120.0), bars)
+        self.assertEqual(x["durum"], "mae_aralik")
+        self.assertEqual((x["mfe_kesin"], x["mfe_en_iyi_olasi"]), (4.0, 4.0))     # 121 hedeften SONRA
+        self.assertEqual((x["mae_kesin"], x["mae_en_kotu_olasi"]), (-0.4, -0.8))   # 96 çıkıştan önce olmuş olabilir
+        self.assertLessEqual(x["mae_en_kotu_olasi"], x["mae_kesin"])               # işaretli: hesaplanan üst sınır
+
+    def test_close_and_open_exits_exact_and_hypothetical(self):
+        bars = [{"date": "D1", "open": 100, "high": 104, "low": 98, "close": 101},
+                {"date": "D2", "open": 90, "high": 99, "low": 89, "close": 97}]
+        x = mm.sinirlar(self.t(2, "süre doldu", 97.0), bars)
+        self.assertEqual((x["durum"], x["mae_kesin"], x["mfe_kesin"]), ("kesin", -2.2, 0.8))
+        y = mm.sinirlar(self.t(2, "SL (açılışta boşluk)", 90.0), bars)
+        self.assertEqual((y["durum"], y["mae_kesin"], y["mae_en_kotu_olasi"]), ("kesin", -2.0, -2.0))
+        z = mm.sinirlar(self.t(1, "SL varsayımı (alış stopun altında)", 94.0, fill=94.0), bars)
+        self.assertEqual(z["durum"], "varsayimsal")
+
+
 if __name__ == "__main__":
     unittest.main()
