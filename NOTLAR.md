@@ -2001,3 +2001,8 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Açık: K1 başarısız (uyarı üretmez); P1 düşük güç; P2 %0,4 yalnız yapay senaryo (canlı kanıtı değil); canlı eşik doğrulaması yok.
 - Öneriler (uygulanmadı, Ek L2): yanlış alarm hedefi ≤ %5 / 250 gün, %95 üst sınır < %5, ≥ 2.000 tekrar; K1 v2 planı (örtüşmeyen bloklar, Bonferroni, bağımsız blok teyidi, yeni tohum doğrulama serileri); haber politikası (son 2 iş günü, tekrar eleme, eski haber geçmişe taşınmaz, günlük ~0,50 $ sınırı).
 - Müşteri sürümü gereksinimi eklendi: son haber analizi zamanı, bekleyen sayısı, güncellik uyarısı. Depo bilerek açık (kullanıcı); zorunlu düzeltme değil.
+
+## 2026-11-16 — FAZ 7: vade tasarımı (yalnız belge; dal faz7-vade; KABUL BEKLİYOR)
+- Ek N: V0 gün içi (önerilmez), V1 1–5 gün (araştırma gerekli; FAZ 5'te katkı yok), V2 bugünkü kısa vade (mevcut altyapı), V3 1–3 ay (ek veri + araştırma), V4 uzun (ek veri + araştırma; bağımsız yıl az).
+- Çelişki sunumu (birleşik puan yok), ortak portföy (tek hisse tek pozisyon, vade başına risk bütçesi), vade alanı ve ayrı sözleşme, vade_firsat tablosu, ambargo ≥ pencere, mekanik ve endeks referansı, durdurma ölçütleri, şema/dosya taslağı, emek tahmini.
+- Müşteri pilotu: yalnız V2 + Ek M zorunluları; diğer vadeler isteğe bağlı. Kod, test, simülasyon yok.

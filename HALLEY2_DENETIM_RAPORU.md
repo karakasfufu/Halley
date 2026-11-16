@@ -4659,3 +4659,199 @@ Kabul kriteri:
 
 **Onay beklenen:** Canlıya alma, K1 düzeltme planının uygulanması, haber politikası uygulaması ve FAZ 7 için ayrı
 onay gerekir.
+
+
+---
+
+# EK N (16.11.2026) — FAZ 7: farklı yatırım vadelerinin TASARIMI (yalnız tasarım; dal `faz7-vade`)
+
+**Konumu:**
+
+- Yalnız tasarım belgesidir. Model eğitilmedi, strateji uygulanmadı, simülasyon ya da yeni test çalıştırılmadı.
+- Canlı sistem değişmedi; canlı veri ya da müşteri raporu Git'e konmadı.
+- Bu belge hiçbir vadenin etkinleştirilmesini önermez.
+
+**Esas alınan bulgular** (yeniden açılmadı):
+
+- **FAZ 5 (Ek K, K2):** 5 ve 10 günlük hedeflerde canlıya alınabilir ekonomik katkı **gösterilmedi**. TP1 olayındaki
+  ayırt etmenin büyük kısmı mekanikti (hedef uzaklığı).
+- **FAZ 4:** Rejim farkları hipotezdir.
+- **FAZ 3:** Veri sorunları geçerlidir: düzeltilmiş fiyat, taban kayması, sıçramalar, hayatta kalma yanlılığı, güncel
+  sektör listesi.
+- **Vade eklemek başarı artışı değildir.** Her yeni vade, ayrı kanıt gerektiren ayrı bir üründür.
+
+## N.1 Bugünkü kısa vade (başlangıç noktası; yeniden tasarlanmıyor)
+
+| Unsur | Bugünkü kural (kodda) |
+|---|---|
+| Geçerlilik | Hazır fırsat yalnız giriş günü açılışında geçerli (`defter.GECERLILIK_GUN = 1`) |
+| Giriş | Ertesi gün açılış; açılış > azami giriş (= giriş + 0,3 ATR) ise yok; TP1 risk/getiri en az 1:2 (azamide 1:1,5) |
+| Çıkış | `journal.evaluate`: TP1'de yarı satış, stop girişe çekilir; TP2; SL; en çok **30 işlem günü** (`MAX_HOLD`) |
+| Beklenen süre | Plan başına `vade_lo`–`vade_hi` işlem günü (panelde gösteriliyor). FAZ 2'de medyan tutma 6–7 gün. |
+| Veri | Günlük mum; canlıda 1 yıllık indirme, girdiler 250 mum |
+| Model | `tp1_v1`: 30 gün içinde TP1'in SL'den önce görülmesi (yalnız bilgi) |
+
+## N.2 Vade karşılaştırma tablosu
+
+| Vade | Kullanıcı ihtiyacı | İşlem günü | Tahmin hedefi | Geçerlilik | Durum |
+|---|---|---|---|---|---|
+| **V0 Gün içi** | Aynı gün al-sat | < 1 | Gün içi hareket | dakikalar | **Ek veri gerekli + araştırma gerekli.** Dakikalık veri yok; günlük mumla sıra bilinmez. **Önerilmez.** |
+| **V1 Çok kısa** | Birkaç günlük fırsat | 1–5 (10'a kadar) | 5/10 günlük getiri ya da TP1 olayı (FAZ 5 tanımları) | 1 gün | **Araştırma gerekli.** FAZ 5'te ekonomik katkı gösterilmedi; yeni kanıt (dönem dışı veri, mekanik referans) olmadan **önerilmez**. |
+| **V2 Kısa / swing (BUGÜNKÜ)** | Haber ve teknik destekli 1–6 haftalık işlem | 2–30 (medyan ~6–7) | TP1'in SL'den önce görülmesi (30 gün) ve net R | 1 gün (açılış) | **Mevcut altyapıyla mümkün** (çalışıyor). Açık zorunlu düzeltmeler Ek M'de (Z1, Z2). |
+| **V3 Orta** | Trend takibi, haftalık bakım | 20–60 (1–3 ay) | 60 gün sonra maliyet sonrası getiri ve/veya hedef/stop olayı (ön kayıtta biri seçilir) | 3–5 iş günü (haftalık plan) | **Ek veri gerekli + araştırma gerekli.** Girdiler için ≥ 2 yıl geçmiş (canlı indirme 1 yıl); haftalık mum türetilebilir. Örtüşen pencereler örneği azaltır. |
+| **V4 Uzun** | Yatırım (aylar–yıl) | 120–250 | 6–12 aylık toplam getiri, endekse göre | haftalar | **Ek veri gerekli + araştırma gerekli.** Temel veriler (bilanço), temettü dahil getiri, düzeltilmemiş fiyat, borsadan çıkanlar ve tarihsel sektör gerekir (FAZ 3 eksikleri). 5 yıllık veride yalnız ~4–5 bağımsız yıl var. |
+
+## N.3 Vade başına kurallar (yalnız mevcut kısa vadeden farklar)
+
+| Unsur | V1 çok kısa | V3 orta | V4 uzun |
+|---|---|---|---|
+| Giriş | V2 ile aynı (ertesi açılış, azami giriş) | Haftalık plan: geçerlilik 3–5 gün; azami giriş ATR yerine **haftalık ATR** ile | Kademeli alım isteğe bağlı; azami giriş geniş (haftalık) |
+| Stop | V2 SL (dar) | Haftalık ATR ya da yapısal dip (daha geniş); adet buna göre küçülür | Geniş stop ya da yalnız zaman ve temel çıkış (ön kayıtta) |
+| Hedef / kısmi satış | TP1 yarı satış yok ya da tek hedef (kısa sürede ikinci hedef gerçekçi değil) | TP1'de üçte bir satış, kalan iz süren stop (ön kayıtta tek kural) | Kısmi satış yok; yeniden dengeleme |
+| Zaman çıkışı | 5 / 10. gün kapanışı | 60. gün kapanışı | 250. gün ya da dönem sonu |
+| Veri sıklığı | Günlük | Günlük + türetilmiş haftalık | Haftalık + çeyreklik temel veri |
+| Tarihsel kapsam | ≥ 2 yıl | ≥ 5 yıl (bugün 5 yıl) | ≥ 10 yıl + borsadan çıkanlar (yok) |
+| Veri kalitesi | FAZ 3 ile aynı | Düzeltilmiş fiyatın uzun dönem etkisi büyür; `fiyat_izi` gerekli | Temettü / bölünme düzeltmesi doğru olmalı; hayatta kalma yanlılığı **kritik** |
+
+## N.4 Çelişkili sinyaller
+
+- Her vade **kendi kartıyla ve kendi hedef tanımıyla** gösterilir. Tek birleşik puan **yoktur**; vadeler otomatik
+  uzlaştırılmaz.
+- Aynı hissede vadeler ters yönde ise (ör. V2 stopa yakın, V3 trendi olumlu) kartta **"vadeler çelişiyor"** etiketi
+  çıkar ve iki kartın hedef tanımları yan yana gösterilir.
+- Hiçbir vade diğerini iptal etmez. Karar kullanıcıdadır.
+- Panel bir vade **filtresi** sunar. Varsayılan görünüm bugünkü V2 olmalıdır.
+
+## N.5 Ortak portföy: nakit, pozisyon, toplam risk
+
+- **Bir hissede tek pozisyon:** Vadeler arası aynı hisse yeniden açılmaz. Açık pozisyonun vadesi kayıtta tutulur.
+- **Ortak nakit:** Vade başına ayrı **risk bütçesi**, toplam risk sınırı ortaktır. Örnek: toplam %6 = V2 %4 + V3 %2.
+  Oranlar ön kayıtta belirlenir; sonuçlara göre ayarlanmaz.
+- **Pozisyon sayısı:** Vade başına ayrı sınır. Sektör sınırı ortaktır.
+- **Başlangıç riski:** Adet gerçek dolum ya da azami girişle hesaplanır (Ek H3 bulgusu, Z2). Geniş stoplu vadelerde
+  adet küçülür.
+- **Simülasyon:** FAZ 2 simülatörüne vade alanı ve vade başına kural parametresi eklenir. Kurallar
+  `journal.evaluate`'te parametre olarak tutulur; ikinci bir kopya yazılmaz.
+
+## N.6 Model, özellik sürümleri ve kayıtlar
+
+- **Tahmin defteri:** `tahmin` tablosuna `vade` alanı eklenir.
+  - Eski kayıtlar NULL kalır ve **"V2" olarak okunur**; uydurma yapılmaz.
+  - Plan imzasına ve sürüm grubuna (`GRUP_ALANLARI`) `vade` eklenir. Vadeler **asla birleştirilmez.**
+- **Sonuçlandırma:** Vade başına ayrı değerlendirme sözleşmesi. Kural sürümü vade parametreleriyle (tutma süresi,
+  kısmi satış, zaman çıkışı) birlikte dondurulur, örneğin `s2-V3`. Eski s2 satırları değişmez.
+- **Modeller:** Vade başına ayrı model dosyası ve özellik sürümü (`tp1_v1` V2'ye aittir). Etkinleştirme vade başına
+  ayrı onay ister. Hiçbir model başka vadenin tahmincisi olarak kullanılmaz.
+- **Hazır fırsat:** `hazir_firsat` tablosunun `UNIQUE(signal_day, ticker)` kuralı çoklu vadeye izin vermez. Tabloyu
+  yeniden kurmak riskli olduğu için yeni vadeler **ayrı tabloda** (`vade_firsat`) tutulur; mevcut tablo değişmez.
+
+## N.7 Doğrulama, örtüşen pencereler, bağımlılık
+
+- **Zaman sıralı bölüm ve ambargo:** Ambargo ≥ hedef penceresi + tutma süresi. Örnek: V3'te 60 işlem günü ≈ 90 takvim
+  günü; V4'te ≥ 365 takvim günü. Ön işleme ve ayarlar yalnız eğitimden (FAZ 5 yöntemi).
+- **Örtüşen hedefler:** Günlük sinyaller 60–250 günlük pencerelerde neredeyse tamamen örtüşür.
+  - Etkin örnek sayısı, **örtüşmeyen pencere sayısı** ve bağımsız gün ile raporlanır.
+  - Aralıklar gün **ve** hisse kümesine dayanıklı olmalıdır (FAZ 4/5'teki tekrar payı uyarısı).
+- **Yeterlilik:**
+  - V3: 5 yılda ~20 örtüşmeyen çeyrek; sınırda.
+  - V4: ~4–5 yıl; **yetersiz** (durdurma kriteri büyük olasılıkla tetiklenir).
+- **Bağımsız doğrulama:** Önceden incelenen dönemler (2024, son 12 ay) bağımsız sayılmaz. Gerçek bağımsız kanıt, ön
+  kayıttan sonra biriken dönem dışı veridir.
+
+## N.8 Başarı ölçütleri, referanslar, durdurma
+
+- **Ön kayıt:** Hedef, kurallar, maliyet, bölümler, referanslar ve başarı ölçütü sonuçlardan önce kaydedilir. Deneme
+  listesi genişletilmez.
+- **Basit referanslar** (FAZ 5 dersiyle, baştan):
+  - sabit oran;
+  - türe göre oran;
+  - **mekanik referans:** hedef uzaklığı ya da stop mesafesi;
+  - **endeks al-tut** (XU100, aynı tutma süresi);
+  - rastgele giriş (aynı gün ve sayı).
+- **Başarı:** İki zaman sınamasında da ön kayıtlı olasılık ölçütü geçilmeli **ve** maliyet sonrası tekil net R
+  referanslardan iyi olmalı (%90 alt sınır > 0). Portföy simülasyonu (FAZ 2 yöntemi) ayrıca raporlanır; tekil
+  sonuçtan portföy getirisi çıkarılmaz.
+- **Durdurma kriterleri:**
+  - örtüşmeyen pencere < 30 ya da bağımsız gün < 60;
+  - ön kayıtlı ölçüt iki sınamada geçilmezse;
+  - mekanik referansa üstünlük yoksa;
+  - gerekli veri (V4 temel veri, borsadan çıkanlar) edinilemezse.
+
+  Durdurulan vade için yeni deneme ancak yeni ön kayıt ve yeni veriyle yapılır.
+
+## N.9 Arayüz, maliyet, performans
+
+- **Arayüz:**
+  - vade filtresi (varsayılan V2);
+  - kartta vade etiketi, geçerlilik, beklenen süre, hedef tanımı;
+  - "vadeler çelişiyor" etiketi;
+  - haber güncellik uyarısı (Ek L2.5).
+- **Maliyet:**
+  - Yapay zekâ maliyeti **0 $** (yeni ücretli çağrı yok).
+  - V4 temel verisi ve borsadan çıkanlar ücretli kaynak gerektirebilir (DataStore: aylık ~50 TL bildirildi, kapsamı
+    doğrulanmadı).
+  - Haber analizi vadeye göre artırılmaz.
+- **Performans:**
+  - V3/V4 günlük ya da haftalık hesap olduğundan işlemci yükü küçüktür.
+  - V3 için ≥ 2 yıl, V4 için ≥ 10 yıl fiyat geçmişi gerekir; bir kerelik indirme ve diskte yer (5 yıl ~0,3 GB).
+  - Panelde vade başına ek sorgu ~ms düzeyinde (FAZ 6 ölçümüne göre `defter`/`izleme` ~1–30 ms).
+
+## N.10 Dosya ve şema değişikliği taslağı (uygulanmadı)
+
+| Dosya / şema | Değişiklik | Not |
+|---|---|---|
+| `bist_haber/vadeler.py` (yeni) | Vade tanımları: kod, gün aralığı, tutma süresi, kısmi satış, zaman çıkışı, stop türü, risk bütçesi payı | Tek kaynak |
+| `bist_haber/journal.py` | `evaluate(..., tutma=MAX_HOLD, kismi=0.5, zaman_cikisi=None)` parametreleri; varsayılan bugünkü davranış | Ek H4'teki s3 seçeneği gibi, varsayılanı değişmeden |
+| `bist_haber/db.py` | Göç v3: `tahmin.vade TEXT`, `vade_firsat` (yeni tablo), `tahmin_degerlendirme` için vade sözleşmesi alanı | Yalnız ekleme; yedek, `integrity_check`, kopyada prova, geri dönüş (FAZ 1 v2 yöntemi) |
+| `bist_haber/defter.py` | `GRUP_ALANLARI` + `vade`; plan imzasına `vade`; vade başına değerlendirme sözleşmesi | Eski kayıt = V2 |
+| `bist_haber/ready.py` | V3 aday üretimi ayrı fonksiyon (haftalık) | V2 yolu değişmez |
+| `app.py` | Vade filtresi, kart etiketi, çelişki etiketi | Varsayılan V2 |
+| `arastirma/vade/` (yeni) | Vade başına etiketleme (`etiketle` parametreli), portföy simülatörüne vade alanı, ön kayıtlar | Araştırma |
+| `tests/` | Vade başına kural, kayıt ayrımı, göç, geri dönüş | — |
+
+## N.11 Bağımlılıklar ve tahmini emek
+
+| İş | Bağımlılık | Emek |
+|---|---|---|
+| V2 açık düzeltmeleri (Z1, Z2) | FAZ 1 kabulü, Midas doğrulaması | Ek M: ~1,5–2,5 gün |
+| Vade altyapısı (`vadeler.py`, `journal` parametreleri, `defter` vade alanı, göç v3) | Z1 ile aynı geçişte yapılması önerilir | 1,5–2 gün |
+| V3 araştırması (ön kayıt, etiket, sınama, portföy simülasyonu) | ≥ 2 yıl canlı girdisi; `fiyat_izi` önerilir | 3–4 gün |
+| V3 ürün entegrasyonu (aday üretimi, panel) | V3 araştırması başarı ölçütünü geçerse ve onay | 2–3 gün |
+| V4 | Temel veri, borsadan çıkanlar, tarihsel sektör (ücretli ya da elle) | Veri edinimi belirsiz; araştırma ≥ 5 gün |
+| V1 | Dönem dışı veri birikimi (aylar), mekanik referanslı yeni ön kayıt | 1–2 gün (ancak veri biriktikten sonra) |
+| V0 | Dakikalık veri kaynağı | Önerilmez |
+
+## N.12 FAZ 7 kabul ölçütleri ve sınırlamalar
+
+**Kabul ölçütleri** (Ek B5: "vade başına etiket, kural, model, sınama ve veri yeterliliğini yazan tasarım notu;
+etkinleştirme yok"):
+
+- Her vade için ihtiyaç, gün, hedef, geçerlilik, kurallar, veri, kayıt, doğrulama, başarı ve durdurma tanımlı
+  (N.2–N.8).
+- Durum etiketleri ("mevcut altyapıyla mümkün" / "ek veri gerekli" / "araştırma gerekli") verildi.
+- Şema ve dosya taslağı, bağımlılıklar ve emek tahmini var (N.10–N.11).
+- Hiçbir şey etkinleştirilmedi.
+
+**Sınırlamalar:**
+
+- Emek tahminleri kabadır.
+- V3/V4 veri yeterliliği hesapla değil, kaba sayımla değerlendirildi.
+- Bu belge yeni bir sonuç ya da kanıt üretmez.
+- Vade eklemek tek başına başarıyı artırmaz.
+
+## N.13 Müşteri pilotu: gerçekten gerekli / isteğe bağlı
+
+| Gerekli (pilot için) | İsteğe bağlı (pilot sonrası, ayrı onay) |
+|---|---|
+| Yalnız **V2** (bugünkü kısa vade); kartta mevcut "vade ~x–y işlem günü" bilgisi | V3 araştırması ve entegrasyonu |
+| Ek M zorunlu düzeltmeleri: Z1 (stop altı gerçekleşme), Z2 (%1 risk gösterimi), Z4 (FAZ 1 kanıtı), Z5 (K1 uyarı üretmez ya da yeniden tasarım) | Vade altyapısı (`vadeler.py`, göç v3) — V3'e karar verilirse |
+| Ü4: müşteri sürümü + haber güncellik göstergesi (Ek L2.5) | V4 (ek veri ve maliyet), V1 (yeni kanıt sonrası) |
+| Panelde **"tek vade: kısa vade (2–30 işlem günü); diğer vadeler sunulmuyor"** açıklaması | Vade çelişki etiketi (birden fazla vade olunca) |
+
+**Onay beklenen:** FAZ 7 kabul kararı. K1 düzeltmesi, ücretli haber analizi, vade uygulaması ve canlıya geçiş ayrı
+onay gerektirir.
+
+## N.14 FAZ 1 (ayrı)
+
+- 16.11 20:06 salt-okunur: 5 tahmin, 0 sonuç, 0 değerlendirme, 0 olay; son çalıştırma aksam 2026-11-16 18:23.
+- Bekleyen: 17.11 sabah kontrolü ve gerçek sonuçlandırma. **FAZ 1 kabul edilmedi.**
