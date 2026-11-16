@@ -1,0 +1,35 @@
+{
+ "ad": "FAZ 6 ön kayıt — model izleme uyarıları (canlı veriye ya da yapay serilere bakılmadan ÖNCE)",
+ "kayit": "2026-11-16; bu dosyanın commit'i izleme kodundan, yapay seri ölçümlerinden ve canlı defter üzerindeki ilk çalıştırmadan önce gelir. Eşikler sonuçlara göre DEĞİŞTİRİLMEZ.",
+ "kapsam": "Tahmin defteri (tahmin / tahmin_sonuc / tahmin_degerlendirme). Ölçüm YALNIZ sonuçlanmış ('tamamlandi'), güncel değerlendirme sözleşmesine sahip (kural s2, maliyet protokolü dolu) tahminlerden; defter.ozet ile AYNI seçim (ortak yardımcı). Sürüm grupları (model × özellik × parametre × kural × maliyet) birleştirilmez. Sözleşmesi eksik eski grup ölçülmez ('sözleşme eksik').",
+ "kontrol_sikligi": "Günde en çok bir kontrol (akşam sonuçlandırmasından sonra çağrılmak üzere; bu fazda bekçiye BAĞLANMAZ). Panel yalnız okur, kayıt yazmaz.",
+ "pencereler": {"birikimli": "grubun başından bugüne bütün ölçülen tahminler", "son": "son 60 bağımsız sonuç günü (giriş günü)"},
+ "referans": {
+  "performans": "Geçmiş backteste göre BOZULMA ÖLÇÜLMEZ: tp1_v1 bütün veriyle eğitildi; dönem dışı sınama sonuçları kat modellerine aittir. Performans yalnız canlı (dönem dışı) veriyle mutlak ölçütlere göre değerlendirilir.",
+  "kalibrasyon": "modelin kendi ortalama tahmini",
+  "rejim": "tp1_v1 eğitim döneminin (2022-11 … 2026-11) sinyal günü rejim dağılımı (FAZ 4 rejim_sonuclari.json → rejim_gun_dagilimi; canlı regime.py tanımı)",
+  "girdi": "tp1_v1 eğitim örnekleri (FAZ 3 arşivi etiket2.csv, egit.load_df süzgeci, 34.579) — her girdi için eğitimden 10 eşit yüzdelikli dilim sınırı ve oranları"
+ },
+ "olcutler_ve_esikler": {
+  "P1_ayirt_etme": "AUC; %90 aralık gün kümesi bootstrap (1000 tekrar, tohum 20261116). Aralığın ÜST sınırı < 0,50 → durum 'esik_asildi' (ayırt etme yok ya da ters).",
+  "P2_taban_oranina_gore": "Brier becerisi = 1 − Brier(model) / Brier(sabit eğitim oranı %29,27). Aralığın ÜST sınırı < 0 → 'esik_asildi' (sabit orandan kötü).",
+  "K1_kalibrasyon": "gerçek TP1 oranının %90 gün kümesi aralığı modelin ortalama tahminini İÇERMİYORSA → 'esik_asildi' (yön: fazla/az tahmin). Bant düzeyi (düşük/orta/yüksek) yalnız bilgi.",
+  "R1_rejim": "BİLGİ (uyarı değil): pencerenin baskın rejiminin eğitimdeki gün payı < %5 → 'eğitimde nadir rejim'; ayrıca pencere ile eğitim rejim dağılımı arası toplam değişim uzaklığı raporlanır.",
+  "G1_girdi": "BİLGİ (uyarı değil): her girdi için PSI (eğitim dilimleriyle; 0 oranlar 1e-4 ile sınırlanır). PSI ≥ 0,25 'belirgin kayma', 0,10–0,25 'orta kayma'. Rejim ve girdi kayması tek başına 'model başarısız' DEMEK DEĞİLDİR."
+ },
+ "asgari_ornek": {
+  "P1": "n ≥ 100, bağımsız gün ≥ 30, en az 10 olumlu ve 10 olumsuz",
+  "P2_K1": "n ≥ 50, bağımsız gün ≥ 20",
+  "G1": "n ≥ 50 (tahmin anındaki girdiler; sonuç gerekmez)",
+  "R1": "≥ 20 farklı sinyal günü",
+  "alti": "'yetersiz veri' — 'model sağlıklı' sonucu ÇIKARILMAZ"
+ },
+ "yanlis_alarm_denetimi": {
+  "teyit": "Uyarı yalnız eşik İKİ kontrolde aşılırsa açılır; ikinci kontrol, ilk aşımdan sonra en az 20 YENİ bağımsız sonuç günü eklendikten sonra olmalı (aynı kanıtla tekrar kontrol ikinci doğrulama SAYILMAZ). İlk aşım 'izleniyor' olarak kaydedilir.",
+  "tekrar_bastirma": "Açık uyarı (grup × ölçüt) için yeni uyarı üretilmez; 'devam ediyor' olarak güncellenir. Eşik altına inip iki kontrol (≥ 20 yeni gün arayla) temiz kalınca 'kapandı'.",
+  "yapay_seri_olcumu": "Normal (kalibre) ve bozulmuş (ayırt etme kaybı, kalibrasyon kayması) yapay serilerde: 250 iş günü, günde 1–3 sonuç, aynı gün ortak şok (gün içi bağımlılık), günlük kontrol; 500 tekrar (tohum 20261116): (a) 250 günde en az bir teyitli yanlış alarm olasılığı, (b) tespit oranı ve gecikmesi. Bu ölçüm eşiklerin CANLI veride doğrulandığı anlamına gelmez.",
+  "ilgili_gozlem": "Aynı günün sonuçları gün kümesi bootstrap ile birlikte örneklenir; aynı hissenin 10 gün içindeki tekrar payı raporlanır."
+ },
+ "davranis": "Uyarılar yalnız yerel kayda (data/izleme_kayit.jsonl, ekle-yalnız; durum data/izleme_durumu.json) ve panele yazılır. Harici bildirim YOK. Modeli yeniden eğitmez, kapatmaz, etkin modeli ya da işlem kurallarını değiştirmez. Her kayıtta: neden, örneklem (n, gün, hisse, tekrar %), dönem, referans, ölçüm ve aralık.",
+ "yasaklar": ["eşikleri sonuçlara göre değiştirmek", "eğitim içi sonucu dönem dışı referans gibi kullanmak", "sürüm gruplarını birleştirmek", "harici bildirim", "model/kural değişikliği"]
+}
