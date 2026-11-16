@@ -5564,3 +5564,33 @@ süreçler arası rezervasyon, tek analiz kilidi, sonradan analiz işareti.
 6. Çöken süreçten kalan açık rezervasyonlar için temizleme aracı yok (muhafazakâr; ay sonunda düşer).
 
 **Kapsam dışı (başlatılmadı):** O2, O4–O6, müşteri yayını, FAZ 8.
+
+
+---
+
+# EK O-3e (16.11.2026) — O3 KABUL KAYDI
+
+**Kullanıcı kararı:** O3, raporlanan canlı geçiş (Ek O-3c) ve tek haberlik ücretli doğrulama (Ek O-3d) kapsamında
+**kabul edildi**.
+
+| | |
+|---|---|
+| Kabul edilen canlı sürüm | Dal `o3-canli`, commit `0e8bbaf` (`main` `6a95652` + yalnız O3). Etiket `o3-kabul`. |
+| Geliştirme ve rapor dalı | `o3-haber` (Ek O-3, O-3b, O-3c, O-3d) |
+| Kanıt | 590 test OK (ağ 0). Yedek: `bist_haber_20261116_212401_o3_oncesi.db`, integrity ok. 24/24 tablo korundu. Tek haber: 1 çağrı, 0,006398 $, defter = ai_calls = analyses, zarf serbest, çift sayım yok, geçmiş tahminler aynı. |
+
+**Açık maddeler (kabulle birlikte korunuyor):**
+
+1. **OpenAI kullanım ekranı karşılaştırması:** Henüz yapılmadı (raporlama gecikmesi). Karşılaştırmada **aynı proje,
+   aynı model (`gpt-5-mini`), aynı zaman aralığı (TR ↔ UTC dönüşümüyle) ve aynı maliyet kapsamı** (yalnız Halley'in
+   chat completions çağrıları; başka uygulama ve anahtar hariç) eşlenmelidir. Bir fark çıkarsa nedeni doğrulanmadan
+   eski "ucuz test" çağrılarına **bağlanmaz**.
+2. **Kayıtsız geçmiş maliyetler:** O3 öncesindeki ucuz test ve kayda geçmemiş çağrıların tutarı **bilinmiyor**.
+   Sıfır kabul edilmez. Kanıt olmadan bütçeye eklenmez ya da bütçeden düşülmez; doğrulanınca ayrı kararla ele alınır.
+3. **Kapasite ifadesi:** Ek O-3b ve O-3d'deki "günde yaklaşık 28 haber" bir **tahmindir, kapasite garantisi
+   değildir**. Haber uzunluğu, profil (ikinci görüş), süreç yeniden başlaması ve gerçek maliyete göre değişir.
+4. gpt-5-mini "deprecated" işaretli; 9 metinsiz güncel haber; 113 bekleyen haber.
+5. **Kuyruk bu kabul nedeniyle topluca işlenmez.**
+
+**Sonraki adım:** O2 geliştirme ve test (kullanıcı onayı, 16.11). Canlıya alma ve müşteri yayını bu onayın kapsamında
+değildir.

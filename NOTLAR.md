@@ -2036,3 +2036,8 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Maliyet 0,006398 $ (2.737 / 2.857 token): defter = ai_calls = analyses. Ay 2,285221 → 2,291619 (çift sayım yok); belirsiz/açık 0. Panel 0,01/0,50 · 2,29/10 $, bekleyen 114 → 113.
 - Geçmiş tahminler/hazır fırsatlar yedekle satır satır aynı; diğer yazımlar mevcut davranış (148 haberde content_hash, ARDYZ company_stats, journal guncellendi).
 - Açık: OpenAI kullanım ekranı karşılaştırması (gecikmeli), kayıtsız eski ucuz test harcaması bilinmiyor (sıfır sayılmadı), gpt-5-mini deprecated, 9 metinsiz haber, 113 bekleyen (topluca işlenmedi). Ek O-3d.
+
+## 2026-11-16 — O3 KABUL EDİLDİ (canlı o3-canli 0e8bbaf, etiket o3-kabul)
+- Kapsam: Ek O-3c canlı geçiş + Ek O-3d tek haber doğrulaması. Kabul kaydı Ek O-3e.
+- Açık: OpenAI kullanım ekranı karşılaştırması (aynı proje/model/zaman/kapsam; fark nedeni doğrulanmadan eski testlere bağlanmaz); kayıtsız geçmiş maliyet bilinmiyor (sıfır değil); "günde ~28 haber" kapasite garantisi değil; kuyruk topluca işlenmez.
+- Sonraki: O2 geliştirme/test onaylandı (canlı ve müşteri yayını hariç).
