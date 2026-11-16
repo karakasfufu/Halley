@@ -1,0 +1,121 @@
+{
+ "olusturuldu": "2026-11-16T11:17:38",
+ "ad": "teknik plan evreninin portföy backtesti",
+ "uyari": "Geçmiş yapay zekâ haber puanı yok; canlı haberli hazır fırsat listesinin geçmiş performansı değildir.",
+ "evren": "canli_ortak",
+ "ayar": {
+  "baslangic_sermaye": 100000.0,
+  "risk_pct": 1.0,
+  "azami_pozisyon": 5,
+  "azami_toplam_risk_pct": 6.0,
+  "azami_sektor": 2,
+  "komisyon_pct": 0.2,
+  "kayma_pct": 0.1,
+  "sabit_adet": null,
+  "sinirsiz": false
+ },
+ "donemler": {
+  "son_12_ay": [
+   "2025-11-14",
+   "2026-11-13"
+  ],
+  "2024": [
+   "2024-01-01",
+   "2024-12-31"
+  ]
+ },
+ "kod": {
+  "commit": "246aae657dd7d3282a2a6e767cdccf839e6be02d",
+  "calisma_agaci_kirli": false
+ },
+ "python": "3.9.13",
+ "veri": {
+  "planlar": "C:/Users/fkara/AppData/Local/Temp/claude/806f7c764d89a846/b5139424-d82b-42ea-909e-806db59966fe/scratchpad/faz2/planlar_seviyeli.csv",
+  "planlar_sha256": "2413d1dfecca4994202797e0a156096953010a7e689ab237070a7b5aaa5a12de",
+  "plan_sayisi_evrende": 36081,
+  "plan_tarih_araligi": [
+   "2022-11-09",
+   "2026-11-12"
+  ],
+  "arastirma_db": "C:/Users/fkara/Documents/ChatGPT/Bulutların Üstü/work/Halley/data/backtest/arastirma_5y.db",
+  "db_boyut": 320942080,
+  "fiyat_son_gun": "2026-11-13",
+  "hisse_sayisi": 584,
+  "takvim": "hisse mumlarının birleşimi",
+  "xu100de_olmayan_gunler": [
+   "2023-12-25",
+   "2024-12-25",
+   "2025-12-25"
+  ],
+  "sektoru_bilinmeyen_hisse": []
+ },
+ "sonuc": {
+  "son_12_ay": {
+   "baslangic": 100000.0,
+   "bitis_ozsermaye": 77270.42,
+   "toplam_getiri_%": -22.73,
+   "azami_dusus_%": -34.07,
+   "azami_dusus_gunu": "2026-10-27",
+   "en_uzun_dusus_suresi_gun": 196,
+   "sharpe_yillik": -1.097,
+   "sortino_yillik": -1.449,
+   "kapanan_islem": 136,
+   "kazanan": 38,
+   "kaybeden": 98,
+   "kazanma_orani_%": 27.9,
+   "kar_faktoru": 0.718,
+   "beklenen_net_tl": -185.26,
+   "ort_R": -0.192,
+   "ort_kazanc_tl": 1692.04,
+   "ort_kayip_tl": -913.2,
+   "en_uzun_ardisik_kayip": 14,
+   "ort_islem_gunu": 8.8,
+   "ort_acik_pozisyon": 4.4,
+   "ayni_mum_belirsiz_islem": 0,
+   "nakitle_kucultulen": 16,
+   "atlanan": {
+    "açılış azami girişin üstünde": 1112,
+    "pozisyon sınırı": 6454,
+    "zaten açık pozisyon": 271,
+    "sektör sınırı": 54
+   },
+   "sonda_acik_pozisyon": 5,
+   "sonda_gerceklesmemis_tl": 2552.3,
+   "kapanan_net_toplam_tl": -25195.94
+  },
+  "2024": {
+   "baslangic": 100000.0,
+   "bitis_ozsermaye": 135872.68,
+   "toplam_getiri_%": 35.87,
+   "azami_dusus_%": -15.15,
+   "azami_dusus_gunu": "2024-10-14",
+   "en_uzun_dusus_suresi_gun": 116,
+   "sharpe_yillik": 1.487,
+   "sortino_yillik": 2.19,
+   "kapanan_islem": 105,
+   "kazanan": 41,
+   "kaybeden": 64,
+   "kazanma_orani_%": 39.0,
+   "kar_faktoru": 1.344,
+   "beklenen_net_tl": 270.48,
+   "ort_R": 0.263,
+   "ort_kazanc_tl": 2707.19,
+   "ort_kayip_tl": -1290.54,
+   "en_uzun_ardisik_kayip": 7,
+   "ort_islem_gunu": 11.3,
+   "ort_acik_pozisyon": 4.58,
+   "ayni_mum_belirsiz_islem": 0,
+   "nakitle_kucultulen": 7,
+   "atlanan": {
+    "açılış azami girişin üstünde": 1167,
+    "pozisyon sınırı": 6956,
+    "zaten açık pozisyon": 225,
+    "sektör sınırı": 41,
+    "giriş günü fiyat yok": 21
+   },
+   "sonda_acik_pozisyon": 5,
+   "sonda_gerceklesmemis_tl": 7643.41,
+   "kapanan_net_toplam_tl": 28400.39
+  }
+ }
+}

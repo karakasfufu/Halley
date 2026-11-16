@@ -1898,3 +1898,8 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 
 ## 2026-11-16 10:45–10:51 — FAZ 1 v2 CANLIYA ALINDI (cb74a3b)
 - Durdurma 10:45:11 (aktif iş/yazma günlüğü yoktu) → kod yedeği kod_60ff0b2_20261116_104552 + DB yedeği bist_haber_20261116_104552_faz1_v2_oncesi.db (integrity ok) → kod → göç 10:46:13-17 guncellendi_v2 (otomatik yedek ok) → 22/22 tablo aynı, BAHKM/ENERY v1 özeti d5d7973ca0bbe41e aynı, yeni alanlar boş → 8 tetikleyici (deneme kopyada) → başlatma 10:47:03 sağlık OK. Model parmak izi 09f8e5e0… aynı. Panel hatasız, sayılar DB ile eşleşiyor. Yeni s2 tahmin ve gerçek sonuçlandırma henüz gözlenmedi (akşam/sabah). Uyku 01:15: kullanıcı bilgisayarı kapattı. Ayrıntı: Ek G.
+
+## 2026-11-16 — FAZ 2 portföy backtest simülatörü (dal faz2-portfoy; araştırma, canlıya dokunulmadı)
+- arastirma/asama6/portfoy.py: journal.evaluate/position_size, sectors, defter.belirsiz_gunler, ready sıralaması tek kaynak; gün sırası d−1 bilgisiyle giriş, d içinde çıkış, aynı gün satış nakdi kullanılmaz; maliyet alış+satış toplamı, satış bacağı giriş fiyatı üzerinden (journal ile birebir). 14 test, 573 test OK.
+- Takvim hisse mumlarının birleşimi (XU100 verisinde 25 Aralık 2023/24/25 yok; gerçek koşuda sıra koruması yakaladı).
+- Sonuç (teknik plan evreni, haber yok): canli_ortak son 12 ay −%22,7 (MDD −%34,1, PF 0,72, ort R −0,19) · 2024 +%35,9 (MDD −%15,2, PF 1,34, ort R +0,26). Evrendeki tüm planlar son 12 ay ort R +0,02 → sıralama kuralı bu dönemde ortalamanın altında seçti. Ayar değiştirilmedi. Ayrıntı: Ek H.
