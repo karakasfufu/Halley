@@ -220,6 +220,18 @@ def run_auto(conn, kind: str, now: Optional[datetime] = None) -> Dict:
     return {"rapor": out.get("rapor"), "hazir": len((out.get("hazir") or {}).get("secilen") or [])}
 
 
+def izleme_kontrolu(conn, now=None) -> Dict:
+    """O5 (17.11.2026): model izleme günlük kontrolü — akşam analizinde, defter sonuçlandırmasından SONRA; günde en
+    çok bir kez (izleme.kontrol_et). Yerel kayıt; harici bildirim yok; modeli değiştirmez. Hata bekçiyi durdurmaz."""
+    try:
+        from . import defter, izleme
+        defter.sonuclandir(conn)                 # ölçüm güncel sonuçlarla (tekrar çağrı zararsız: tekrar yazmaz)
+        r = izleme.kontrol_et(conn, config.DATA, now.replace(tzinfo=None) if now else None)
+        return {k: v for k, v in r.items() if k != "olaylar"}
+    except Exception as e:
+        return {"hata": f"{type(e).__name__}: {e}"[:200]}
+
+
 def run_session(conn, universe: Dict[str, str], kind: str, settings: Dict, ai: bool = False,
                 progress=None, now: Optional[datetime] = None, steps=None) -> Dict:
     """Sabah ya da akşam analizi. steps: test için adım işlevleri (update/prices) değiştirilebilir."""
@@ -254,6 +266,8 @@ def run_session(conn, universe: Dict[str, str], kind: str, settings: Dict, ai: b
     say("Karar izi kaydediliyor...", 0.88)
     ctx = signals.Context(conn, now.date())
     out["calistirma"] = log_run(conn, universe, kind, window=int(settings.get("pencere", 7)), ctx=ctx)
+    if kind == "aksam":
+        out["izleme"] = izleme_kontrolu(conn, now)
     # Önerilen senaryolar sanal işlem günlüğüne (panelin listesiyle aynı kural: hisse başına tek açık kayıt)
     out["yeni_sanal"] = []
     for r in _recommended(conn, out["calistirma"]["run_id"]):
