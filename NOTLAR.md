@@ -2056,3 +2056,6 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 ## 2026-11-17 — O2 canlı geçişi BAŞARILI (kayıt; edcac9d, etiket o2-canli-gecis) + geri dönüş uyumluluğu + pilot notu düzeltmesi
 - Açık: gerçek s3 sonuçlandırması, FAZ 1 kabulü. Ücretli çağrı / ek geliştirme yok.
 - Uyumluluk (s3 damgalı 19 sanal işlem + s3 tahmini, kopyada): eski kararlı kod damgaları siler (19→0), s3 tahminini sonuçlandırmaz → güvenli değil; O2/pilot + gerceklesme_kurali=s2 → damgalar korunur, s3 tahmini girişsiz (s3). Pilot sürüm notu düzeltildi (dosya aynı). Ek O-2c.
+
+## 2026-11-17 — Git geçmişi temizliği (yanlışlıkla eklenen kişisel bilgi; Ek G-T)
+- d5ef349→ce68145, ab463ee→e7ad2e6, 77d193c→eaa14f9, 3e702d8→4ea7412 (o3-haber); ref güncellemesini kullanıcı yaptı. Uzak ve yerel referanslardan erişim 0. Eski commit GitHub önbelleğinde (Destek talebi kullanıcıda); önceki kopyalar geri çekilemez. Etiketler, kabul kayıtları ve pilot değişmedi.

@@ -5959,3 +5959,60 @@ yokken yapıldı. Ücretli çağrı yapılmadı; diğer entegrasyonlar etkinleş
 - Kurulum dosyası **değişmedi** (SHA-256 aynı), pre-release kaldı, kararlı Latest korundu.
 - **Sınır:** Not düzeltilmeden önce sayfayı okuyan ya da notu kaydeden kişiye düzeltme kendiliğinden ulaşmaz.
 - Davranış ayarı için panelde düğme yok; ayar dosyası elle düzenlenir (ek geliştirme yapılmadı).
+
+
+---
+
+# EK G-T (17.11.2026) — Git geçmişinden yanlışlıkla eklenen kişisel bilgi parçalarının temizlenmesi
+
+**Ne oldu:**
+
+- `d5ef349` commit'i `araclar/paket_denetim.py` dosyasına iki kişisel değeri açık metin olarak ekledi: bir e-posta
+  adresinin yerel kısmı ve Windows kullanıcı adı. Değerler gizli bilgi arama desenlerinin içindeydi.
+- `ab463ee` bunları dosyadan çıkardı. Değerler bu kayıtta, betiklerde ve yeni commit'lerde **yazılmadı**.
+
+**Etki alanı (salt-okur belirlendi):**
+
+- Tek dosya, iki commit (`d5ef349` ekledi, `ab463ee` sildi).
+- Tek dal `o3-haber` (yerel ve GitHub). Hiçbir etiket bu commit'leri içermiyordu.
+- Depoda çatal ve PR yok.
+
+**Yapılan (dar kapsamlı):**
+
+1. **Geri dönüş kopyası:**
+   - 39 referansın listesi;
+   - tüm referansların git paketi (bundle, doğrulandı).
+   - İkisi yalnız yerelde; kişisel değeri içerdiği için hiçbir yere yüklenmez.
+2. **Yerel yeniden yazma:**
+   - Yalnız `d5ef349`'daki dosya içeriği, bir sonraki commit'in temiz hâliyle değiştirildi.
+   - Sonraki commit'ler aynı ağaç, yazar, tarih ve mesajla yeniden bağlandı.
+   - Son ağaç eski uçla birebir aynı.
+3. **GitHub'a geçiş:**
+   - Temiz geçmiş normal gönderimle `o3-haber-temiz` dalına konuldu.
+   - **Kullanıcı** `o3-haber` referansını GitHub API ile bu commit'e çevirdi (zorla güncelleme kullanıcının adımıdır;
+     oturumda izin denetimi zorla gönderimi engellemişti, başka yolla aşılmadı).
+   - Yerel dal kayıpsız eşitlendi, geçici dal silindi.
+
+**Commit eşlemesi (`o3-haber`):**
+
+| Eski | Yeni | Not |
+|---|---|---|
+| `d5ef349` | `ce68145` | Ek O-1a/O-2b/P1 + araçlar; dosya içeriği temizlendi |
+| `ab463ee` | `e7ad2e6` | Ağaç aynı |
+| `77d193c` | `eaa14f9` | Ağaç aynı |
+| `3e702d8` | `4ea7412` | Ek O-2c; ağaç aynı. Yeni uç. |
+
+**Doğrulama:**
+
+- GitHub'daki 24 dal ve etiketten ve 14 yerel daldan, değeri içeren commit'e **ulaşılamıyor** (0).
+- Kod, kabul kayıtları ve etiketleri (`faz*-kabul`, `o3-kabul`, `o3-kabul-kayit`, `o2-canli-gecis`), `o3-canli` /
+  `o2-s3` dalları ve yayımlanmış pilot paketi **değişmedi**.
+
+**Geri alınamayanlar ve kalan adımlar:**
+
+- Bu işlemden önce depoyu klonlayan, çeken ya da sayfayı görüntüleyen kişilerin elindeki kopyalar **geri çekilemez.**
+- GitHub eski commit'i SHA adresiyle hâlâ sunuyor (17.11'de doğrulandı). Önbelleğin kalıcı olarak silinmesi için
+  **GitHub Destek'e "hassas veri kaldırma" talebi** gerekir (kullanıcının adımı).
+- **Kapsam dışı bırakılan:** Windows kullanıcı adı bu olaydan önce de `DEVIR.md` ve kabul etiketli araştırma kayıt
+  dosyalarındaki klasör yollarında bulunuyordu (6 dosya, birçok commit ve etiket). Kabul kayıtlarını korumak için
+  bunlara dokunulmadı. Temizlenmesi ayrı karar gerektirir; etiketli commit'leri yeniden yazmayı içerir.
