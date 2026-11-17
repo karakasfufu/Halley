@@ -21,7 +21,7 @@ out["yasak_dosya"] = [r for r in rel if r.endswith((".env", ".db", ".sqlite", "-
 out["kaynak_py"] = [r for r in rel if r.endswith(".py") and r != "app.py"]
 desen = {"openai_anahtar": rb"sk-[A-Za-z0-9_\-]{20,}", "env_satiri": rb"OPENAI_API_KEY\s*=\s*['\"]?[A-Za-z0-9_\-]{8,}",
          "telegram": rb"\d{8,10}:[A-Za-z0-9_\-]{30,}", "eposta": rb"[A-Za-z0-9._%+-]+@gmail\.com",
-         "kullanici_yolu": rb"C:[\\/]Users[\\/]"}
+         "kullanici_yolu": rb"C:.Users."}
 # Kişiye özel desenler (kullanıcı adı, e-posta) depoya YAZILMAZ: çalıştırırken HALLEY_KISISEL_DESEN ortam değişkeniyle
 # verilir (| ile ayrılmış düzenli ifade).
 import os as _os
