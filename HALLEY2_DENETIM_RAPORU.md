@@ -6062,3 +6062,59 @@ yokken yapıldı. Ücretli çağrı yapılmadı; diğer entegrasyonlar etkinleş
   kabul edileceği garanti değildir.
 - Yerel geri dönüş kopyası ve kabul etiketleri korunuyor.
 - Gerçek s3 sonuçlandırması ve FAZ 1 kabulü açık.
+
+
+---
+
+# EK P2 (17.11.2026) — Normal güncelleme kanalında yayın ve güvenli geri dönüş
+
+**Yayın (kullanıcı onayı, 17.11):**
+
+| | |
+|---|---|
+| Sürüm | **Halley 2026-11-17 (`1dae1e7`) — beta**, sıra **202611171741**, etiket `v202611171741` |
+| Kanal | GitHub **Latest** (normal kanal). Uygulama içi güncelleme `releases/latest/download/surum.json` üzerinden bu sürümü görür. |
+| Dosyalar | `Halley_Kurulum.exe` SHA-256 `f88d43a55663c3ef…`; `Halley_Guncelleme.zip` `141a65b9923a7ccd…` (yayımlanan adresten indirilip doğrulandı, GitHub özetleriyle aynı); `surum.json` |
+| Defender | İki dosyada da tehdit yok |
+| Pilot | `v202611170052` pre-release olarak duruyor; pilot kullanıcılarına bu sürüm uygulama içinden önerilir |
+
+**Güncelleme mekanizması:** Sürüm işaretlemesi yeterliydi; ancak geri dönüş yollarında güvenlik açığı bulundu ve kod
+düzeltildi (dal `guncelleme-guvenli`, `o2-s3` üzerine).
+
+| Commit | Düzeltme |
+|---|---|
+| `2c48249` | Ayarlar'daki "Önceki sürüme dön" ve panel hata düğmesi: s3 kaydı varken s3'ü tanımayan önceki sürüme dönüş engellendi. Ayarlar'da "Gerçekleşme kuralı" seçimi eklendi; elle JSON düzenlemesine gerek yok, bozuk dosya riski kalktı. |
+| `7786751` | Veritabanı yolu uygulamanın açtığı dosyayla (`config.DB_PATH` = `<kök>/app/data/bist_haber.db`) doğrulanır. Dosya yokluğu yalnız doğrulanmış temiz kurulumda "s3 yok" sayılır; yol ya da okuma hatasında "uyumluluk doğrulanamadı" denir ve dönüş engellenir. Sayıma `tahmin_sonuc` da eklendi. İlk açılış denetimi (`denetim.txt`) sürerken okuyucu kayıt yazmaz. |
+| `1dae1e7` | **Gerçek kurulum testinde bulundu:** yeni panel açılamazsa başlatıcı saniyeler içinde geri dönebiliyor; okuyucu tabanlı önlem yetişmiyordu. Çözüm: eski sürümün içe aktarma denemesi sırasında yeni kod, kurulu kod s3'ü tanımıyorsa ve s3 kaydı varsa ya da bu doğrulanamıyorsa denemeyi bilerek başarısız kılar. Uygulama içi güncelleme yapılmaz, **tam kurulum** istenir (kurulum programında otomatik dönüş yok). |
+
+**Başlatıcı (`Halley.cs`) değiştirilmedi.** Uygulama içi güncelleme başlatıcıyı değiştirmez; başlatıcıdaki bir düzeltme
+mevcut müşterilere ulaşmazdı ve imza değiştiği için uygulama içi güncellemeyi de kapatırdı.
+
+**Testler:**
+
+- Tam takım `1dae1e7`: **637 test OK**, ağ 0.
+- `test_guncelleme`: 44 test; s3 türlerinin hepsi, yol uyuşmazlığı, temiz/temiz olmayan kurulum, okuma hatası,
+  ilk açılış penceresi, ön kontrol.
+
+**Gerçek kurulumlarla yapılan testler (test klasörlerinde; müşteri ve canlı veriye dokunulmadı):**
+
+| Deneme | Sonuç |
+|---|---|
+| Eski kararlı (2318) → uygulama içi (yerel paket) | Eski güncelleyici "yeni" dedi, hazırladı. Başlatıcı geçti (6 sn), "guncellendi". Veri, ayar ve `.env` korundu; gerçek alış s2'de kaldı; "Önceki sürüme dön" s3 nedeniyle **engellendi** (panelde görüldü). |
+| A: önceden 3 s3 kaydı + kararlı kurulu | Uygulama içi güncelleme **reddedildi** ("TAM KURULUM GEREKİYOR"); hiçbir şey değişmedi. Kurulum programıyla güncelleme: kod yeni, 3 s3 kaydı ve ayarlar korundu, otomatik dönüş yolu yok. |
+| B: s3 yok + yeni panel bilerek açılamaz | Başlatıcı kararlıya **güvenle** döndü; s3 kaydı 0, ayarlar korundu. |
+| İlk hâli (`7786751` öncesi) A | **Başarısız:** başlatıcı uyumsuz koda döndü. `1dae1e7` ile düzeltildi. |
+| Yayından sonra gerçek adres | Eski kararlı kurulum GitHub'dan yeni sürümü buldu, indirdi, doğruladı, kurdu (`guncellendi`, ayarlar korundu, önceki sürüm saklandı). |
+
+**Açık nokta:** Gerçek adres testinin ilk denemesinde hazırlık adımı sessizce tamamlanmadı. Hata çıktısı test betiğinde
+yakalanmadı; ikinci deneme aynı adımları sorunsuz tamamladı. Neden kesinleşmedi. Müşteri panelinde böyle bir hata
+olursa hata mesajı gösterilir ve yeniden denenebilir.
+
+**Sürüm durumu:**
+
+| | Sürüm |
+|---|---|
+| Kod (en güncel) | `guncelleme-guvenli` `1dae1e7` |
+| Canlı (geliştirici klasörü) | `edcac9d` (O2). Güncelleme modülü geliştirici klasöründe kapalı olduğu için davranış farkı yok. |
+| Müşteri paketi (normal kanal) | `v202611171741` = `1dae1e7` |
+| Pilot (pre-release) | `v202611170052` = `edcac9d` |

@@ -2063,3 +2063,8 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 ## 2026-11-17 — Pilot geri dönüş talimatı kurulu pilotta doğrulandı, not yeniden düzeltildi (Ek O-2d)
 - Kurulu pilotta elle ayar düzenlemesi: yeni kural s2, 19/19 s3 damgası korundu, s3 tahmini girişsiz (s3), ayarlar korundu, panel açıldı. Bozuk JSON ayarları okunamaz kılar → not: önce kopya al, sonra kontrol et. Yol hatası düzeltildi; eski kararlı kurulum önerilmiyor.
 - Açık: d5ef349 SHA ile erişilebilir (tam silinme tamamlanmadı; Destek talebi kullanıcıda, garanti yok); gerçek s3 sonuçlandırma; FAZ 1 kabulü.
+
+## 2026-11-17 — Normal kanalda yayın v202611171741 (1dae1e7, beta) + güvenli geri dönüş düzeltmeleri (Ek P2)
+- Latest = v202611171741; uygulama içinden görülür. Dosyalar indirilip doğrulandı, Defender temiz. Pilot pre-release duruyor.
+- Geri dönüş: s3 varken uyumsuz önceki sürüme elle dönüş engeli; ilk açılış penceresinde okuyucu yazmaz; kurulu kod s3'ü tanımıyor ve s3 var ise uygulama içi güncelleme reddedilir (tam kurulum). Başlatıcı değişmedi. Ayarlar'da gerçekleşme kuralı seçimi.
+- Gerçek kurulum testleri: kararlı → uygulama içi OK; A (s3 var) reddedildi + kurulum programı OK; B güvenli otomatik dönüş; gerçek adres OK (ilk denemede hazırlık sessiz kaldı, ikinci başarılı; neden açık). 637 test OK.
