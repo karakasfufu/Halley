@@ -329,6 +329,11 @@ def connect(path=None) -> sqlite3.Connection:
         if col not in price_cols:
             conn.execute(f"ALTER TABLE prices ADD COLUMN {col} REAL")
     migrate_tahmin(conn, path)
+    try:                                   # O4 (17.11.2026): fiyat izlenebilirliği (yalnız ekleme, yedekli; FAZ 3)
+        from . import fiyat_izi
+        fiyat_izi.migrate(conn, path)
+    except Exception:                      # göç başarısızsa Halley bugünkü gibi çalışır (prices.update eski yolla yazar)
+        pass
     return conn
 
 

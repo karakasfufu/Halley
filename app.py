@@ -2759,6 +2759,29 @@ def ai_usage_panel() -> None:
                          hide_index=True, width="stretch")
 
 
+def fiyat_izi_satiri() -> None:
+    """O4 (17.11.2026): son fiyat indirmesi — salt-okur; bilinmeyen geçmiş 'bilinmiyor' olarak gösterilir."""
+    try:
+        from bist_haber import prices as _pr
+        s = _pr.son_indirme(conn)
+    except Exception as e:
+        st.caption(f"Fiyat izlenebilirliği okunamadı: {str(e)[:100]}")
+        return
+    if s is None:
+        st.caption("📈 Fiyat izlenebilirliği kurulu değil (veritabanı göçü yapılmadı); fiyatlar bugünkü gibi yazılıyor.")
+        return
+    if s.get("kayit_yok"):
+        st.caption(f"📈 Fiyat izlenebilirliği kurulu; henüz izlenen indirme yok. Önceki {s['bilinmeyen_satir']:,} fiyat "
+                   "satırının kaynağı ve indirme zamanı **bilinmiyor** (izleme kurulmadan önce kaydedilmiyordu).")
+        return
+    a = s["ayarlar"]
+    st.caption(f"📈 Son fiyat indirmesi: {s['zaman'][:16].replace('T', ' ')} · kaynak {s['kaynak']} "
+               f"{s.get('kaynak_surum') or ''} · ayarlar: dönem {a.get('period')}, aralık {a.get('interval')}, "
+               f"auto_adjust {a.get('auto_adjust')} · {s['hisse']} hisse, {s['satir']:,} satır, {s['degisen']} değişen "
+               f"satır (eski değerleri saklandı; toplam {s['eski_kayit']:,}) · kod {s.get('kod_surum')} · izleme öncesi "
+               f"{s['bilinmeyen_satir']:,} satırın kaynağı **bilinmiyor**.")
+
+
 def update_panel() -> None:
     """⚙️ Ayarlar → 💾 Veri ve gelişmiş: sürüm, elle kontrol, önceki sürüme dönüş (2026-11-15)."""
     from bist_haber import guncelleme
@@ -2823,6 +2846,7 @@ def page_ayarlar() -> None:
         settings_panel()
     with t2:
         update_panel()
+        fiyat_izi_satiri()
         advanced_panel()
     with t3:
         # Plan 1.3 (2026-11-09): programı kullanacak kişi için güncel kılavuz (KULLANIM.md ile aynı metin)

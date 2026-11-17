@@ -15,9 +15,11 @@ def update(conn, tickers: Iterable[str], period: str = "1y") -> int:
     tickers = sorted(set(tickers))
     if not tickers:
         return 0
-    df = yf.download([t + ".IS" for t in tickers], period=period, interval="1d",
-                     auto_adjust=True, progress=False, group_by="ticker", threads=False)
+    ayarlar = {"period": period, "interval": "1d", "auto_adjust": True, "group_by": "ticker", "threads": False}
+    df = yf.download([t + ".IS" for t in tickers], period=period, interval=ayarlar["interval"],
+                     auto_adjust=ayarlar["auto_adjust"], progress=False, group_by="ticker", threads=False)
     rows = 0
+    satirlar = []
 
     def num(rec, col):
         v = rec.get(col)
@@ -33,12 +35,43 @@ def update(conn, tickers: Iterable[str], period: str = "1y") -> int:
             sub = df
         sub = sub.dropna(subset=["Close"])
         for idx, rec in sub.iterrows():
-            conn.execute("INSERT OR REPLACE INTO prices(ticker,date,open,high,low,close,volume) VALUES(?,?,?,?,?,?,?)",
-                         (t, idx.date().isoformat(), num(rec, "Open"), num(rec, "High"), num(rec, "Low"),
-                          float(rec["Close"]), float(rec.get("Volume", 0) or 0)))
+            satirlar.append((t, idx.date().isoformat(), num(rec, "Open"), num(rec, "High"), num(rec, "Low"),
+                             float(rec["Close"]), float(rec.get("Volume", 0) or 0)))
             rows += 1
+    from . import fiyat_izi
+    if satirlar and fiyat_izi.kurulu(conn):
+        # O4 (17.11.2026): kaynak, ayarlar, kütüphane ve kod sürümü kaydedilir; değişen satırın eskisi saklanır;
+        # değişmeyen satır yeniden yazılmaz. Eski satırlarda indirme_id NULL = bilinmiyor (uydurulmaz).
+        from . import defter
+        fiyat_izi.yaz(conn, satirlar, "yfinance", ayarlar, DUZELTME, kaynak_surum=getattr(yf, "__version__", None),
+                      kod_surum=defter.kod_surum())
+    else:
+        for r in satirlar:
+            conn.execute("INSERT OR REPLACE INTO prices(ticker,date,open,high,low,close,volume) VALUES(?,?,?,?,?,?,?)", r)
     conn.commit()
     return rows
+
+
+DUZELTME = "auto_adjust=True: bölünme ve temettü düzeltmeli; yeni düzeltmede geçmiş satırlar yeniden hesaplanır"
+
+
+def son_indirme(conn):
+    """Panel için son fiyat indirmesi (kayıt yoksa ya da izleme kurulmamışsa None)."""
+    from . import fiyat_izi
+    import json
+    if not fiyat_izi.kurulu(conn):
+        return None
+    r = conn.execute("SELECT zaman, kaynak, kaynak_surum, ayarlar_json, duzeltme, hisse_sayisi, satir_sayisi, "
+                     "degisen_satir, kod_surum FROM fiyat_indirme ORDER BY id DESC LIMIT 1").fetchone()
+    if not r:
+        return {"kayit_yok": True, "bilinmeyen_satir": conn.execute(
+            "SELECT COUNT(*) FROM prices WHERE indirme_id IS NULL").fetchone()[0]}
+    out = dict(zip(("zaman", "kaynak", "kaynak_surum", "ayarlar_json", "duzeltme", "hisse", "satir", "degisen",
+                    "kod_surum"), tuple(r)))
+    out["ayarlar"] = json.loads(out.pop("ayarlar_json") or "{}")
+    out["bilinmeyen_satir"] = conn.execute("SELECT COUNT(*) FROM prices WHERE indirme_id IS NULL").fetchone()[0]
+    out["eski_kayit"] = conn.execute("SELECT COUNT(*) FROM fiyat_eski").fetchone()[0]
+    return out
 
 
 def _fetch_stats(ticker: str):
