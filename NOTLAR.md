@@ -2068,3 +2068,9 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Latest = v202611171741; uygulama içinden görülür. Dosyalar indirilip doğrulandı, Defender temiz. Pilot pre-release duruyor.
 - Geri dönüş: s3 varken uyumsuz önceki sürüme elle dönüş engeli; ilk açılış penceresinde okuyucu yazmaz; kurulu kod s3'ü tanımıyor ve s3 var ise uygulama içi güncelleme reddedilir (tam kurulum). Başlatıcı değişmedi. Ayarlar'da gerçekleşme kuralı seçimi.
 - Gerçek kurulum testleri: kararlı → uygulama içi OK; A (s3 var) reddedildi + kurulum programı OK; B güvenli otomatik dönüş; gerçek adres OK (ilk denemede hazırlık sessiz kaldı, ikinci başarılı; neden açık). 637 test OK.
+
+## 2026-11-17 — O4 ve O5 geliştirme/test (canlı değil) + paralel takip (Ek O-4, O-5, O-1b)
+- O4 o4-fiyat-izi 23e9539: db.connect yedekli tek göç (fiyat_izi_v1), prices.update kaynak/ayar/sürüm kaydı + değişen satırın eskisi; bilinmeyen geçmiş NULL. Kopya: eski tablolar aynı, 157.069 satır bilinmiyor, taklit indirmede 1 eski değer saklandı, eski kod uyumlu. 652 test OK.
+- O5 o5-izleme 084a5d9: izleme bekçiye (akşam, günde bir, hata yalıtımlı) ve panele (salt-okur); K1 kapalı (0 olay); P1/P2 notları; olculen_kayitlar ortak seçim; O2 grupları ayrı. Kopya: hepsi yetersiz veri, 0 olay. 672 test OK.
+- Takip: FAZ 1 sonuç yok, s3 tahmini 0 (akşam analizi bekleniyor) — açık. 77 metinsiz: 76'sı bugünkü bildirimler (okuyucu eşiği 100), 1'i okunamayan sayfa. OpenAI karşılaştırması için Usage ekranı kapsamı yazıldı.
+- Canlıya geçiş onayı beklenen: O4, O5. Canlı edcac9d; müşteri Latest v202611171741 (1dae1e7).

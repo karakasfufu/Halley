@@ -6118,3 +6118,112 @@ olursa hata mesajı gösterilir ve yeniden denenebilir.
 | Canlı (geliştirici klasörü) | `edcac9d` (O2). Güncelleme modülü geliştirici klasöründe kapalı olduğu için davranış farkı yok. |
 | Müşteri paketi (normal kanal) | `v202611171741` = `1dae1e7` |
 | Pilot (pre-release) | `v202611170052` = `edcac9d` |
+
+
+---
+
+# EK O-4 (17.11.2026) — O4 geliştirme ve test: fiyat izlenebilirliği (dal `o4-fiyat-izi` `23e9539`)
+
+**Konumu:** Geliştirme ve kopyada test; canlıya geçiş **onay bekliyor**. FAZ 3'teki `fiyat_izi_v1` altyapısı birebir
+kullanıldı; yalnız ürüne bağlandı.
+
+**Değişenler:**
+
+| Dosya | Değişiklik |
+|---|---|
+| `bist_haber/fiyat_izi.py` | FAZ 3'ten. Fiyat tablosu boşsa (yeni kurulum) gereksiz yedek alınmaz. Göç `BEGIN IMMEDIATE` ile tek süreçte yapılır (panel ve okuyucu aynı anda açılırsa çift göç yok). |
+| `bist_haber/db.py` | `connect()` sonunda `fiyat_izi.migrate` (yedekli, yalnız ekleme). Hata olursa yutulur, Halley bugünkü gibi çalışır. |
+| `bist_haber/prices.py` | `update()` yazımı `fiyat_izi.yaz` üzerinden: kaynak (`yfinance`), kütüphane sürümü, ayarlar (period, interval, auto_adjust, group_by, threads), düzeltme türü, kod sürümü, satır özeti. Değişen satırın eskisi `fiyat_eski`'ye yazılır; değişmeyen satır yeniden yazılmaz. İzleme kurulu değilse eski yol. `son_indirme()` (salt-okur). |
+| `app.py` | Ayarlar → Veri ve gelişmiş: son fiyat indirmesi satırı. İzleme öncesi satırlar için açıkça "kaynağı **bilinmiyor**" yazar. |
+| Testler | `test_fiyat_izi` (FAZ 3, 7; kurulumu "O4 öncesi veritabanı" olarak düzeltildi) + `test_o4_fiyat_izi` (8). |
+
+**Bilinmeyen geçmiş uydurulmaz:** Göçten önceki fiyat satırlarında `indirme_id` NULL kalır ve "bilinmiyor" olarak
+gösterilir. Bu tablolar kurulmadan önceki fiyat sürümleri geri oluşturulamaz.
+
+**Testler:** Tam takım `23e9539`: **652 test OK**, ağ 0.
+
+**Canlı kopya provası** (canlı salt-okur kopyalandı; ağ yok, yfinance taklit; canlı dosya değişmedi):
+
+| Kontrol | Sonuç |
+|---|---|
+| İlk açılış göçü | 0,6 sn. Yedek `…_fiyat_izi_oncesi.db`: integrity ok, göç öncesiyle **aynı**. |
+| Eski tablolar | **Hepsi aynı** (prices'ta yalnız yeni sütun). Yeni: `fiyat_indirme`, `fiyat_eski`, `veri_anlik`. Tetikleyici 22 → 28. Integrity ok. |
+| Bilinmeyen | 157.069 / 157.069 satır `indirme_id` NULL |
+| Taklit indirme | 3 hisse, 15 satır, bilerek 1 değişen: kayıt `yfinance 1.2.0`, ayarlar, düzeltme metni. 1 eski değer saklandı. Değişmeyen 14 satıra dokunulmadı. |
+| Boyut | +24.576 bayt |
+| Geri dönüş (eski kod `edcac9d`, göç edilmiş kopyada) | Açılır, fiyat yazar (`indirme_id` NULL), rapor ve sonuçlandırma çalışır, integrity ok. Tam geri dönüş: göç öncesi yedek, **yalnız** göçten sonra yeni kullanıcı verisi oluşmadıysa. |
+
+**Sınırlar:**
+
+- Eski kod fiyat yazarsa o satırların izi boş kalır ("bilinmiyor").
+- Her `auto_adjust` düzeltmesinde (temettü, bölünme) bir hissenin geçmiş satırları değişir ve eski değerleri saklanır.
+  Disk payı izlenmeli (Ek O: düzeltme olayı başına ~250 satır/hisse).
+- Panelde yalnız son indirme gösterilir; ayrıntılı geçmiş görüntüsü yok.
+
+---
+
+# EK O-5 (17.11.2026) — O5 geliştirme ve test: model izleme (dal `o5-izleme` `084a5d9`)
+
+**Konumu:** Geliştirme ve kopyada test; canlıya geçiş **onay bekliyor**. FAZ 6'nın kabul edilen bileşenleri bağlandı.
+
+**Değişenler:**
+
+| Dosya | Değişiklik |
+|---|---|
+| `bist_haber/izleme.py`, `izleme_ref/tp1_v1.json` | FAZ 6'dan. **K1 kapalı:** ölçülmez, uyarı ve geçiş kaydı **üretmez** (`UYARI_OLCUTLERI = P1, P2`). P1 notu: "yalnız belirgin ters sıralamayı yakalar". P2 notu: "yalnız yapay senaryolarda sınandı; canlıda doğrulanmadı". "Eşik aşılmadı" her yerde "modelin iyi olduğu anlamına gelmez". Grup üyeliği O2 ölçüm kuralıyla (`defter.grup_uyesi_mi`). |
+| `bist_haber/defter.py` | `olculen_kayitlar()`: `ozet()` ile **aynı** seçim (kural iki kez kodlanmaz); `grup_uyesi_mi()`. |
+| `bist_haber/watchdog.py` | `izleme_kontrolu()`: akşam analizinde, defter sonuçlandırmasından sonra, günde en çok bir kez. Hata bekçiyi durdurmaz. Harici bildirim yok. |
+| `app.py` | Performans → "🩺 Model izleme" (salt-okur). K1 "⚫ kapalı". "Eşik aşılmadı" yeşil değil gri. Yetersiz veri açıkça. |
+| `.gitignore` | `data/izleme_durumu.json`, `data/izleme_kayit.jsonl` |
+| Testler | `test_faz6_izleme` (uyarlandı; rejim önbelleği testi O5 kapsamı dışında bırakıldı) + `test_o5_izleme` (7) |
+
+**Model eğitilmez, kapatılmaz ya da değiştirilmez.** Etkin model `tp1_v1` ve eşikler aynı.
+
+**Testler:** Tam takım `084a5d9`: **672 test OK**, ağ 0.
+
+- K1, eşik zorla aşılmış olsa bile 28 günde **0 olay** üretti.
+- Bekçi kontrolü günde bir kez ve hata yalıtımlı çalıştı.
+- O2 grupları ayrı ölçüldü: s2 / s2→s3 / s3.
+- Panel salt-okur kaldı (dosya yazmadı).
+
+**Canlı kopya provası** (canlı salt-okur):
+
+- Grup "kural s2": P1, P2, G1 ve R1 **yetersiz veri** (sonuçlanmış tahmin 0); K1 kapalı.
+- Sözleşmesiz eski grup ölçüme girmedi.
+- Bekçi kontrolü: 0 olay.
+- Değiştirilemez tablolar ve diğer kayıtlar aynı; yalnız iki yerel izleme dosyası yazıldı.
+
+**Sınır:** Az veride bütün ölçütler "yetersiz"dir. Anlamlı ölçüm için P2'de en az 50 sonuç ve 20 bağımsız gün, P1'de
+100 sonuç ve 30 gün gerekir. K1'in yeniden tasarımı bu kapsamda değil.
+
+---
+
+# EK O-1b (17.11.2026 ~18:20) — Paralel takip (salt-okur)
+
+- **FAZ 1:** Sonuçlanmış tahmin **yok** (5 tahmin açık). 17.11 akşam analizi henüz çalışmadı; son fiyat günü 16.11.
+  **Açık madde.**
+- **O2 gerçek s3 döngüsü:** s3 sözleşmeli tahmin **0** (ilk s3 tahmini bu akşamki analizde bekleniyor). **Açık madde.**
+- **Metni alınamayan güncel haberler (77):**
+  - **76'sı** 17.11 bildirimi. KAP listesi alındı (08:31, 18:06), sayfaları henüz okunmadı. Bu zamanlamadır, hata
+    değildir: KAP okuyucusu bekleyen sayfa 100'ü geçince (`AUTO_START_MIN_PAGES`) ya da "Haberleri güncelle" ile
+    başlar.
+  - **1'i** (`kap:1698549`, 16.11, borçlanma aracı bildirimi) 16.11 turunda "sayfa boş ya da hatalı" bulunan
+    7 sayfadan. Neden doğrulanmadı (sayfa açılmadı); okuyucu yeniden dener.
+  - Ücretli çağrı ya da toplu analiz başlatılmadı.
+- **OpenAI kullanım karşılaştırması (kullanıcı hesabından gereken):**
+  - **Ekran:** platform.openai.com → **Usage** (gerekirse **Cost**).
+  - **Kapsam:** Halley'in API anahtarının ait olduğu **proje**; model **gpt-5-mini**; tarih **1–17.11.2026** (UTC;
+    TR saati 3 saat ileride). İstek türü chat completions. Mümkünse günlük döküm (CSV).
+  - **Halley kayıtları:** Kasım haber analizi 2,2916 $ (tokenlardan); ai_calls 1 çağrı 0,006398 $ (16.11 21:47);
+    yapay zekâ yorumu 0 $.
+  - Kayıtsız eski "ucuz test" tutarı **bilinmiyor**; sıfır sayılmaz. Fark çıkarsa nedeni doğrulanmadan eski testlere
+    bağlanmaz.
+
+**Sürüm durumu (17.11 ~18:20):**
+
+| | Sürüm |
+|---|---|
+| Kod — en güncel geliştirme | `o5-izleme` `084a5d9` (⊃ `o4-fiyat-izi` `23e9539` ⊃ `guncelleme-guvenli` `1dae1e7` ⊃ `o2-s3` `edcac9d`) |
+| Canlı (geliştirici klasörü) | `edcac9d` (O2 + O3). O4 ve O5 **canlıda değil.** |
+| Müşteri paketi (normal kanal, Latest) | `v202611171741` = `1dae1e7`. O4 ve O5 pakette **yok**. |
+| Pilot (pre-release) | `v202611170052` = `edcac9d` |
