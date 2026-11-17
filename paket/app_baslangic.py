@@ -23,15 +23,17 @@ except Exception as _hata:
             if j.exists() and b"kural_sec" in j.read_bytes():
                 return True
             import sqlite3 as _sq
-            _db = _kok / "app" / "data" / "bist_haber.db"
-            if not _db.exists():
-                return True
+            _veri = _kok / "app" / "data"
+            _db = _veri / "bist_haber.db"
+            if not _db.exists():      # yalnız doğrulanmış temiz kurulumda "s3 yok"
+                return not _veri.exists() or all(_p.name == "gunluk" for _p in _veri.iterdir())
             _c = _sq.connect(f"file:{_db.as_posix()}?mode=ro", uri=True, timeout=10)
             try:
                 _t = {r[0] for r in _c.execute("SELECT name FROM sqlite_master WHERE type='table'")}
                 _n = 0
-                if "tahmin" in _t:
-                    _n += _c.execute("SELECT COUNT(*) FROM tahmin WHERE kural_surum='s3'").fetchone()[0]
+                for _ad in ("tahmin", "tahmin_sonuc", "tahmin_degerlendirme"):
+                    if _ad in _t:
+                        _n += _c.execute(f"SELECT COUNT(*) FROM {_ad} WHERE kural_surum='s3'").fetchone()[0]
                 for _ad in ("trade_journal", "hazir_firsat", "takip_senaryo"):
                     if _ad in _t:
                         _n += _c.execute(f"SELECT COUNT(*) FROM {_ad} WHERE sonuc_json LIKE '%\"kural\": \"s3\"%'").fetchone()[0]

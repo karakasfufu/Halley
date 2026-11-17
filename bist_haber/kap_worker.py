@@ -248,6 +248,20 @@ def serve(db_path=None, sleep: Callable[[float], None] = time.sleep, once: bool 
                     return
                 sleep(SERVE_CHECK_SEC)
                 continue
+            # O2 (17.11.2026): güncellemeden sonraki ilk açılış denetlenirken (başlatıcı sağlık kontrolü geçmeden
+            # önceki sürüme dönebilir) hiçbir kayıt YAZILMAZ; s3'ü tanımayan önceki sürüm otomatik dönüşten çıkarılır.
+            from . import guncelleme
+            if guncelleme.denetim_suruyor():
+                try:
+                    guncelleme.uyumsuz_onceki_kilitle()
+                except Exception as e:
+                    st = load()
+                    st["bekci_hata"] = f"önceki sürüm kilidi: {e}"[:200]
+                    _save(st, beat=False)
+                if once:
+                    return
+                sleep(min(SERVE_CHECK_SEC, 5))
+                continue
             conn = db.connect(db_path)
             try:
                 pend = pending_counts(conn)["toplam"]

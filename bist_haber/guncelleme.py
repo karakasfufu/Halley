@@ -236,12 +236,32 @@ def onceki(root: Optional[Path] = None) -> Optional[str]:
     return None
 
 
-def s3_kayit_sayisi(db_path: Path) -> int:
-    """O2 (s3) kuralıyla başlamış kayıt sayısı: s3 sözleşmeli tahmin, s3 değerlendirmesi, sonucunda "kural": "s3"
-    damgası olan sanal işlem / hazır fırsat / takip senaryosu. Okunamazsa -1 (doğrulanamadı)."""
+def temiz_kurulum(root: Path) -> bool:
+    """Veri klasöründe kullanıcı verisi hiç yok (yalnız günlük klasörü): doğrulanmış temiz kurulum."""
+    d = Path(root) / "app" / "data"
+    try:
+        return not d.exists() or all(p.name == "gunluk" for p in d.iterdir())
+    except OSError:
+        return False
+
+
+def uygulama_db_yolu(root: Path) -> Optional[Path]:
+    """Uygulamanın GERÇEKTEN açtığı veritabanı (config.DB_PATH) kurulumun veri klasöründeyse o yol; değilse None
+    (yol doğrulanamadı)."""
+    try:
+        p, beklenen = Path(config.DB_PATH).resolve(), (Path(root) / "app" / "data" / "bist_haber.db").resolve()
+    except OSError:
+        return None
+    return p if p == beklenen else None
+
+
+def s3_kayit_sayisi(db_path: Path, temiz: bool = False) -> int:
+    """O2 (s3) kuralıyla başlamış kayıt sayısı: s3 sözleşmeli tahmin, s3 sonucu, s3 değerlendirmesi, sonucunda
+    "kural": "s3" damgası olan sanal / gerçek işlem, hazır fırsat, takip senaryosu. Dosya yoksa yalnız doğrulanmış
+    temiz kurulumda 0; aksi halde ve okuma hatasında -1 (uyumluluk doğrulanamadı)."""
     import sqlite3
     if not Path(db_path).exists():
-        return 0
+        return 0 if temiz else -1
     try:
         c = sqlite3.connect(f"file:{Path(db_path).as_posix()}?mode=ro", uri=True, timeout=10)
     except Exception:
@@ -251,8 +271,9 @@ def s3_kayit_sayisi(db_path: Path) -> int:
         n = 0
         if "tahmin" in tablolar:
             n += c.execute("SELECT COUNT(*) FROM tahmin WHERE kural_surum='s3'").fetchone()[0]
-        if "tahmin_degerlendirme" in tablolar:
-            n += c.execute("SELECT COUNT(*) FROM tahmin_degerlendirme WHERE kural_surum='s3'").fetchone()[0]
+        for t in ("tahmin_sonuc", "tahmin_degerlendirme"):
+            if t in tablolar:
+                n += c.execute(f"SELECT COUNT(*) FROM {t} WHERE kural_surum='s3'").fetchone()[0]
         for t in ("trade_journal", "hazir_firsat", "takip_senaryo"):
             if t in tablolar:
                 n += c.execute(f"SELECT COUNT(*) FROM {t} WHERE sonuc_json LIKE '%\"kural\": \"s3\"%'").fetchone()[0]
@@ -283,14 +304,45 @@ def geri_donus_engeli(root: Optional[Path] = None) -> Optional[str]:
     o = root / "guncelleme" / "onceki" if root else None
     if not o or not (o / "app.py").exists() or s3_destekli(o):
         return None
-    n = s3_kayit_sayisi(root / "app" / "data" / "bist_haber.db")
+    yol = uygulama_db_yolu(root)
+    n = s3_kayit_sayisi(yol, temiz_kurulum(root)) if yol is not None else -1
     if n == 0:
         return None
     neden = (f"bu sürümün s3 kuralıyla başlattığı {n} kayıt var" if n > 0
-             else "veritabanındaki s3 kayıtları doğrulanamadı")
+             else "uyumluluk doğrulanamadı (veritabanı yolu ya da okunması)")
     return (f"Önceki sürüme dönülemez: {neden} ve önceki sürüm bu kayıtları doğru işleyemez (s3 işaretlerini siler, "
             "kayıtları eski kuralla yeniden hesaplar). Güvenli yol: bu sürümde kalıp gerçekleşme kuralını \"s2 (geri "
             "dönüş)\" yapmak; yeni kayıtlar eski kuralla başlar, s3 kayıtları kendi kuralıyla sonuçlanır.")
+
+
+def denetim_suruyor(root: Optional[Path] = None) -> bool:
+    """Başlatıcı güncellemeden sonraki ilk açılışı denetliyor mu (guncelleme/denetim.txt; sağlık kontrolü geçince
+    başlatıcı siler)? Bu sırada sağlık kontrolü başarısız olursa başlatıcı önceki sürüme KENDİLİĞİNDEN döner."""
+    root = root or kok()
+    return bool(root) and (root / "guncelleme" / "denetim.txt").exists()
+
+
+def uyumsuz_onceki_kilitle(root: Optional[Path] = None) -> Optional[Dict]:
+    """O2 (17.11.2026): başlatıcının otomatik geri dönüşü s3'ü tanımayan koda yapılmasın. Önceki sürüm s3'ü
+    tanımıyorsa ve veritabanında s3 kaydı varsa ya da bu doğrulanamıyorsa, önceki sürüm klasörü SİLİNMEDEN
+    'onceki_uyumsuz_<zaman>' adıyla kenara alınır (otomatik / elle geri dönüş artık o koda yapılamaz). Kayıt:
+    guncelleme/onceki_kilit.json. Yapılacak bir şey yoksa None."""
+    root = root or kok()
+    if not root:
+        return None
+    o = root / "guncelleme" / "onceki"
+    if not (o / "app.py").exists() or s3_destekli(o):
+        return None
+    yol = uygulama_db_yolu(root)
+    n = s3_kayit_sayisi(yol, temiz_kurulum(root)) if yol is not None else -1
+    if n == 0:
+        return None
+    hedef = root / "guncelleme" / f"onceki_uyumsuz_{datetime.now():%Y%m%d_%H%M%S}"
+    o.rename(hedef)
+    k = {"zaman": datetime.now().isoformat(timespec="seconds"), "s3_kayit": n, "kenara_alinan": hedef.name,
+         "neden": "önceki sürüm s3 kayıtlarını tanımıyor" if n > 0 else "uyumluluk doğrulanamadı"}
+    (root / "guncelleme" / "onceki_kilit.json").write_text(json.dumps(k, ensure_ascii=False), encoding="utf-8")
+    return k
 
 
 def geri_don_iste() -> None:
