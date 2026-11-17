@@ -2059,3 +2059,7 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 
 ## 2026-11-17 — Git geçmişi temizliği (yanlışlıkla eklenen kişisel bilgi; Ek G-T)
 - d5ef349→ce68145, ab463ee→e7ad2e6, 77d193c→eaa14f9, 3e702d8→4ea7412 (o3-haber); ref güncellemesini kullanıcı yaptı. Uzak ve yerel referanslardan erişim 0. Eski commit GitHub önbelleğinde (Destek talebi kullanıcıda); önceki kopyalar geri çekilemez. Etiketler, kabul kayıtları ve pilot değişmedi.
+
+## 2026-11-17 — Pilot geri dönüş talimatı kurulu pilotta doğrulandı, not yeniden düzeltildi (Ek O-2d)
+- Kurulu pilotta elle ayar düzenlemesi: yeni kural s2, 19/19 s3 damgası korundu, s3 tahmini girişsiz (s3), ayarlar korundu, panel açıldı. Bozuk JSON ayarları okunamaz kılar → not: önce kopya al, sonra kontrol et. Yol hatası düzeltildi; eski kararlı kurulum önerilmiyor.
+- Açık: d5ef349 SHA ile erişilebilir (tam silinme tamamlanmadı; Destek talebi kullanıcıda, garanti yok); gerçek s3 sonuçlandırma; FAZ 1 kabulü.

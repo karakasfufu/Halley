@@ -6016,3 +6016,49 @@ yokken yapıldı. Ücretli çağrı yapılmadı; diğer entegrasyonlar etkinleş
 - **Kapsam dışı bırakılan:** Windows kullanıcı adı bu olaydan önce de `DEVIR.md` ve kabul etiketli araştırma kayıt
   dosyalarındaki klasör yollarında bulunuyordu (6 dosya, birçok commit ve etiket). Kabul kayıtlarını korumak için
   bunlara dokunulmadı. Temizlenmesi ayrı karar gerektirir; etiketli commit'leri yeniden yazmayı içerir.
+
+
+---
+
+# EK O-2d (17.11.2026) — Pilot geri dönüş talimatı: kurulu pilotta doğrulama ve ikinci düzeltme
+
+**Bulunanlar:**
+
+1. Ek O-2c'deki not düzeltmesinde ayar dosyası yolunda yazım hatası vardı: `\a` bir kontrol karakterine dönüşmüştü.
+2. Davranış geri dönüşü o ana kadar yalnız kod ve kopya düzeyinde sınanmıştı. **Kurulu pilotta**, müşterinin yapacağı
+   elle düzenlemeyle sınanmamıştı.
+
+**Kurulu pilotta deneme** (`edcac9d`, test klasörü; varsayılan yollar, kurulu Python):
+
+- **Senaryo:** Not Defteri düzenlemesi taklit edildi: `app\data\ayarlar.json`'a virgül +
+  `"gerceklesme_kurali": "s2"`, UTF-8 BOM'lu.
+- **Sonuç:**
+  - yeni kural s2;
+  - s3 damgalı 19 eski sanal işlemin 19'u korundu;
+  - yeni kayıt s2 ile başladı;
+  - s3 tahmini "girişsiz (s3)";
+  - müşterinin bütçe ayarı korundu;
+  - panel hatasız açıldı ve ayar değeri göründü.
+- **Bozuk JSON (virgül unutulursa):** Ayarlar okunamıyor (`{}`) ve geri dönüş uygulanmıyor (s3 kalıyor). Bir sonraki
+  ayar kaydında dosya yalnız yeni değerlerle yazılır (`pipeline.save_settings`), yani ayarlar kaybolabilir.
+
+**Yayındaki sürüm notu yeniden düzeltildi (`v202611170052`):**
+
+- yol düzeltildi;
+- "önce dosyanın kopyasını alın" adımı eklendi;
+- "açtıktan sonra Ayarlar'daki değerlerinizi kontrol edin" adımı eklendi;
+- bozuk dosya uyarısı ve kopyayı geri koyma talimatı eklendi.
+- Eski kararlı kurulumu geri dönüş olarak öneren metin **yok.**
+- Kurulum dosyası aynı (SHA-256 `c83bb4bf…389a`), pre-release; Latest v202611152318.
+
+**Sınırlar:**
+
+- Davranış geri dönüşü elle dosya düzenlemesi gerektirir; panelde düğme yoktur (ek geliştirme yapılmadı).
+- Notun önceki hâllerini okuyan ya da kaydeden kişilere düzeltme kendiliğinden ulaşmaz.
+
+**Açık maddeler (değişmedi):**
+
+- `d5ef349` GitHub'da SHA ile erişilebilir; tam silinme **tamamlanmadı.** GitHub Destek talebi kullanıcının kararı;
+  kabul edileceği garanti değildir.
+- Yerel geri dönüş kopyası ve kabul etiketleri korunuyor.
+- Gerçek s3 sonuçlandırması ve FAZ 1 kabulü açık.
