@@ -387,3 +387,31 @@ def son_islem(root: Optional[Path] = None) -> Optional[Dict]:
         return json.loads(p.read_text(encoding="utf-8-sig")) if p and p.exists() else None
     except (OSError, ValueError):
         return None
+
+
+class TamKurulumGerekli(ImportError):
+    pass
+
+
+def guncelleme_on_kontrolu(cwd: Optional[Path] = None) -> None:
+    """O2 (17.11.2026): ESKİ sürümün uygulama içi güncelleme hazırlığı yeni kodu ayrı süreçte içe aktararak dener
+    (çalışma klasörü <kök>/guncelleme/yeni). Bu modül o sırada yüklenince: şu an kurulu kod s3'ü tanımıyorsa ve
+    veritabanında s3 kaydı varsa (ya da bu doğrulanamıyorsa) deneme BİLEREK başarısız olur → uygulama içi güncelleme
+    yapılmaz, tam kurulum istenir. Neden: başlatıcının otomatik geri dönüşü (yeni sürüm açılamazsa, saniyeler içinde
+    olabilir) s3'ü tanımayan bu koda dönerdi. Kurulum programında otomatik geri dönüş yoktur. Başka her durumda
+    hiçbir şey yapmaz."""
+    yeni = Path(cwd or os.getcwd())
+    if yeni.name != "yeni" or yeni.parent.name != "guncelleme":
+        return
+    root = yeni.parent.parent
+    mevcut = root / "app"
+    if not (root / "Halley.exe").exists() or not (mevcut / "app.py").exists() or s3_destekli(mevcut):
+        return
+    n = s3_kayit_sayisi(mevcut / "data" / "bist_haber.db", temiz_kurulum(root))
+    if n != 0:
+        raise TamKurulumGerekli(
+            "TAM KURULUM GEREKİYOR: s3 kayıtları var " + (f"({n})" if n > 0 else "(doğrulanamadı)")
+            + ", kurulu sürüm bunları tanımıyor. Halley_Kurulum.exe ile güncelleyin (veriler korunur).")
+
+
+guncelleme_on_kontrolu()

@@ -311,6 +311,42 @@ class GuvenliGeriDonus(Guncelleme):
         dj.assert_not_called()
         self.assertTrue((self.root / "guncelleme" / "onceki" / "app.py").exists())
 
+    def mevcut_kod(self, s3_destekli):
+        (self.root / "app" / "bist_haber").mkdir(parents=True, exist_ok=True)
+        (self.root / "app" / "app.py").write_text("x")
+        (self.root / "app" / "bist_haber" / "journal.pyc").write_bytes(b"..kural_sec.." if s3_destekli else b"..eski..")
+        yeni = self.root / "guncelleme" / "yeni"
+        yeni.mkdir(parents=True, exist_ok=True)
+        return yeni
+
+    def test_inplace_update_refused_when_s3_and_installed_code_unaware(self):
+        yeni = self.mevcut_kod(False)
+        self.db_kur(sanal=3)
+        with self.assertRaises(g.TamKurulumGerekli) as e:
+            g.guncelleme_on_kontrolu(yeni)
+        self.assertIn("TAM KURULUM", str(e.exception))
+        self.assertIsInstance(e.exception, ImportError)          # eski sürümün içe aktarma denemesi başarısız sayar
+
+    def test_inplace_update_refused_when_unverifiable(self):
+        yeni = self.mevcut_kod(False)
+        (self.root / "app" / "data" / "ayarlar.json").write_text("{}", encoding="utf-8")   # veri var, db yok
+        with self.assertRaises(g.TamKurulumGerekli):
+            g.guncelleme_on_kontrolu(yeni)
+
+    def test_inplace_update_allowed_otherwise(self):
+        yeni = self.mevcut_kod(False)
+        self.db_kur()                                            # s3 yok → otomatik dönüş güvenli
+        g.guncelleme_on_kontrolu(yeni)
+        y2 = self.mevcut_kod(True)
+        g.guncelleme_on_kontrolu(y2)                             # kurulu kod s3'ü tanıyor
+        g.guncelleme_on_kontrolu(self.root)                      # içe aktarma denemesi dışında hiçbir şey yapmaz
+        g.guncelleme_on_kontrolu(ROOT)
+
+    def test_old_import_check_runs_new_module_in_yeni_dir(self):
+        """Eski sürümün _ice_aktarma_denemesi bist_haber.guncelleme'yi içe aktarıyor (kontrol orada çalışır)."""
+        import inspect
+        self.assertIn("bist_haber.guncelleme", inspect.getsource(g._ice_aktarma_denemesi))
+
     def test_starter_fallback_checks_s3(self):
         src = (ROOT / "paket" / "app_baslangic.py").read_text(encoding="utf-8")
         for parca in ("_geri_donus_guvenli", "kural_sec", "tahmin_sonuc", "tahmin_degerlendirme", 'gunluk'):
