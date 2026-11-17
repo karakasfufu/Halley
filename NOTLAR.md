@@ -2047,3 +2047,8 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - Tahmin defteri: yeni sözleşme s3; her tahmin kendi kuralıyla; s2→s3 ayrı değerlendirme ve ayrı ölçüm grubu (birleştirilmez). FAZ 1: mevcut 5 tahmin s2 ile sonuçlanır (kopyada A=B).
 - Panel: "stop seviyesinde tahmini kayıp", giriş kaynağı (azami giriş ön hesap / gerçek alış / plan), üst sınır değil + Midas doğrulanmadı uyarısı.
 - Geri dönüş: kod geri dönüşü s3 tahmini varken hatalı sonuç yazar (kopya E) → ayar gerceklesme_kurali=s2 (kopya F doğru). 622 test OK, ağ 0. Ek O-2. Canlıya geçiş onay bekliyor (O1 + 17.11 açılış kontrolünden sonra önerilir).
+
+## 2026-11-17 — FAZ 1 sabah kanıtı + O2 CANLIYA ALINDI (edcac9d) + pilot/beta pre-release v202611170052
+- FAZ 1: sabah 08:37, 17.11 adayları onaylandı, BAHKM/ENERY açık, v1 özeti aynı, 5/5 kapsam, sonuç 0 (gerçek sonuçlandırma açık madde; Ek O-1a).
+- O2: bütçe defterindeki 2 satır 16.11 tek haber denemesi (zarf + çağrı); 2404943→edcac9d tek değişiklik (önceden açık gerçek alış s2 kalır; paket testinde bulundu); 624 test OK. Açılış ~10:16 (adaylar SL üstünde), durdurma 10:19:07, yedek bist_haber_20261117_101917_o2_oncesi.db (integrity ok), göç yok, başlatma 10:20:05; değiştirilemez tablolar aynı, 19 bekleyen sanal kayıt s3 damgası, gerçekleşmişler eski kural. Geri dönüş yalnız davranış (gerceklesme_kurali=s2). Ek O-2b.
+- Pilot: pre-release, Latest v202611152318 korundu; indirme doğrulandı (SHA-256 c83bb4bf…389a, Defender temiz); uygulama içinden önerilmez. Ek P1.

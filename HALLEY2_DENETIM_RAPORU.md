@@ -5789,3 +5789,124 @@ anlamına geldiği için o satırlarda açıkça `"s2"` yazıldı:
 - geri dönüş önce `gerceklesme_kurali = "s2"` ayarıyla.
 
 **Onay beklenen:** O2'nin canlıya geçişi. Müşteri yayını ve diğer entegrasyonlar başlatılmadı.
+
+
+---
+
+# EK O-1a (17.11.2026) — FAZ 1 canlı kanıtı: 17.11 sabah kontrolü (salt-okur)
+
+**Kaynak:** Canlı veritabanı salt-okur okundu (bekçi çıktısı `dongu_sabah_20261117.txt`, 08:39). Gerçek rapor dosyası
+Git'e konmadı.
+
+| Gözlem | Sonuç |
+|---|---|
+| Sabah çalıştırması | `watch_runs` #5, sabah, 17.11, başlangıç 08:37:16 (bekçi saatinde; elle değil) |
+| Hazır fırsatlar 17.11 | INVES (#5), ENERY (#6), METRO (#7): `aday` → **`onaylandi`** (08:31:47) |
+| Önceki girişler | BAHKM (#1) ve ENERY (#2), giriş 16.11: `giris` (açık). Açılış 163,50 / 14,60, SL'nin üstünde. |
+| Değiştirilemez kayıtlar | BAHKM ve ENERY v1 sütun özeti `d5d7973ca0bbe41e`, geçiş öncesiyle **aynı** |
+| Tahmin defteri | 5 tahmin: 2 sözleşmesiz v1 (16.11) ve 3 s2 (17.11). Sonuç 0, ayrı değerlendirme 0, defter olayı 0. |
+| Kapsam | 5/5 hazır fırsatın tahmini var, eksik 0 |
+| Performans grupları | "kural s2 · maliyet %0,2+%0,1" (3 açık) ve "kural eksik · maliyet eksik" (2 açık); güven "çok az örnek, karar verilmez" |
+| Veri | Son fiyat günü 16.11; `integrity_check` ok |
+| Bütçe defteri | Yalnız 16.11'deki tek haberlik doğrulamanın 2 satırı (zarf `zarf_kapali` + çağrı `tamam`); 17.11'de ücretli çağrı **yok** |
+
+**Açık madde (korunuyor) — FAZ 1 gerçek sonuçlandırma:**
+
+- Henüz hiçbir tahminin nihai sonucu yok. İlk TP1, TP2 ya da SL görülmesi; girişsiz, iptal ve süre dolması yolları;
+  s2 sözleşmesiyle sonuç satırı yazılması canlıda gözlenmedi.
+- FAZ 1 kabulü bu gözleme bağlı ve ayrı izleniyor. O2 geçişi için zorunlu değil (kullanıcı kararı, 17.11).
+
+
+---
+
+# EK O-2b (17.11.2026) — O2 kontrollü canlıya geçiş kaydı
+
+**Kapsam:** Kullanıcının koşullu onayı yalnız O2 içindir. Geçiş 17.11 sabah ve açılış kontrollerinden sonra, aktif iş
+yokken yapıldı. Ücretli çağrı yapılmadı; diğer entegrasyonlar etkinleştirilmedi.
+
+## O2b.1 Geçiş öncesi koşullar
+
+| Koşul | Kanıt |
+|---|---|
+| Mevcut 5 tahmin kendi sözleşmesiyle korunur | Kopyada (canlı, 17.11 10:17 itibarıyla) eski kod ve O2 aynı işlemlerden sonra `tahmin`, `tahmin_sonuc`, `tahmin_degerlendirme`, `defter_olay` SHA-256 ile aynı. 2 v1 ve 3 s2 tahmin s2 ile sonuçlanır. |
+| Bağlı hazır fırsat aynı olayda farklı kuralla sessizce sonuçlanmaz | **Düzeltildi** (`2404943`): `ready.hazir_kurali` bağlı tahminin sözleşmesini izler. Performans tablosunda "Kural" sütunu var. Test: `test_o2_s3.BagliOneri`. Canlıda 17.11 adaylarının üçü de SL'nin üstünde açıldı (INVES 726,00 > 687,29; ENERY 14,74 > 14,10; METRO 9,30 > 8,75), yani farklılaşma durumu bugün oluşmadı. |
+| s3 etiketi eklenen sanal işlemler gerçekleşmemiş | 19 kaydın hepsi `bekliyor`; hiçbirinde giriş günü yok. Gerçekleşmiş 5 kayıt (4 kapandı, 1 açık) eski kuralda kaldı. |
+| Yeniden analiz ve tekrar kayıt s2'nin üzerine yazmaz | Aynı plan → "tekrar" (yeni satır yok). Değişen plan → yeni s3 tahmini; eski s2 kendi kuralıyla "yerini_aldi". Test: `test_o2_s3.YenidenAnaliz`. |
+| Nihai sürüm = testlerden geçen kod | Canlıya alınan **`edcac9d`** (dal `o2-s3`). Tam takım bu commit'te **624 test OK**, ağ 0. Canlı klasör commit ile 0 fark. |
+
+**2404943 → edcac9d:**
+
+- Tek commit, `journal.kural_sec`. Geçişten önce açılmış **gerçek alış** da s2 ile sürer; önce s3'e geçiyordu.
+  Sayısal sonuç aynıydı, yalnız etiket değişiyordu; "gerçekleşmiş işlemin kuralı değişmez" koşulu için düzeltildi.
+- Paket güncelleme testinde bulundu. Yeni test eklendi.
+- Bu commit'te tekrarlananlar: tam takım, kopya provası, paket denetimi ve kurulum testleri.
+
+**Bütçe defteri:** Canlıdaki iki satır 16.11 21:47'deki tek haberlik doğrulamanın iş zarfı (`zarf_kapali`) ve tek
+çağrısıdır (`tamam`, 0,006398 $). İki ayrı haber değildir; 17.11'de ücretli çağrı yok.
+
+## O2b.2 Geçiş
+
+| Adım | Sonuç |
+|---|---|
+| Durdurma öncesi | Sabah 08:37 ve açılış ~10:16 tamamlandı (`hazir_durum.json` sabah ve açılış 17.11). Analiz "tamamlandı", KAP okuyucu "durdu", yazma günlüğü yok. |
+| Durdurma | 10:19:07 (5 süreç). Durdurma sırasında tablo değişmedi. |
+| Kod yedeği | `data/yedek/kod_o3canli_0e8bbaf_20261117_101917` (141 dosya, `.env` ve veri hariç). `o3-canli` ile 0 fark. |
+| Veritabanı yedeği | `data/yedek/bist_haber_20261117_101917_o2_oncesi.db` (37.912.576 bayt). Integrity **ok**; yedek = canlı (25 tablo içerik özeti + 22 tetikleyici). |
+| Uygulama | `araclar/o2_gecis.py uygula`: 10 dosya. **Göç yok** (şema değişmez). Uygulama sonrası 25/25 tablo aynı (171.577 satır). |
+| Yeniden başlatma | 10:20:05; sağlık OK; kesinti ~1 dk |
+
+## O2b.3 Geçiş sonrası kontroller (panel açıldıktan sonra, yedekle satır satır)
+
+| Kontrol | Sonuç |
+|---|---|
+| Değiştirilemez ve ölçüm kayıtları | `tahmin` 5, `tahmin_sonuc` 0, `tahmin_degerlendirme` 0, `defter_olay` 0, `harcama_rezervasyon` 2, `ai_calls` 1, `analyses` 156, `impacts` 152: **yedekle aynı** |
+| İşlem günlüğü | 4 `kapandı` ve 6 `iptal` değişmedi. 1 `açık` (sanal): yalnız `guncellendi` değişti, kural s2. 19 `bekliyor`: `sonuc_json`'a `"kural": "s3"` damgası. |
+| Hazır fırsatlar | 5/5 durum ve sonuç aynı. 17.11 adayları bağlı s2 tahminini izliyor. |
+| Panel | Haber güncelliği "analiz bekliyor". Kartlarda "Ayarlar'da sermaye ve risk yüzdesi girin" (canlıda sermaye girilmemiş). İşlem Günlüğü "varsayımsaldır" açıklaması. Performans s3 açıklaması ve sözleşme grubu "kural s2 · maliyet %0,2+%0,1 (3 tahmin)". Hata yok. |
+| Sözleşme grupları | Henüz sonuç olmadığı için "ölçüm s3" grubu oluşmadı (beklenen). İlk s2 sonucundan sonra ayrı grup olarak görünecek. |
+| Bekçi ve ayarlar | `watchdog.py` değişmedi, `ai=False`. Sabah haber kontrolü kapalı. `gerceklesme_kurali` tanımlı değil, yani s3 etkin. |
+| Bütünlük | ok |
+
+## O2b.4 Geri dönüş (yalnız davranış geri dönüşü)
+
+- s3 kaydı oluştuktan sonra eski kod **doğrudan geri yüklenmez**. `araclar/o2_gecis.py kod_geri` s3 kaydı varsa bunu
+  reddeder (kopyada sınandı).
+- **Geri dönüş:** Halley durdurulur, `araclar/o2_gecis.py davranis_geri <canlı>` ile `gerceklesme_kurali = "s2"`
+  yazılır, Halley başlatılır.
+  - Kod O2 olarak kalır.
+  - Yeni kayıtlar s2 ile başlar.
+  - s3 ile başlamış kayıtlar s3 ile doğru sonuçlanır.
+  - **Bu, eski koda tam dönüş değildir; yalnız davranış geri dönüşüdür.**
+- Şu an canlıda s3 sözleşmeli tahmin 0'dır. İlk s3 tahmini bu akşamki analizde oluşacak; ondan sonra yalnız
+  davranış geri dönüşü kullanılabilir.
+
+## O2b.5 Kalan kabul maddeleri
+
+1. **Yeni s3 kayıtlarının gerçek döngü kanıtı (izlenecek):**
+   - ilk s3 sözleşmeli tahmin (bu akşam);
+   - s3 ile sonuçlandırma;
+   - açılış ≤ SL durumunda öneri ve tahminin birlikte "girişsiz" olması;
+   - s2 sonucunun ayrı s3 değerlendirmesi ve ayrı ölçüm grubu.
+2. Sermaye girilince pozisyon satırı ve "stop seviyesinde tahmini kayıp" metni canlıda görülecek. Şu an canlıda sermaye
+   yok; panel testinde doğrulandı.
+3. **FAZ 1 gerçek sonuçlandırma:** ayrı açık madde (Ek O-1a).
+4. Midas emir türleri kullanıcı tarafından doğrulanmadı. Azami girişe göre ön hesap "en kötü giriş" varsayımıdır.
+
+**Onay beklenen:** O2 kabulü (yukarıdaki gerçek döngü kanıtıyla).
+
+---
+
+# EK P1 (17.11.2026) — Pilot / Beta yayını (müşteri indirmesi; pre-release)
+
+| | |
+|---|---|
+| Sürüm | **Halley PİLOT / BETA — 2026-11-17 (`edcac9d`)**, sıra **202611170052**, etiket `v202611170052` |
+| Yayın türü | GitHub **pre-release**, `--latest=false`. Kararlı **v202611152318 Latest olarak kaldı** (API ile doğrulandı). |
+| Doğrudan indirme | https://github.com/karakasfufu/Halley-guncelleme/releases/download/v202611170052/Halley_Kurulum.exe |
+| SHA-256 | `c83bb4bf631168c0dbf1f4edd51acc61c0b4df9089b9f23f85a2a8da3ed4389a` (146.999.808 bayt). Yayımlanan adresten indirildi; değer ve boyut aynı, GitHub özeti aynı. Defender: tehdit yok. |
+| İçerik | O3 (haber güncelliği, bütçe rezervasyonu) ve O2 (s3, risk gösterimi). K1, `izleme` ve `fiyat_izi` **yok**. Model `tp1_v1` ve eşikler (`22b983b5a3ec`) canlıyla aynı. 57 derlenmiş dosya commit kaynağıyla içerik olarak aynı. |
+| Gizlilik denetimi | `data` boş. `.env`, veritabanı, yedek, canlı rapor, test, araştırma ve kaynak `.py` yok. Anahtar, e-posta ya da kullanıcı yolu yok. Tek eşleşme herkese açık güncelleme deposu adresi. |
+| Güncelleyici | Uygulama içi güncelleme `releases/latest/download/surum.json` okur ve hâlâ v202611152318 bilgisini alır. Pilot mevcut kullanıcılara **önerilmez**. Pilot kuruluyken kararlı manifest "guncel" döner (geri inmez). **Pilot uygulama içinden kurulamaz; yalnız doğrudan kurulum dosyasıyla.** |
+| Kurulum testleri | T1 temiz kurulum: API anahtarı istemi var, panel hatasız. T2 kararlı v202611152318 + deneme verisi → pilot: ayarlar, `.env` ve veritabanı korundu, güncelleme öncesi yedek oluştu, göç ok, önceden açık gerçek alış s2'de kaldı. T3 pilot → kararlı geri dönüş: ayarlar ve `.env` korundu, 25 tablo aynı, eski sürüm açıldı. |
+| Sürüm notu | Pilot/beta uyarısı; FAZ 1 canlı kabulü sürüyor; satış sonuçları varsayımsal; yatırım performansı kanıtlanmadı; Midas doğrulanmadı; "stop seviyesinde tahmini kayıp" üst sınır değil; O4/O5 yok. |
+| Sıra notu | Kullanıcının "O3 pilotu önce" kararı bu sohbette görülmedi. Bir önceki talimat O2 tamamlanmadan yayımlamamaktı. O2 geçişi başlamak üzereyken, kullanıcı izniyle iki paket yerine testli O2'li pilot yayımlandı (10:1x). |
