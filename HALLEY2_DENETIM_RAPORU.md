@@ -5910,3 +5910,52 @@ yokken yapıldı. Ücretli çağrı yapılmadı; diğer entegrasyonlar etkinleş
 | Kurulum testleri | T1 temiz kurulum: API anahtarı istemi var, panel hatasız. T2 kararlı v202611152318 + deneme verisi → pilot: ayarlar, `.env` ve veritabanı korundu, güncelleme öncesi yedek oluştu, göç ok, önceden açık gerçek alış s2'de kaldı. T3 pilot → kararlı geri dönüş: ayarlar ve `.env` korundu, 25 tablo aynı, eski sürüm açıldı. |
 | Sürüm notu | Pilot/beta uyarısı; FAZ 1 canlı kabulü sürüyor; satış sonuçları varsayımsal; yatırım performansı kanıtlanmadı; Midas doğrulanmadı; "stop seviyesinde tahmini kayıp" üst sınır değil; O4/O5 yok. |
 | Sıra notu | Kullanıcının "O3 pilotu önce" kararı bu sohbette görülmedi. Bir önceki talimat O2 tamamlanmadan yayımlamamaktı. O2 geçişi başlamak üzereyken, kullanıcı izniyle iki paket yerine testli O2'li pilot yayımlandı (10:1x). |
+
+
+---
+
+# EK O-2c (17.11.2026) — O2 canlı geçişi başarılı (kayıt); geri dönüş uyumluluğu; pilot notu düzeltmesi
+
+**Kayıt:**
+
+- O2'nin kontrollü canlı geçişi 17.11 10:19–10:20'de **başarıyla** yapıldı (Ek O-2b).
+- Canlı sürüm `edcac9d` (dal `o2-s3`), etiket `o2-canli-gecis`.
+- **Açık kalanlar:** gerçek s3 sonuçlandırması (ilk s3 tahmini ve sonucu) ve **FAZ 1 kabulü** (gerçek sonuçlandırma).
+  O2 kabulü bunlara bağlı.
+- Bu işler için ücretli çağrı ya da ek geliştirme başlatılmadı.
+
+## O2c.1 Geri dönüş uyumluluğu (mevcut s3 damgalı sanal işlemler dahil)
+
+**Deneme düzeni:**
+
+- Canlının O2 ile bir tur çalışmış kopyası kullanıldı: 19 bekleyen sanal işlem s3 damgalı.
+- Kopyaya bir s3 sözleşmeli deneme tahmini eklendi; açılışı SL'nin altında.
+- İki kod aynı kopyada çalıştırıldı.
+
+| | Eski kararlı kod (v202611152318) | O2 / pilot kodu + `gerceklesme_kurali = "s2"` |
+|---|---|---|
+| s3 damgalı 19 sanal işlem | **19 → 0**: damgalar sessizce silindi, kayıtlar s2 ile yeniden hesaplandı | 19 → **19**: korundu |
+| Hazır fırsatlar | 2 kaydın sonucu yeniden yazıldı | değişmedi |
+| s3 tahmini | **sonuçlanmadı** (kararlı sürümde tahmin defteri yok) | "girişsiz (s3): açılış stopun altında veya eşit" |
+| Yeni kayıtlar | — | s2 ile başlar |
+
+**Sonuç:**
+
+- s3 kayıtları varken eski kararlı kurulumu çalıştırmak **güvenli geri dönüş değildir.**
+- Güvenli yol, uyumlu kod (O2 / pilot) üzerinde **davranış geri dönüşüdür.** Kod kalır, yeni kayıtlar s2 ile başlar,
+  s3 kayıtları kendi kuralıyla sonuçlanır.
+- Bu, eski koda tam dönüş değildir.
+- Pilot kullanıcısında s3 damgaları ilk açılışta oluşur. Bu yüzden kararlı kuruluma dönüş pratikte her zaman
+  güvensizdir.
+
+## O2c.2 Pilot sürüm notu düzeltildi (`v202611170052`, 17.11)
+
+- Eski metindeki "Kararlı sürüme geri dönmek için v202611152318'in kurulum dosyasını çalıştırın" talimatı
+  **kaldırıldı.**
+- **Yerine gelen:**
+  - açık uyarı (eski kararlı kurulum s3 kayıtları varken güvenli değil);
+  - davranış geri dönüşü adımları: Halley'i kapat → `app\data\ayarlar.json`'a `"gerceklesme_kurali": "s2"` ekle →
+    aç.
+- Kurulum dosyası **değişmedi** (SHA-256 aynı), pre-release kaldı, kararlı Latest korundu.
+- **Sınır:** Not düzeltilmeden önce sayfayı okuyan ya da notu kaydeden kişiye düzeltme kendiliğinden ulaşmaz.
+- Davranış ayarı için panelde düğme yok; ayar dosyası elle düzenlenir (ek geliştirme yapılmadı).

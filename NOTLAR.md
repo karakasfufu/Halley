@@ -2052,3 +2052,7 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - FAZ 1: sabah 08:37, 17.11 adayları onaylandı, BAHKM/ENERY açık, v1 özeti aynı, 5/5 kapsam, sonuç 0 (gerçek sonuçlandırma açık madde; Ek O-1a).
 - O2: bütçe defterindeki 2 satır 16.11 tek haber denemesi (zarf + çağrı); 2404943→edcac9d tek değişiklik (önceden açık gerçek alış s2 kalır; paket testinde bulundu); 624 test OK. Açılış ~10:16 (adaylar SL üstünde), durdurma 10:19:07, yedek bist_haber_20261117_101917_o2_oncesi.db (integrity ok), göç yok, başlatma 10:20:05; değiştirilemez tablolar aynı, 19 bekleyen sanal kayıt s3 damgası, gerçekleşmişler eski kural. Geri dönüş yalnız davranış (gerceklesme_kurali=s2). Ek O-2b.
 - Pilot: pre-release, Latest v202611152318 korundu; indirme doğrulandı (SHA-256 c83bb4bf…389a, Defender temiz); uygulama içinden önerilmez. Ek P1.
+
+## 2026-11-17 — O2 canlı geçişi BAŞARILI (kayıt; edcac9d, etiket o2-canli-gecis) + geri dönüş uyumluluğu + pilot notu düzeltmesi
+- Açık: gerçek s3 sonuçlandırması, FAZ 1 kabulü. Ücretli çağrı / ek geliştirme yok.
+- Uyumluluk (s3 damgalı 19 sanal işlem + s3 tahmini, kopyada): eski kararlı kod damgaları siler (19→0), s3 tahminini sonuçlandırmaz → güvenli değil; O2/pilot + gerceklesme_kurali=s2 → damgalar korunur, s3 tahmini girişsiz (s3). Pilot sürüm notu düzeltildi (dosya aynı). Ek O-2c.
