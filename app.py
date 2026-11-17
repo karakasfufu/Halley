@@ -2782,7 +2782,10 @@ def update_panel() -> None:
             conn.close()
             st.rerun()
         prev = guncelleme.onceki(root)
-        if prev:
+        engel = guncelleme.geri_donus_engeli(root) if prev else None
+        if prev and engel:
+            c2.warning("↩️ " + engel)
+        elif prev:
             if c2.button(f"↩️ Önceki sürüme dön ({prev})", key="upd_back", width="stretch",
                          help="Son güncellemeden önceki sürüm geri yüklenir; verileriniz değişmez. Halley yeniden açılır."):
                 try:
@@ -2795,6 +2798,20 @@ def update_panel() -> None:
             c2.caption("Geri dönülecek önceki sürüm yok (henüz uygulama içinden güncelleme yapılmadı).")
         st.caption("Halley her açılışta yeni sürüm olup olmadığını kendiliğinden kontrol eder. Güncellemede yalnız uygulama kodu iner; "
                    "verileriniz (veritabanı, ayarlar, raporlar) ve API anahtarınız değişmez.")
+        # O2 güvenli geri dönüş (17.11.2026): eski koda dönmek yerine yalnız davranışı geri almak (ayar dosyasını elle
+        # düzenlemeye gerek kalmasın; bozuk JSON ayarları sıfırlardı)
+        kural_now = pipeline.load_settings().get("gerceklesme_kurali", "s3")
+        sec = st.radio("Gerçekleşme kuralı (yeni kayıtlar)", ["s3 (önerilen)", "s2 (geri dönüş)"],
+                       index=1 if kural_now == "s2" else 0, horizontal=True, key="upd_kural",
+                       help="s3: açılış zarar durdurun altında ya da eşitse 'giriş olmadı' sayılır (yapay kâr yok). "
+                            "s2 (geri dönüş): yeni kayıtlar eski kuralla başlar. Her iki durumda da s3 ile başlamış "
+                            "kayıtlar kendi kuralıyla sonuçlanır. Bu, eski koda dönüş değil, yalnız davranış geri dönüşüdür.")
+        yeni_kural_ = "s2" if sec.startswith("s2") else "s3"
+        if yeni_kural_ != kural_now:
+            pipeline.save_settings(gerceklesme_kurali=yeni_kural_)
+            flash("info", f"Gerçekleşme kuralı (yeni kayıtlar): {yeni_kural_}.")
+            conn.close()
+            st.rerun()
 
 
 def page_ayarlar() -> None:

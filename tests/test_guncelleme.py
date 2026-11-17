@@ -204,3 +204,60 @@ class PaketDenetimi(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GuvenliGeriDonus(Guncelleme):
+    """O2 (17.11.2026): s3 kayıtları varken s3'ü tanımayan önceki sürüme uygulama içinden dönülmez."""
+
+    def onceki_kur(self, s3_destekli):
+        o = self.root / "guncelleme" / "onceki"
+        (o / "bist_haber").mkdir(parents=True)
+        (o / "app.py").write_text("x")
+        (o / "surum.txt").write_text("2026-11-15 (eski)", encoding="utf-8")
+        (o / "bist_haber" / "journal.pyc").write_bytes(b"..kural_sec.." if s3_destekli else b"..evaluate..")
+
+    def db_kur(self, s3=0, tahmin_s3=0):
+        import sqlite3
+        c = sqlite3.connect(str(self.root / "app" / "data" / "bist_haber.db"))
+        c.execute("CREATE TABLE trade_journal(id INTEGER PRIMARY KEY, sonuc_json TEXT)")
+        c.execute("CREATE TABLE tahmin(id INTEGER PRIMARY KEY, kural_surum TEXT)")
+        for _ in range(s3):
+            c.execute("INSERT INTO trade_journal(sonuc_json) VALUES(?)", (json.dumps({"durum": "bekliyor", "kural": "s3"}),))
+        c.execute("INSERT INTO trade_journal(sonuc_json) VALUES(?)", (json.dumps({"durum": "kapandı"}),))
+        for _ in range(tahmin_s3):
+            c.execute("INSERT INTO tahmin(kural_surum) VALUES('s3')")
+        c.commit()
+        c.close()
+
+    def test_blocked_when_s3_records_and_old_code_unaware(self):
+        self.onceki_kur(False)
+        self.db_kur(s3=19, tahmin_s3=1)
+        self.assertEqual(g.s3_kayit_sayisi(self.root / "app" / "data" / "bist_haber.db"), 20)
+        e = g.geri_donus_engeli(self.root)
+        self.assertIn("dönülemez", e)
+        with self.assertRaises(RuntimeError):
+            g.geri_don_iste()
+        self.assertFalse((self.root / "guncelleme" / "geri_don.txt").exists())
+
+    def test_allowed_without_s3_or_with_s3_aware_old_code(self):
+        self.onceki_kur(False)
+        self.db_kur(s3=0)
+        self.assertIsNone(g.geri_donus_engeli(self.root))       # s3 kaydı yok → eski koda dönmek güvenli
+        g.geri_don_iste()
+        self.assertTrue((self.root / "guncelleme" / "geri_don.txt").exists())
+
+    def test_allowed_when_previous_version_knows_s3(self):
+        self.onceki_kur(True)
+        self.db_kur(s3=5)
+        self.assertIsNone(g.geri_donus_engeli(self.root))       # önceki sürüm de O2: s3 kayıtlarını doğru işler
+
+    def test_unreadable_db_blocks(self):
+        self.onceki_kur(False)
+        (self.root / "app" / "data" / "bist_haber.db").write_bytes(b"bozuk degil sqlite")
+        self.assertIn("doğrulanamadı", g.geri_donus_engeli(self.root))
+
+    def test_starter_fallback_checks_s3(self):
+        src = (ROOT / "paket" / "app_baslangic.py").read_text(encoding="utf-8")
+        self.assertIn("_geri_donus_guvenli", src)
+        self.assertIn("kural_sec", src)
+        self.assertIn('\\"kural\\": \\"s3\\"', src)

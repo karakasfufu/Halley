@@ -236,10 +236,70 @@ def onceki(root: Optional[Path] = None) -> Optional[str]:
     return None
 
 
+def s3_kayit_sayisi(db_path: Path) -> int:
+    """O2 (s3) kuralıyla başlamış kayıt sayısı: s3 sözleşmeli tahmin, s3 değerlendirmesi, sonucunda "kural": "s3"
+    damgası olan sanal işlem / hazır fırsat / takip senaryosu. Okunamazsa -1 (doğrulanamadı)."""
+    import sqlite3
+    if not Path(db_path).exists():
+        return 0
+    try:
+        c = sqlite3.connect(f"file:{Path(db_path).as_posix()}?mode=ro", uri=True, timeout=10)
+    except Exception:
+        return -1
+    try:
+        tablolar = {r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        n = 0
+        if "tahmin" in tablolar:
+            n += c.execute("SELECT COUNT(*) FROM tahmin WHERE kural_surum='s3'").fetchone()[0]
+        if "tahmin_degerlendirme" in tablolar:
+            n += c.execute("SELECT COUNT(*) FROM tahmin_degerlendirme WHERE kural_surum='s3'").fetchone()[0]
+        for t in ("trade_journal", "hazir_firsat", "takip_senaryo"):
+            if t in tablolar:
+                n += c.execute(f"SELECT COUNT(*) FROM {t} WHERE sonuc_json LIKE '%\"kural\": \"s3\"%'").fetchone()[0]
+        return n
+    except Exception:
+        return -1
+    finally:
+        c.close()
+
+
+def s3_destekli(app_dir: Path) -> bool:
+    """Klasördeki uygulama kodu s3 kayıtlarını tanıyor mu (O2 ve sonrası: journal.kural_sec)?"""
+    for ad in ("journal.pyc", "journal.py"):
+        p = Path(app_dir) / "bist_haber" / ad
+        try:
+            if p.exists():
+                return b"kural_sec" in p.read_bytes()
+        except OSError:
+            return False
+    return False
+
+
+def geri_donus_engeli(root: Optional[Path] = None) -> Optional[str]:
+    """O2 (17.11.2026): önceki sürüm s3 kayıtlarını tanımıyorsa ve veritabanında s3 kaydı varsa (ya da bu
+    doğrulanamıyorsa) geri dönüş güvenli DEĞİLDİR: eski kod s3 damgalarını siler, kayıtları eski kuralla yeniden
+    hesaplar, s3 tahminlerini sonuçlandırmaz. Engel yoksa None."""
+    root = root or kok()
+    o = root / "guncelleme" / "onceki" if root else None
+    if not o or not (o / "app.py").exists() or s3_destekli(o):
+        return None
+    n = s3_kayit_sayisi(root / "app" / "data" / "bist_haber.db")
+    if n == 0:
+        return None
+    neden = (f"bu sürümün s3 kuralıyla başlattığı {n} kayıt var" if n > 0
+             else "veritabanındaki s3 kayıtları doğrulanamadı")
+    return (f"Önceki sürüme dönülemez: {neden} ve önceki sürüm bu kayıtları doğru işleyemez (s3 işaretlerini siler, "
+            "kayıtları eski kuralla yeniden hesaplar). Güvenli yol: bu sürümde kalıp gerçekleşme kuralını \"s2 (geri "
+            "dönüş)\" yapmak; yeni kayıtlar eski kuralla başlar, s3 kayıtları kendi kuralıyla sonuçlanır.")
+
+
 def geri_don_iste() -> None:
     root = kok()
     if not root or not onceki(root):
         raise RuntimeError("Geri dönülecek önceki sürüm yok.")
+    engel = geri_donus_engeli(root)
+    if engel:
+        raise RuntimeError(engel)
     (root / "guncelleme" / "geri_don.txt").write_text(datetime.now().isoformat(timespec="seconds"), encoding="utf-8")
 
 
