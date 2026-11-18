@@ -2074,3 +2074,10 @@ Tüm ekranlar canlı panelde (1440 px, koyu) ve geliştirme kopyasında (koyu + 
 - O5 o5-izleme 084a5d9: izleme bekçiye (akşam, günde bir, hata yalıtımlı) ve panele (salt-okur); K1 kapalı (0 olay); P1/P2 notları; olculen_kayitlar ortak seçim; O2 grupları ayrı. Kopya: hepsi yetersiz veri, 0 olay. 672 test OK.
 - Takip: FAZ 1 sonuç yok, s3 tahmini 0 (akşam analizi bekleniyor) — açık. 77 metinsiz: 76'sı bugünkü bildirimler (okuyucu eşiği 100), 1'i okunamayan sayfa. OpenAI karşılaştırması için Usage ekranı kapsamı yazıldı.
 - Canlıya geçiş onayı beklenen: O4, O5. Canlı edcac9d; müşteri Latest v202611171741 (1dae1e7).
+
+## 2026-11-18 — O4 + O5 canlıya geçti, v202611180914 normal kanalda yayımlandı (Ek O-6)
+- Canlı 09:07: edcac9d → 084a5d9. Süreç yoktu (son nabız 18.11 01:45). Kod + DB yedeği (o45_oncesi) ve göç yedeği integrity ok, canlıyla aynı. Eski tablolar aynı, 157.700 fiyat satırı izi "bilinmiyor". O5: gruplar ayrı, hepsi yetersiz, K1 kapalı, 2. kontrol atlandı.
+- 17.11 18:20 akşam analizi ilk 3 s3 tahminini yazdı (giriş 18.11). Geri dönüş yalnız s3 tanıyan koda; O4 öncesi kod fiyat yazarsa iz boşluğu.
+- Paket v202611180914: 672 test OK; içerik denetimi temiz; T1 temiz, T2 uygulama içi (17.11 → yeni), T3 tam kurulum, gerçek adres güncellemesi: veri/ayar/.env korundu. Kurulumda gerçek ücretsiz fiyat indirmesi iz kaydı oluşturdu.
+- OpenAI: 0,006398 $ çağrısı Kasım 2,29162 $ toplamının içinde (aynı analiz); çift sayılmaz.
+- Açık: canlı ilk normal fiyat indirmesi izi, ilk akşam izleme kontrolü, FAZ 1/O2 s3 sonuçları.

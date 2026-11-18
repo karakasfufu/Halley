@@ -6227,3 +6227,108 @@ gösterilir. Bu tablolar kurulmadan önceki fiyat sürümleri geri oluşturulama
 | Canlı (geliştirici klasörü) | `edcac9d` (O2 + O3). O4 ve O5 **canlıda değil.** |
 | Müşteri paketi (normal kanal, Latest) | `v202611171741` = `1dae1e7`. O4 ve O5 pakette **yok**. |
 | Pilot (pre-release) | `v202611170052` = `edcac9d` |
+
+
+---
+
+# EK O-6 (18.11.2026) — O4 + O5 canlı geçiş ve normal kanal yayını (`084a5d9`, `v202611180914`)
+
+**Onay:** Kullanıcının 18.11.2026 mesajı (kontrollü canlı geçiş + mevcut müşteri yayını onayı kapsamında yayın).
+
+## Geçiş öncesi durum (kayıt tarihleriyle)
+
+- **Canlı kod:** `edcac9d`. İzlenen bütün dosyalar commit ile aynıydı; farklı olanlar yalnız rapor, not ve okuyucu
+  durum dosyaları.
+- **Çalışan süreç:** Yok. Son nabız 2026-11-18 01:45:51; zamanlanmış görev yok. Etkin yazma işi olmadığı
+  doğrulandıktan sonra yedek alındı.
+- **Akşam analizi:** 2026-11-17 18:22:32'de çalıştı (`watch_runs` 6). Son fiyat günü 2026-11-17.
+- **İlk s3 tahminleri:** 3 adet (KRGYO, KRPLS, ENERY), `tahmin_zamani` 2026-11-17T18:20:24, giriş günü 2026-11-18.
+  `sonuc_json` içinde 21 s3 damgası. `tahmin_sonuc` ve `tahmin_degerlendirme` 0.
+- **KAP okuyucu turu:** 2026-11-17 18:38–18:53. 127 sayfa beklemedeydi; 119'u okundu, 8'i okunamadı.
+
+## Nihai kod doğrulaması
+
+- Tam takım `084a5d9`: **672 test OK**, ağ 0. Takımda O2/s3, O3 haber/bütçe ve güvenli geri dönüş testleri de var.
+- Canlı kopyasında aynı araçla prova yapıldı:
+  - göç 1,06 sn sürdü; eski tablolar aynı kaldı;
+  - s3'ü tanımayan koda dönüş **reddedildi**;
+  - `edcac9d`'ye dönüşte eski kod göç edilmiş veritabanını açtı, s3 ile sonuçlandırdı, integrity ok.
+
+## Canlı geçiş (2026-11-18 09:07)
+
+| Adım | Sonuç |
+|---|---|
+| Yedek | Kod `data/yedek/kod_o45_oncesi_20261118_090701` (144 dosya; .env yedeğe alınmadı, dokunulmadı). DB `data/yedek/bist_haber_20261118_090701_o45_oncesi.db`: integrity ok, canlıyla **aynı**. |
+| Uygulama | 17 dosya kopyalandı, kaynakla aynı. O4 göçü tek süreçte yapıldı: 0,87 sn, `kurulu=True`. |
+| Göç yedeği | `bist_haber_20261118_090722_fiyat_izi_oncesi.db`: integrity ok, göç öncesiyle **aynı**. |
+| Veri korunması | Eski tabloların hiçbiri değişmedi: tahmin 8, sonuç 0, değerlendirme 0, analyses 156, ai_calls 1, harcama_rezervasyon 2, prices 157.700. Eski tetikleyiciler duruyor (22 → 28). Integrity ok. |
+| Bilinmeyen | 157.700 / 157.700 fiyat satırında iz boş ("bilinmiyor"). `fiyat_indirme` 0; ilk normal indirmede oluşacak. Test amacıyla canlı fiyat değiştirilmedi. |
+| Canlı kod | Bütün izlenen dosyalar `084a5d9` ile aynı. |
+| O5 (canlı DB, izleme dosyaları geçici klasöre) | Gruplar ayrı: s3/s3, s2/s2, sözleşmesiz eski grup ölçüm dışı. Hepsi "yetersiz" (n=0). K1 "kapali", `UYARI_OLCUTLERI = P1, P2`. 1. kontrolde 0 olay; 2. kontrol "bugün zaten kontrol edildi" diye **atlandı** (mükerrer yok). K1 olay ve durum anahtarı 0. Kontrol canlı DB'yi değiştirmedi. |
+| O2 / O3 | Varsayılan kural s3. Bütçe: Kasım haber harcaması geçişten önce ve sonra aynı (2,29162 $). |
+
+## Geri dönüş notu (canlı)
+
+- **Kod geri dönüşü:** `o45_gecis.py geri <hedef> data/yedek/kod_o45_oncesi_20261118_090701`. Bu yedek `edcac9d`
+  (s3'ü tanır). Araç, s3'ü tanımayan bir yedeğe dönüşü **reddeder**. Canlıda s3 kaydı olduğu için `edcac9d`'den eski
+  koda dönülmez.
+- **Veritabanı:** Kod geri dönüşünde veritabanına dokunulmaz. O4 tabloları zararsız kalır.
+- **İz boşluğu:** O4 öncesi kod (`edcac9d`) fiyat yazarsa o satırlarda iz (`indirme_id`) boş olur ve fiyat iz
+  geçmişinde **boşluk** oluşur. Bu boşluk sonradan doldurulamaz.
+- **Tam veri geri dönüşü:** Göç öncesi yedekler, yalnız göçten sonra yeni kullanıcı verisi oluşmadıysa kullanılabilir.
+  Yoksa yeni kayıtlar kaybolur.
+
+## Paket ve yayın
+
+- **Paket:** `v202611180914` (2026-11-18, `084a5d9`). Ortam ve başlatıcı imzası önceki sürümle aynı (uygulama içi
+  güncelleme mümkün).
+  - Kurulum SHA-256 `174db8f588190d4295f4de88776b8f7639e21bb4364cbc65ee56f0c9cf2ef11e`
+  - Zip SHA-256 `b38a4ceb784ad5c9e0f178c245018a73da36b78f066063252a043bba5ed945a2`
+- **İçerik denetimi:**
+  - veri, .env, .db ve kaynak .py yok; zip korunan alana yazmıyor;
+  - 59 .pyc kaynakla aynı;
+  - model gpt-5-mini ve seçim eşikleri canlıyla aynı;
+  - O4/O5 dosyaları var; K1 uyarı ölçütü değil;
+  - desen bulgusu yalnız güncelleme deposunun adresi (önceki yayınla aynı).
+- **Gerçek kurulum testleri** (scratch klasörlerinde, gerçek anahtar yok):
+
+| Test | Sonuç |
+|---|---|
+| T1 temiz kurulum | Açılış 7 sn; .env yok; veri klasörü boş. İlk bağlantıda O4 tabloları kuruluyor; fiyat tablosu boş olduğu için yedek alınmıyor (tasarım). |
+| T2 uygulama içi güncelleme (v202611171741 → yeni; o sürümün kendi güncelleyicisi + başlatıcı) | Sürüm yeni; kod paketle aynı; önceki saklandı. Eski tablolar **aynı** (s3 damgalı kayıt dahil). Göç yedeği alındı; eski 3 fiyatın izi boş. Ayarlar ve .env korundu. Geri dönüş serbest (önceki s3'ü tanır). |
+| T3 tam kurulum (v202611171741 üstüne Halley_Kurulum.exe) | "Halley güncellendi, verileriniz korundu"; kurulum öncesi yedek alındı. Panel tarayıcıda açıldı; Performans → "🩺 Model izleme · açık uyarı 0 · henüz kontrol yapılmadı" görüldü. İlk panel oturumunda göç yapıldı ve yedeği alındı. |
+| T3 gerçek indirme | Ücretsiz yfinance XU100 indirmesi bu kurulumda kendiliğinden çalıştı. `fiyat_indirme` kaydı: yfinance 1.2.0, ayarlar, düzeltme notu, kod `2026-11-18 (084a5d9)`, 251 satır. Önceki deneme satırı iz boş kaldı. ai_calls 0. Not: test `HALLEY_OFFLINE` ile başlatıldı, ama bu fiyat indirmesi ağa çıktı. |
+| Yayından sonra gerçek adres | v202611171741 kurulumu GitHub'dan yeni sürümü buldu, indirdi, doğruladı ve kurdu. Açılış 4 sn; ayarlar korundu; önceki saklandı. |
+
+- **Yayın:** `v202611180914` **Latest** (2026-11-18 06:29 UTC). `latest/download/surum.json` yeni sürümü gösteriyor;
+  indirilen zip ve kurulum SHA-256 değerleri paketle aynı.
+
+## OpenAI karşılaştırması: çift sayım kontrolü
+
+- `ai_calls` tek kaydı (`kap:1698251`, 2026-11-16T21:47:49, 2737 + 2857 token, 0,00639825 $) `analyses`
+  tablosundaki **aynı** analizdir: aynı haber, aynı zaman, aynı tokenlar.
+- Kasım `analyses` toplamı: 156 kayıt, 841.511 girdi + 1.040.621 çıktı token = **2,29162 $**. Bu toplam o çağrıyı
+  **içerir**.
+- Rezervasyon kaydı `kayda_gecti = 1`: bütçe hesabı da iki kez saymıyor.
+- Halley'in kayıtlı Kasım harcaması **2,2916 $**'dır, 2,2980 $ değildir. Yapay zekâ yorumu 0 $.
+- Kayıtsız eski testlerin tutarı bilinmiyor; sıfır sayılmaz.
+
+## Kalan gerçek döngü kontrolleri
+
+1. **O4 canlı:** Halley açılınca ilk normal fiyat indirmesinde `fiyat_indirme` kaydı ve `indirme_id` oluşmalı.
+   Değişen satır olursa `fiyat_eski` kaydı da oluşmalı. Halley geçişten sonra henüz açılmadı.
+2. **O5 canlı:** İlk akşam analizinde bekçi kontrolü `data/izleme_durumu.json` dosyasını yazmalı. Gruplar "yetersiz
+   veri" kalmalı, K1 olayı olmamalı.
+3. **FAZ 1 ve O2:** İlk s3 tahminlerinin (giriş günü 2026-11-18) sonuçlanması ve s3 ölçüm grubunda görünmesi gerekiyor.
+   Hâlâ açık.
+4. **Müşteri tarafı:** Müşterilerin uygulama içinde güncellemeyi kendi onaylarıyla kurmaları gerekiyor; gözlem yok.
+
+## Sürüm durumu (2026-11-18 09:35)
+
+| | Sürüm |
+|---|---|
+| Kod | `o5-izleme` `084a5d9` |
+| Canlı (geliştirici klasörü) | `084a5d9` (O2 + O3 + güvenli güncelleme + O4 + O5). Halley kapalı. |
+| Müşteri normal kanal (Latest) | `v202611180914` = `084a5d9` |
+| Önceki normal sürüm | `v202611171741` = `1dae1e7` (yayında duruyor) |
+| Pilot (pre-release) | `v202611170052` = `edcac9d` |
